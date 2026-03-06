@@ -1,0 +1,23 @@
+// Call this when the user taps the in-game back button so they return to the Kotlin app.
+// Attach to your back button's OnClick, or call from your UI handler.
+#if UNITY_ANDROID && !UNITY_EDITOR
+using UnityEngine;
+
+public static class BackToKotlin
+{
+    public static void GoBackToKotlin()
+    {
+        try
+        {
+            var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+            if (activity != null)
+                activity.Call("goBackToKotlin");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("BackToKotlin: " + e.Message);
+        }
+    }
+}
+#endif

@@ -1,0 +1,47 @@
+// =============================================================================
+// Add to your GameManager script in Unity.
+// 1) SetAccessAndRefreshTokens(string json) - called from Android via UnitySendMessage.
+// 2) In Start() or Awake(), also try reading from PlayerPrefs (Android writes tokens there).
+// =============================================================================
+
+[System.Serializable]
+private class TokenPayload
+{
+    public string access;
+    public string refresh;
+}
+
+public void SetAccessAndRefreshTokens(string json)
+{
+    if (string.IsNullOrEmpty(json)) return;
+    try
+    {
+        var payload = JsonUtility.FromJson<TokenPayload>(json);
+        if (payload != null && !string.IsNullOrEmpty(payload.access))
+            ApplyTokensAndSkipLogin(payload.access, payload.refresh ?? "");
+    }
+    catch (System.Exception e)
+    {
+        Debug.LogWarning("[GameManager] SetAccessAndRefreshTokens failed: " + e.Message);
+    }
+}
+
+void Start()
+{
+    // Fallback: tokens are also written to PlayerPrefs by Android - read them if UnitySendMessage wasn't received
+    string access = PlayerPrefs.GetString("access", null);
+    if (string.IsNullOrEmpty(access)) access = PlayerPrefs.GetString("auth_token", null);
+    if (string.IsNullOrEmpty(access)) access = PlayerPrefs.GetString("access_token", null);
+    string refresh = PlayerPrefs.GetString("refresh", null);
+    if (string.IsNullOrEmpty(refresh)) refresh = PlayerPrefs.GetString("refresh_token", null);
+    if (!string.IsNullOrEmpty(access))
+        ApplyTokensAndSkipLogin(access, refresh ?? "");
+}
+
+void ApplyTokensAndSkipLogin(string access, string refresh)
+{
+    // TODO: Set on your API client and skip login UI
+    // ApiClient.SetAccessToken(access);
+    // ApiClient.SetRefreshToken(refresh);
+    Debug.Log("[GameManager] Tokens applied from Android, bypassing login.");
+}

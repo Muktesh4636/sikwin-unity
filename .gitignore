@@ -1,0 +1,35 @@
+# Build outputs
+*.apk
+*.ap_
+*.aab
+build/
+.gradle/
+**/build/
+**/.gradle/
+
+# Android
+*.iml
+local.properties
+*.hprof
+
+# Unity
+**/Library/
+**/Temp/
+**/Obj/
+**/Logs/
+**/UserSettings/
+*.csproj
+*.unityproj
+*.sln
+
+# Node / Web
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.log

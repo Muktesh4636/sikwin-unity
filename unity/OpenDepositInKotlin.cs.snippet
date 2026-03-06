@@ -1,0 +1,22 @@
+// Call this when the user taps the balance in the game so they go to the Deposit page in the Kotlin app.
+#if UNITY_ANDROID && !UNITY_EDITOR
+using UnityEngine;
+
+public static class OpenDepositInKotlin
+{
+    public static void OpenDeposit()
+    {
+        try
+        {
+            var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+            if (activity != null)
+                activity.Call("openDepositInKotlin");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("OpenDepositInKotlin: " + e.Message);
+        }
+    }
+}
+#endif
