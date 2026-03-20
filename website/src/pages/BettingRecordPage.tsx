@@ -16,7 +16,10 @@ export function BettingRecordPage() {
   useEffect(() => {
     setLoading(true);
     apiBettingHistory()
-      .then((r) => setList(r.data ?? []))
+      .then((r) => {
+        const data = r.data;
+        setList(Array.isArray(data) ? data : (data?.results ?? []));
+      })
       .catch(() => setList([]))
       .finally(() => setLoading(false));
   }, []);
@@ -25,7 +28,7 @@ export function BettingRecordPage() {
     <div className="mobile-frame min-h-dvh bg-[#121212]">
       {/* APK Color.kt: BlackBackground #121212, SurfaceColor #1E1E1E, PrimaryYellow #FFCC00, TextWhite, TextGrey #BDBDBD, GreenSuccess #4CAF50, RedError #F44336 */}
       <header className="sticky top-0 z-40 bg-[#121212]/95 backdrop-blur">
-        <div className="mx-auto max-w-[430px] px-4 py-4">
+        <div className="mx-auto max-w-[460px] px-4 py-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -45,15 +48,15 @@ export function BettingRecordPage() {
         </div>
       </header>
 
-      <div className="px-4 pt-4 pb-4">
+      <div className="px-4 pt-4 pb-24">
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FFCC00] border-t-transparent" />
           </div>
         ) : (
-          <div className="space-y-2 pb-8">
-            {list.map((b) => (
-              <div key={b.id} className="flex gap-3 rounded-lg bg-[#1E1E1E] p-4">
+          <div className="space-y-2">
+            {list.map((b, index) => (
+              <div key={`bet-${index}-${b.id}`} className="flex flex-wrap gap-3 rounded-lg bg-[#1E1E1E] p-4">
                 <DiceIcon />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-[#FFFFFF]">Round: {b.round.round_id}</p>

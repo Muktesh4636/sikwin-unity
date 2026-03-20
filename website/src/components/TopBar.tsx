@@ -5,7 +5,7 @@ export function TopBar({ title, back }: { title: string; back?: boolean }) {
   const nav = useNavigate();
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-appBg/90 backdrop-blur">
-      <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+      <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
         {back ? (
           <button type="button" className="flex h-11 w-11 items-center justify-center rounded text-primaryYellow transition-opacity hover:opacity-90" onClick={() => nav(-1)} aria-label="Back">
             <BackArrow />

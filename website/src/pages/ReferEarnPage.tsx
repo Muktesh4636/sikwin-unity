@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { useAuth } from '../auth/AuthContext';
+import { apiReferralData, type ReferralData as ReferralDataType } from '../api/endpoints';
 
 function GiftIcon({ className }: { className?: string }) {
   return (
@@ -63,12 +64,11 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+/** Same as Kotlin APK Icons.Default.AccountBalanceWallet */
 function WalletIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-      <line x1="1" y1="10" x2="23" y2="10" />
-      <path d="M17 14h.01" />
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
     </svg>
   );
 }
@@ -93,8 +93,19 @@ export function ReferEarnPage() {
   const nav = useNavigate();
   const { user } = useAuth();
   const [showAllMilestones, setShowAllMilestones] = useState(false);
+  const [referralData, setReferralData] = useState<ReferralDataType | null>(null);
 
-  const referralCode = user?.referral_code || 'Gunduata722161';
+  const referralCode = referralData?.referral_code || user?.referral_code || '';
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    apiReferralData()
+      .then((r) => setReferralData(r.data ?? null))
+      .catch(() => setReferralData(null));
+  }, []);
 
   const copyCode = useCallback(() => {
     navigator.clipboard.writeText(referralCode).catch(() => {});
@@ -114,17 +125,17 @@ export function ReferEarnPage() {
     }
   }, [referralCode]);
 
-  // Placeholder stats – replace with API when available
-  const totalReferrals = 0;
-  const depositedCount = 0;
-  const totalEarned = '0';
+  const totalReferrals = referralData?.total_referrals ?? 0;
+  const depositedCount = referralData?.referrals?.filter((r) => r.has_deposit).length ?? 0;
+  const totalEarned = referralData?.total_earnings ?? '0';
+  const nextMilestoneFromApi = referralData?.next_milestone;
   const nextMilestone = MILESTONES[0];
-  const currentProgress = 0;
+  const currentProgress = nextMilestoneFromApi?.current_progress ?? 0;
 
   return (
     <div className="mobile-frame min-h-dvh bg-[#121212]">
       <header className="sticky top-0 z-40 bg-[#121212]">
-        <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
           <button
             type="button"
             className="flex h-11 w-11 items-center justify-center rounded text-[#FFCC00] transition-opacity hover:opacity-90"
@@ -138,7 +149,7 @@ export function ReferEarnPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[430px] px-4 pb-10 pt-2">
+      <div className="mx-auto max-w-[460px] px-4 pb-24 pt-2">
         {/* Invite section – gradient area */}
         <div
           className="rounded-2xl px-4 pb-6 pt-6"
@@ -270,7 +281,7 @@ export function ReferEarnPage() {
             <div className="mt-1 text-xs text-[#BDBDBD]">Deposited (counts)</div>
           </div>
         </div>
-        <div className="mt-3 rounded-2xl bg-[#1E1E1E] px-4 py-5">
+        <div className="mt-6 rounded-2xl bg-[#1E1E1E] px-4 py-6">
           <div className="flex flex-col items-center justify-center">
             <WalletIcon className="h-8 w-8 text-[#FFCC00]" />
             <div className="mt-2 text-2xl font-bold text-white">₹{totalEarned}</div>

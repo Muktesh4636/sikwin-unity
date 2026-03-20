@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { t as getT } from '../translations';
 
 const STORAGE_KEY = 'app_language';
 
@@ -58,4 +59,13 @@ export function useLocale() {
     };
   }
   return ctx;
+}
+
+/** Translation function for current locale. Use for all user-facing strings. */
+export function useTranslations() {
+  const { locale } = useLocale();
+  return useCallback(
+    (key: string) => getT(locale, key),
+    [locale]
+  );
 }

@@ -1,8 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiWallet, type Wallet } from '../api/endpoints';
-import { useEffect } from 'react';
+import { useTranslations } from '../context/LocaleContext';
 
 function RefreshIcon({ className }: { className?: string }) {
   return (
@@ -28,14 +28,14 @@ function MenuItem({
   return (
     <Link
       to={to}
-      className={`flex w-full items-center gap-5 rounded-none border-b border-border px-4 py-4 last:border-b-0 ${
+      className={`flex w-full items-center gap-4 rounded-none border-b border-border px-4 py-3 last:border-b-0 ${
         noBorderBelow ? 'border-b-0' : ''
       } ${highlighted ? 'bg-primaryYellow/15' : 'bg-surface'}`}
     >
-      <span className={`[&>svg]:h-7 [&>svg]:w-7 [&>img]:h-7 [&>img]:w-7 ${highlighted ? 'text-primaryYellow' : 'text-textGrey [&>img]:grayscale [&>img]:opacity-80'}`}>{icon}</span>
-      <span className={`flex-1 text-base font-medium ${highlighted ? 'text-primaryYellow' : 'text-textWhite'}`}>{label}</span>
-      <span className={highlighted ? 'text-primaryYellow' : 'text-textGrey'}>
-        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <span className={`[&>svg]:h-7 [&>svg]:w-7 [&>img]:h-7 [&>img]:w-7 shrink-0 ${highlighted ? 'text-primaryYellow' : 'text-textGrey [&>img]:grayscale [&>img]:opacity-80'}`}>{icon}</span>
+      <span className={`min-w-0 flex-1 text-base font-medium ${highlighted ? 'text-primaryYellow' : 'text-textWhite'}`}>{label}</span>
+      <span className={`shrink-0 ${highlighted ? 'text-primaryYellow' : 'text-textGrey'}`}>
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </span>
@@ -56,37 +56,29 @@ function DiceNavIcon() {
   return <img src="/dice_3d.png" alt="" className="h-7 w-7 object-contain" />;
 }
 
-function DocumentIcon() {
+/** APK: Icons.Default.Description — document with lines (deposit record) */
+function DepositRecordIcon() {
   return (
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    <svg fill="currentColor" viewBox="0 0 24 24">
+      <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm2-4h8v-2H8v2zm0-4h8v-2H8v2zm0-4h5v-2H8v2z" />
     </svg>
   );
 }
 
-/** Wallet icon: rounded C-shape body, inner rounded card/flap, black dot, subtle outline - matches reference */
+/** APK: Icons.Default.Receipt — receipt slip (withdrawal record) */
+function WithdrawalRecordIcon() {
+  return (
+    <svg fill="currentColor" viewBox="0 0 24 24">
+      <path d="M18 17H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V7h12v2zM3 22l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20z" />
+    </svg>
+  );
+}
+
+/** Wallet icon — same as Kotlin APK Icons.Default.AccountBalanceWallet */
 function WalletIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      {/* C-shape body: bold rounded C opening right, with slightly rounded “prongs” at opening */}
-      <path
-        fill="currentColor"
-        stroke="#0d0d0d"
-        strokeWidth="0.6"
-        strokeLinejoin="round"
-        fillRule="evenodd"
-        d="M15 6L8 6Q6 6 6 8L6 16Q6 18 8 18L15 18L15 6z M11.5 6v12h3.5V6h-3.5z"
-      />
-      {/* Inner flap/card: rounded rectangle nested in open part of C */}
-      <path
-        fill="currentColor"
-        stroke="#0d0d0d"
-        strokeWidth="0.5"
-        strokeLinejoin="round"
-        d="M14.5 9.5L16.5 9.5Q17.5 9.5 17.5 10.5L17.5 14.5Q17.5 15.5 16.5 15.5L14.5 15.5Q13.5 15.5 13.5 14.5L13.5 10.5Q13.5 9.5 14.5 9.5z"
-      />
-      {/* Black dot in center of card */}
-      <circle cx="16" cy="12" r="1.2" fill="#0a0a0a" />
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
     </svg>
   );
 }
@@ -109,9 +101,9 @@ function DepositIcon({ className }: { className?: string }) {
   );
 }
 
-function ReferIcon() {
+function ReferIcon({ className }: { className?: string }) {
   return (
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
     </svg>
   );
@@ -168,6 +160,7 @@ function BookIcon() {
 export function ProfilePage() {
   const auth = useAuth();
   const nav = useNavigate();
+  const t = useTranslations();
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -187,25 +180,25 @@ export function ProfilePage() {
   const username = auth.user?.username ?? 'User';
 
   return (
-    <div className="mobile-frame min-h-dvh bg-appBg">
-      {/* Header: My Dashboard | ₹ balance + yellow + */}
-      <header className="flex items-center justify-between bg-appBg px-4 py-2">
-        <h1 className="text-lg font-bold text-textWhite">My Dashboard</h1>
+    <div className="mx-auto w-full max-w-[500px] min-h-dvh bg-appBg">
+      {/* Header: My Dashboard | ₹ balance + (match APK 16dp, 24sp title) */}
+      <header className="flex items-center justify-between bg-appBg px-4 py-3">
+        <h1 className="text-base font-bold text-textWhite">{t('my_dashboard')}</h1>
         <button
           type="button"
-          onClick={() => nav('/wallet')}
-          className="flex items-center gap-2 text-lg text-textWhite"
+          onClick={() => nav('/deposit')}
+          className="flex items-center gap-1.5 text-sm"
         >
-          <span className="font-bold">₹ {balance}</span>
-          <span className="flex h-11 w-11 items-center justify-center rounded bg-primaryYellow text-2xl font-bold leading-none text-black">
+          <span className="font-bold" style={{ color: '#FFCC00' }}>₹ {balance}</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded text-lg font-bold leading-none text-black" style={{ backgroundColor: '#FFCC00' }}>
             +
           </span>
         </button>
       </header>
 
-      <div className="px-4 pt-2 pb-4">
-        {/* Profile block: avatar + Hi~ username + VIP0 */}
-        <div className="flex items-center gap-5">
+      <div className="px-4 pt-2 pb-24">
+        {/* Profile block: avatar 80dp + Hi username + VIP0 (match APK) */}
+        <div className="flex items-center gap-4">
           <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full bg-card">
             <img
               src="/default_profile.jpg"
@@ -215,100 +208,111 @@ export function ProfilePage() {
           </div>
           <div>
             <div className="text-xl font-bold text-textWhite">Hi~ {username}</div>
-            <span className="mt-1 inline-block rounded bg-[#424242] px-2.5 py-1 text-xs font-bold text-textGrey">
+            <span className="mt-1 inline-block rounded bg-[#424242] px-2 py-1 text-xs font-bold text-textGrey">
               VIP0
             </span>
           </div>
         </div>
 
-        {/* Total/INR + big balance + refresh */}
-        <div className="mt-6">
-          <div className="text-base text-textGrey">Total/INR</div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-2xl font-bold text-primaryYellow">₹</span>
+        {/* Total INR + balance + refresh (APK: 14sp label, 24sp ₹, 32sp balance, 20dp refresh) */}
+        <div className="mt-5">
+          <div className="text-base text-textGrey">{t('total_inr')}</div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="text-2xl font-bold" style={{ color: '#FFCC00' }}>₹</span>
             <span className="text-3xl font-bold text-textWhite">{balance}</span>
             <button
               type="button"
               onClick={fetchWallet}
               disabled={refreshing}
-              className="ml-2 rounded-full p-2 text-primaryYellow transition-transform hover:opacity-90 disabled:animate-spin"
+              className="ml-1 rounded-full p-1 transition-transform hover:opacity-90 disabled:animate-spin"
+              style={{ color: '#FFCC00' }}
               aria-label="Refresh balance"
             >
-              <RefreshIcon className="h-6 w-6" />
+              <RefreshIcon className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* REFER & EARN banner */}
+        {/* REFER & EARN banner (APK: 12dp radius, 16dp padding, 48dp icon, 18sp/12sp) */}
         <Link
           to="/refer"
-          className="mt-4 flex w-full items-center gap-3 rounded-xl bg-primaryYellow px-4 py-3.5 text-left"
+          className="mt-4 flex w-full items-center gap-3 rounded-xl bg-primaryYellow px-4 py-3 text-left"
         >
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/10 text-black">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-black/10 text-black">
             <ReferIcon className="h-6 w-6" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-black uppercase tracking-wide text-black">REFER & EARN</div>
-            <div className="text-xs font-bold text-black/80">Invite friends and win up to ₹ 1 Lakh!</div>
+            <div className="text-base font-black uppercase tracking-wide text-black">{t('refer_earn_title')}</div>
+            <div className="text-xs font-bold text-black/80">{t('refer_earn_subtitle')}</div>
           </div>
-          <span className="text-black">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span className="shrink-0 text-black">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </span>
         </Link>
 
-        {/* Quick actions: My wallet, Withdrawal, Deposit (match app layout) */}
-        <div className="mt-3 flex w-full gap-4">
+        {/* Quick actions (APK: 12dp gap, 16dp vertical padding, 28dp icon, 11sp text) */}
+        <div className="mt-3 flex w-full gap-3">
           <Link
             to="/wallet"
-            className="flex min-h-[100px] flex-1 flex-col items-center justify-center gap-3 rounded-xl bg-surface py-5 transition-opacity hover:opacity-90 active:opacity-95"
+            className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-surface py-4 transition-opacity hover:opacity-90 active:opacity-95"
           >
             <WalletIcon className="h-7 w-7 shrink-0 text-primaryYellow" aria-hidden />
-            <span className="text-center text-sm font-medium text-textWhite">My wallet</span>
+            <span className="text-center text-sm font-medium text-textWhite">{t('my_wallet')}</span>
           </Link>
           <Link
             to="/withdraw"
-            className="flex min-h-[100px] flex-1 flex-col items-center justify-center gap-3 rounded-xl bg-surface py-5 transition-opacity hover:opacity-90 active:opacity-95"
+            className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-surface py-4 transition-opacity hover:opacity-90 active:opacity-95"
           >
             <WithdrawIcon className="h-7 w-7 shrink-0 text-primaryYellow" aria-hidden />
-            <span className="text-center text-sm font-medium text-textWhite">Withdrawal</span>
+            <span className="text-center text-sm font-medium text-textWhite">{t('withdrawal')}</span>
           </Link>
           <Link
             to="/deposit"
-            className="flex min-h-[100px] flex-1 flex-col items-center justify-center gap-3 rounded-xl bg-surface py-5 transition-opacity hover:opacity-90 active:opacity-95"
+            className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-surface py-4 transition-opacity hover:opacity-90 active:opacity-95"
           >
             <DepositIcon className="h-7 w-7 shrink-0 text-primaryYellow" aria-hidden />
-            <span className="text-center text-sm font-medium text-textWhite">Deposit</span>
+            <span className="text-center text-sm font-medium text-textWhite">{t('deposit')}</span>
           </Link>
         </div>
 
-        {/* Menu Section 1: Records & account */}
-        <div className="mt-6 overflow-hidden rounded-xl bg-surface">
-          <MenuItem icon={<ListIcon />} label="Transaction record" to="/transactions" />
-          <MenuItem icon={<DiceNavIcon />} label="Betting History" to="/betting-record" noBorderBelow />
-          <MenuItem icon={<DocumentIcon />} label="Deposit record" to="/deposit-record" />
-          <MenuItem icon={<DocumentIcon />} label="Withdrawal record" to="/withdrawal-record" noBorderBelow />
-          <MenuItem icon={<WalletIcon />} label="My Withdrawal Account" to="/withdrawal-account" />
-          <MenuItem icon={<PersonIcon />} label="Personal data" to="/personal-info" />
-          <MenuItem icon={<SecurityIcon />} label="Security" to="/security" />
-          <MenuItem icon={<LanguagesIcon />} label="Languages" to="/languages" />
-          <MenuItem icon={<HelpCenterIcon />} label="Help center" to="/help-center" />
-          <MenuItem icon={<ReferIcon />} label="Refer a Friend" to="/refer" />
+        {/* Menu Section 1: Records (APK: 16dp padding, 12dp radius, 24dp icon, 16sp text) */}
+        <div className="mt-5 overflow-hidden rounded-xl bg-surface">
+          <MenuItem icon={<ListIcon />} label={t('transaction_record')} to="/transactions" />
+          <MenuItem icon={<DiceNavIcon />} label={t('betting_history')} to="/betting-record" />
+          <MenuItem icon={<DepositRecordIcon />} label={t('deposit_record')} to="/deposit-record" />
+          <MenuItem icon={<WithdrawalRecordIcon />} label={t('withdrawal_record')} to="/withdrawal-record" noBorderBelow />
         </div>
-        {/* Menu Section 2: Partner & game */}
         <div className="mt-3 overflow-hidden rounded-xl bg-surface">
-          <MenuItem icon={<BusinessIcon />} label="Become a partner with us" to="/partner" highlighted />
-          <MenuItem icon={<DiceNavIcon />} label="Dice Results" to="/dice-results" />
-          <MenuItem icon={<BookIcon />} label="Game Guidelines" to="/game-guidelines" />
+          <MenuItem icon={<WalletIcon />} label={t('my_withdrawal_account')} to="/withdrawal-account" />
+          <MenuItem icon={<PersonIcon />} label={t('personal_data')} to="/personal-info" />
+          <MenuItem icon={<SecurityIcon />} label={t('security')} to="/security" />
+          <MenuItem icon={<LanguagesIcon />} label={t('languages')} to="/languages" />
+          <MenuItem icon={<HelpCenterIcon />} label={t('help_center')} to="/help-center" />
+          <MenuItem icon={<ReferIcon />} label={t('refer_a_friend')} to="/refer" noBorderBelow />
+        </div>
+        <div className="mt-3 overflow-hidden rounded-xl bg-surface">
+          <MenuItem icon={<BusinessIcon />} label={t('become_partner')} to="/partner" highlighted />
+          <MenuItem icon={<DiceNavIcon />} label={t('dice_results')} to="/dice-results" />
+          <MenuItem icon={<BookIcon />} label={t('game_guidelines')} to="/game-guidelines" />
         </div>
 
+        {/* Logout (APK: 48dp height, 8dp radius) */}
         <button
           type="button"
-          onClick={() => auth.logout('user_logout')}
-          className="mt-6 w-full rounded-xl border border-border bg-surface py-4 text-base font-medium text-textWhite"
+          onClick={() => {
+            auth.logout('user_logout');
+            nav('/', { replace: true });
+          }}
+          className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface text-base font-medium text-textWhite active:opacity-80"
         >
-          Log out
+          <span className="shrink-0" aria-hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </span>
+          <span>{t('log_out')}</span>
         </button>
       </div>
     </div>

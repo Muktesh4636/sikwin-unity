@@ -38,6 +38,8 @@ export function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<MaintenanceState>({ active: false });
   const [checking, setChecking] = useState(true);
 
+  const MAINTENANCE_CHECK_TIMEOUT_MS = 5000;
+
   const check = async () => {
     try {
       setChecking(true);
@@ -48,7 +50,7 @@ export function MaintenanceGate({ children }: { children: React.ReactNode }) {
         setState({ active: false });
       }
     } catch {
-      // Network failure should not block.
+      // Network failure or timeout: do not block the app.
       setState({ active: false });
     } finally {
       setChecking(false);
@@ -65,10 +67,17 @@ export function MaintenanceGate({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (checking) {
+  // If we're still checking after a short time, show the app anyway so the site never appears "down"
+  const [showAnyway, setShowAnyway] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShowAnyway(true), MAINTENANCE_CHECK_TIMEOUT_MS + 500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (checking && !showAnyway) {
     return (
-      <div className="mobile-frame app-shell grid place-items-center">
-        <div className="text-textGrey">Loading…</div>
+      <div className="mobile-frame app-shell grid place-items-center min-h-dvh bg-[#121212]">
+        <div className="text-[#BDBDBD]">Loading…</div>
       </div>
     );
   }

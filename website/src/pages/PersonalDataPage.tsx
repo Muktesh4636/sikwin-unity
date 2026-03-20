@@ -91,7 +91,7 @@ export function PersonalDataPage() {
   return (
     <div className="mobile-frame min-h-dvh bg-[#121212]">
       <header className="sticky top-0 z-40 bg-[#121212]/95 backdrop-blur">
-        <div className="relative flex max-w-[430px] items-center px-4 py-4">
+        <div className="relative flex max-w-[460px] items-center px-4 py-4">
           <button
             type="button"
             onClick={() => nav(-1)}

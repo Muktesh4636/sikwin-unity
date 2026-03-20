@@ -49,6 +49,10 @@ export async function apiLogin(username: string, password: string) {
   return http.post<AuthResponse>('auth/login/', { username, password });
 }
 
+export async function apiSendOtp(phoneNumber: string) {
+  return http.post<Record<string, unknown>>('auth/otp/send/', { phone_number: phoneNumber });
+}
+
 export async function apiRegister(data: Record<string, string>) {
   return http.post<AuthResponse>('auth/register/', data);
 }
@@ -72,6 +76,7 @@ export type BankDetail = {
   ifsc_code: string;
   is_default?: boolean;
   account_holder_name?: string | null;
+  account_name?: string | null;
 } & Record<string, any>;
 
 export async function apiBankDetails() {
@@ -83,7 +88,7 @@ export async function apiDeleteBankDetail(id: number) {
 }
 
 export async function apiAddBankDetail(data: {
-  account_holder_name: string;
+  account_name: string;
   account_number: string;
   bank_name: string;
   ifsc_code: string;
@@ -132,20 +137,134 @@ export type Bet = {
   created_at: string;
 };
 
-export async function apiMyDeposits() {
-  return http.get<DepositRequest[]>('auth/deposits/mine/');
+/** Normalize API response: either a direct array or paginated { results: [] }. */
+export function normalizeListResponse<T>(
+  data: T[] | { results: T[] } | null | undefined
+): T[] {
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  if ('results' in data && Array.isArray(data.results)) return data.results;
+  return [];
 }
 
-export async function apiMyWithdrawals() {
-  return http.get<WithdrawRequest[]>('auth/withdraws/mine/');
+/** Optional limit (default backend may be 10–20). Use a high value to get all records. */
+export async function apiMyDeposits(params?: { limit?: number; offset?: number }) {
+  return http.get<DepositRequest[] | { results: DepositRequest[]; count?: number; next?: string }>(
+    'auth/deposits/mine/',
+    { params: params ?? { limit: 1000 } }
+  );
 }
 
-export async function apiBettingHistory() {
-  return http.get<Bet[]>('game/betting-history/');
+export type PaymentMethod = {
+  id: number;
+  name: string;
+  method_type: string;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_name?: string | null;
+  ifsc_code?: string | null;
+  upi_id?: string | null;
+  usdt_wallet_address?: string | null;
+  qr_image?: string | null;
+  is_active: boolean;
+};
+
+export async function apiPaymentMethods() {
+  return http.get<PaymentMethod[]>('auth/payment-methods/');
+}
+
+export async function apiUploadDepositProof(amount: string, file: File) {
+  const form = new FormData();
+  form.append('amount', amount);
+  form.append('screenshot', file);
+  return http.post<DepositRequest>('auth/deposits/upload-proof/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60_000,
+  });
+}
+
+export async function apiSubmitUtr(data: { amount: string; utr: string; [key: string]: string }) {
+  return http.post<DepositRequest>('auth/deposits/submit-utr/', data);
+}
+
+/** Optional limit to get all records. */
+export async function apiMyWithdrawals(params?: { limit?: number; offset?: number }) {
+  return http.get<WithdrawRequest[] | { results: WithdrawRequest[]; count?: number; next?: string }>(
+    'auth/withdraws/mine/',
+    { params: params ?? { limit: 1000 } }
+  );
+}
+
+/** Optional limit (default: last 100 records). */
+export async function apiBettingHistory(params?: { limit?: number; offset?: number }) {
+  return http.get<Bet[] | { results: Bet[]; count?: number; next?: string }>(
+    'game/betting-history/',
+    { params: params ?? { limit: 100 } }
+  );
 }
 
 export async function apiLeaderboard() {
   return http.get<Record<string, any>>('auth/leaderboard/');
+}
+
+export type ReferralData = {
+  referral_code: string;
+  total_referrals: number;
+  active_referrals: number;
+  total_earnings: string;
+  current_milestone_bonus?: string;
+  next_milestone?: {
+    next_milestone?: number;
+    next_bonus: number;
+    next_bonus_display?: string;
+    current_progress: number;
+    progress_percentage: number;
+    target?: number;
+    tier?: number;
+  };
+  milestones?: Array<{ count: number; bonus: number; bonus_display?: string }>;
+  referrals?: Array<{ id: number; username: string; has_deposit?: boolean }>;
+};
+
+export async function apiReferralData() {
+  return http.get<ReferralData>('auth/referral-data/');
+}
+
+export type DailyRewardStatus = {
+  claimed?: boolean;
+  message?: string;
+  reward?: { amount?: number; type?: string };
+};
+
+export async function apiDailyRewardStatus() {
+  return http.get<DailyRewardStatus>('auth/daily-reward/');
+}
+
+export async function apiClaimDailyReward() {
+  return http.post<{
+    daily_reward?: { amount?: number; type?: string };
+    reward?: { amount?: number; type?: string };
+    message?: string;
+  }>('auth/daily-reward/');
+}
+
+export type LuckyDrawStatus = {
+  claimed?: boolean;
+  message?: string;
+  reward?: { amount?: number };
+  deposit_amount?: number;
+};
+
+export async function apiCheckLuckyDrawStatus() {
+  return http.get<LuckyDrawStatus>('auth/lucky-draw/');
+}
+
+export async function apiClaimLuckyDraw() {
+  return http.post<{
+    lucky_draw?: { amount?: number };
+    reward?: { amount?: number };
+    message?: string;
+  }>('auth/lucky-draw/');
 }
 
 export async function apiRecentDiceResults(count: number) {
@@ -161,6 +280,6 @@ export async function apiPartnerRequest(data: { name: string; phone_number: stri
 }
 
 export async function apiMaintenanceStatus() {
-  return http.get<Record<string, any>>('maintenance/status/');
+  return http.get<Record<string, any>>('maintenance/status/', { timeout: 5000 });
 }
 

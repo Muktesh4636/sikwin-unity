@@ -76,10 +76,10 @@ export function WithdrawPage() {
     : '';
 
   return (
-    <div className="mobile-frame min-h-dvh bg-appBg">
+    <div className="mx-auto w-full max-w-[500px] min-h-dvh bg-appBg">
       {/* Header: yellow back + yellow "Online withdrawal" */}
       <header className="sticky top-0 z-40 border-b border-border bg-appBg/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[500px] items-center gap-3 px-4 py-4">
           <button
             type="button"
             onClick={() => nav(-1)}
@@ -89,16 +89,16 @@ export function WithdrawPage() {
             <BackArrow />
           </button>
           <h1 className="flex-1 text-center text-xl font-bold text-primaryYellow">
-            Online withdrawal
+            Online Withdrawal
           </h1>
           <div className="w-11" />
         </div>
       </header>
 
-      <div className="px-4 py-4">
+      <div className="px-4 py-5 pb-24">
         {/* Withdrawal method: Bank Account (yellow + underline) */}
-        <div className="mb-5">
-          <span className="relative inline-block text-lg font-bold text-primaryYellow">
+        <div className="mb-6">
+          <span className="relative inline-block text-xl font-bold text-primaryYellow">
             Bank Account
             <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primaryYellow" />
           </span>
@@ -108,13 +108,13 @@ export function WithdrawPage() {
         <div className="rounded-xl border border-border bg-surface px-5 py-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-sm font-medium text-textGrey">Available Balance</div>
+              <div className="text-base font-medium text-textGrey">Available Balance</div>
               <div className="mt-2 text-2xl font-bold text-primaryYellow">
                 ₹{loading ? '—' : withdrawable}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm font-medium text-textGrey">Unavailable Balance</div>
+              <div className="text-base font-medium text-textGrey">Unavailable Balance</div>
               <div className="mt-2 text-2xl font-bold text-textGrey">
                 ₹{loading ? '—' : unavailable}
               </div>
@@ -123,16 +123,23 @@ export function WithdrawPage() {
         </div>
 
         {loading ? (
-          <div className="mt-6 text-center text-textGrey">Loading…</div>
+          <div className="mt-6 text-center text-base text-textGrey">Loading…</div>
         ) : banks.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-border bg-surface p-5">
-            <div className="text-base font-bold text-primaryYellow">No bank account added</div>
-            <p className="mt-2 text-base text-textGrey">
-              Add a bank account in the app. Website add-bank will be added next.
+          <div className="mt-6 rounded-xl border border-border bg-surface p-6">
+            <div className="text-lg font-bold text-primaryYellow">No bank account added</div>
+            <p className="mt-2.5 text-base text-textGrey">
+              Add a bank account to withdraw funds.
             </p>
+            <button
+              type="button"
+              onClick={() => nav('/withdrawal-account/add')}
+              className="mt-5 w-full rounded-xl bg-primaryYellow py-3.5 text-base font-bold text-black transition-opacity hover:opacity-95"
+            >
+              + Add bank account
+            </button>
           </div>
         ) : (
-          <form onSubmit={submit} className="mt-6 space-y-4">
+          <form onSubmit={submit} className="mt-6 space-y-5">
             {/* Bank account dropdown (dark grey field + chevron) */}
             <div className="relative">
               <button
@@ -178,6 +185,18 @@ export function WithdrawPage() {
                         </button>
                       </li>
                     ))}
+                    <li className="border-t border-border">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowBankDropdown(false);
+                          nav('/withdrawal-account/add');
+                        }}
+                        className="w-full px-5 py-3.5 text-left text-base font-medium text-primaryYellow transition-opacity hover:opacity-90"
+                      >
+                        + Add bank account
+                      </button>
+                    </li>
                   </ul>
                 </>
               )}
@@ -185,24 +204,24 @@ export function WithdrawPage() {
 
             {/* Amount input */}
             <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-5 py-4">
-              <span className="text-xl font-bold text-textWhite">₹</span>
+              <span className="text-2xl font-bold text-textWhite">₹</span>
               <input
                 type="text"
                 inputMode="numeric"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
                 placeholder="Please enter amount"
-                className="min-w-0 flex-1 bg-transparent text-lg font-medium text-textWhite outline-none placeholder:text-textGrey"
+                className="min-w-0 flex-1 bg-transparent text-xl font-medium text-textWhite outline-none placeholder:text-textGrey"
               />
             </div>
 
             {error && (
-              <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-base text-red-400">
                 {error}
               </div>
             )}
             {ok && (
-              <div className="rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-2 text-sm text-green-400">
+              <div className="rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-2.5 text-base text-green-400">
                 {ok}
               </div>
             )}
@@ -211,7 +230,7 @@ export function WithdrawPage() {
             <button
               type="submit"
               disabled={submitting || !amount || !selected}
-              className="w-full rounded-xl bg-primaryYellow py-4 text-lg font-bold text-white transition-opacity hover:opacity-95 disabled:opacity-50"
+              className="w-full rounded-xl bg-primaryYellow py-4 text-lg font-bold text-black transition-opacity hover:opacity-95 disabled:opacity-50"
             >
               {submitting ? 'Submitting…' : 'Submit'}
             </button>

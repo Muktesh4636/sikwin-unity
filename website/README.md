@@ -2,6 +2,39 @@
 
 Mobile-first website that matches the Sikwin APK UI style and uses the same APIs.
 
+**All website code lives in this one folder (`website/`):** the React app, static assets, and the WebGL game. Nothing outside this folder is needed to build or deploy the site.
+
+```
+website/
+├── src/                 # React app (pages, components, API, auth)
+├── public/              # Static assets (copied as-is into dist)
+│   ├── game/            # WebGL game (index.html, Build/, TemplateData/)
+│   ├── *.jpg, *.png     # Images, APK, etc.
+│   └── ...
+├── index.html           # SPA entry
+├── package.json
+├── vite.config.ts
+├── deploy-to-server.sh  # Build + rsync to server
+└── dist/                # Build output (generated; deploy this to server)
+```
+
+## Access on the internet at gunduata.club
+
+You’ve set a DNS record so **gunduata.club** points to your server. To serve the site there:
+
+1. **On the server** (the IP that gunduata.club points to), configure Nginx to serve the website and proxy `/api/` to your backend. Use the example in `docs/nginx-gunduata.conf`: set `root` to the folder where the built site will live (e.g. `/var/www/gunduata.club`) and `location / { try_files $uri $uri/ /index.html; }` for the SPA.
+2. **Deploy the built site** to that folder:
+   ```bash
+   cd website
+   ./deploy-to-server.sh
+   ```
+   This builds the site and uploads `dist/` to the server. Defaults use the LB at `187.77.186.84` and path `/var/www/gunduata.club`; override with `DEPLOY_HOST`, `REMOTE_PATH` if your server is different.
+3. **Reload Nginx** on the server after the first deploy: `nginx -t && systemctl reload nginx` (or `sudo systemctl reload nginx`).
+
+After that, anyone on the internet can open **http://gunduata.club** (or **https://gunduata.club** if you enable SSL) and get the same site. The app already uses `https://gunduata.club/api/` as the API base, so API calls work when the site is loaded from gunduata.club.
+
+**If gunduata.club still shows "Roll with Royalty" or another site:** Nginx on the Load Balancer is serving a different folder. Deploy the build (step 2 above), then on the LB set Nginx `root` for gunduata.club to `/var/www/gunduata.club` and reload Nginx. Step-by-step: **[docs/DEPLOY-GUNDUATA-CLUB.md](../docs/DEPLOY-GUNDUATA-CLUB.md)**.
+
 ## Setup
 
 ```bash
@@ -26,6 +59,34 @@ To override, create a `.env` file:
 ```bash
 VITE_API_BASE_URL=https://gunduata.club/api/
 ```
+
+## Redirect IP to gunduata.club
+
+If you have a DNS record pointing **gunduata.club** to your server (or machine), you can redirect visitors from the IP to the same page on the domain so the URL bar shows **gunduata.club**.
+
+Create a `.env` file (or add to it):
+
+- **Local dev** (e.g. you run Vite on port 5174 and gunduata.club resolves to your machine):
+  ```bash
+  VITE_CANONICAL_SITE_URL=http://gunduata.club:5174
+  ```
+  Then opening `http://192.168.29.147:5174/` will redirect to `http://gunduata.club:5174/` (same page).
+
+- **Production** (site served at gunduata.club on port 80/443):
+  ```bash
+  VITE_CANONICAL_SITE_URL=https://gunduata.club
+  ```
+  Then opening the site via IP will redirect to `https://gunduata.club/` (same path).
+
+Restart the dev server after changing `.env`.
+
+## Download APK
+
+The **Home** page has a **Download APK** button (below the promotional banners). To enable it, place your Android APK at:
+
+- `website/public/gundu-ata.apk`
+
+The link serves the file and triggers a download as `GunduAta.apk`.
 
 ## Notes
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
-import { apiMyWithdrawals, type WithdrawRequest } from '../api/endpoints';
+import { apiMyWithdrawals, normalizeListResponse, type WithdrawRequest } from '../api/endpoints';
 
 type Filter = 'All' | 'Success' | 'Failed';
 
@@ -14,7 +14,7 @@ export function WithdrawalRecordPage() {
   useEffect(() => {
     setLoading(true);
     apiMyWithdrawals()
-      .then((r) => setList(r.data ?? []))
+      .then((r) => setList(normalizeListResponse(r.data)))
       .catch(() => setList([]))
       .finally(() => setLoading(false));
   }, []);
@@ -30,7 +30,7 @@ export function WithdrawalRecordPage() {
     <div className="mobile-frame min-h-dvh bg-[#1A1A1A]">
       {/* Header: yellow back, "Withdrawal Record" center */}
       <header className="sticky top-0 z-40 bg-[#1A1A1A]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
           <button
             type="button"
             onClick={() => nav(-1)}
@@ -74,7 +74,7 @@ export function WithdrawalRecordPage() {
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primaryYellow border-t-transparent" />
           </div>
         ) : (
-          <div className="mt-4 space-y-3 pb-8">
+          <div className="mt-4 min-h-0 space-y-3 pb-24">
             {filtered.map((w) => {
               const isRejected = w.status === 'REJECTED';
               return (

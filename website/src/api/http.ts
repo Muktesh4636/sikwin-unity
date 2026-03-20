@@ -34,7 +34,7 @@ let refreshInFlight: Promise<string | null> | null = null;
 
 export const http = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30_000,
+  timeout: 60_000,
 });
 
 http.interceptors.request.use((config) => {
@@ -51,7 +51,7 @@ http.interceptors.response.use(
   async (error: AxiosError) => {
     const status = error.response?.status;
     const url = (error.config?.url ?? '').toString();
-    const isAuthRoute = url.includes('auth/login/') || url.includes('auth/register/') || url.includes('auth/token/refresh/');
+    const isAuthRoute = url.includes('auth/login/') || url.includes('auth/register/') || url.includes('auth/token/refresh/') || url.includes('auth/otp/');
 
     if (status !== 401 || isAuthRoute) {
       throw error;
@@ -82,7 +82,7 @@ http.interceptors.response.use(
           const resp = await axios.post<RefreshResponse>(
             `${API_BASE_URL}auth/token/refresh/`,
             { refresh },
-            { timeout: 30_000 }
+            { timeout: 60_000 }
           );
           const newAccess = resp.data?.access;
           const newRefresh = resp.data?.refresh || resp.data?.refresh_token;

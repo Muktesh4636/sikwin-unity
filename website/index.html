@@ -2,13 +2,61 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <script>
+      (function() {
+        var s = window.screen;
+        var isMobile = s.width <= 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0 && s.width < 1024);
+        if (isMobile) {
+          var w = Math.min(Math.max(s.width, 360), 430);
+          var meta = document.querySelector('meta[name="viewport"]');
+          if (meta) meta.setAttribute('content', 'width=' + w + ', initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#121212" />
     <title>Gundu Ata</title>
+    <!-- Preload/prefetch game assets so they're in cache when user taps Play -->
+    <link rel="prefetch" href="/game/index.html" />
+    <link rel="preload" href="/game/Build/WebGL.loader.js" as="script" />
+    <link rel="prefetch" href="/game/Build/WebGL.framework.js" />
+    <link rel="prefetch" href="/game/Build/WebGL.data" />
+    <link rel="prefetch" href="/game/Build/WebGL.wasm" />
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function() {
+        var s = window.screen;
+        var isMobile = s.width <= 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0 && s.width < 1024);
+        function setMobileViewport() {
+          if (isMobile) {
+            var w = Math.min(Math.max(s.width, 360), 430);
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (meta) meta.setAttribute('content', 'width=' + w + ', initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+          }
+        }
+        setMobileViewport();
+        window.addEventListener('resize', setMobileViewport);
+        window.addEventListener('orientationchange', function() { setTimeout(setMobileViewport, 150); });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Start prefetching heavy game assets after main app has loaded (so we don't block first paint)
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var base = '/game/Build/';
+          var names = ['WebGL.framework.js', 'WebGL.data', 'WebGL.wasm'];
+          for (var i = 0; i < names.length; i++) {
+            var link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.href = base + names[i];
+            document.head.appendChild(link);
+          }
+        }, 300);
+      });
+    </script>
   </body>
 </html>

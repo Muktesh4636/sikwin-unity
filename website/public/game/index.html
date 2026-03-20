@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <title>Gundu Ata | Dice Game</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; min-height: 100vh; min-height: 100dvh; overflow: hidden; background: #231F20; }
+      #unity-container.unity-mobile { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
+      .unity-mobile #unity-canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; min-height: 100%; }
+      #rotate-overlay { display: none; position: fixed; inset: 0; z-index: 99999; background: #231F20; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center; color: #FFCC00; font-family: system-ui, sans-serif; }
+      #rotate-overlay.show { display: flex; }
+      #rotate-overlay .icon { font-size: 4rem; margin-bottom: 1rem; }
+      #rotate-overlay p { font-size: 1.25rem; font-weight: 600; margin: 0; }
+      /* Hide Unity Logo and Footer */
+      #unity-logo, #unity-footer, #unity-logo-title-footer, #unity-build-title, #unity-fullscreen-button { display: none !important; visibility: hidden !important; opacity: 0 !important; }
+      .unity-logo, .unity-footer { display: none !important; }
+      /* Loading bar hidden – no loading screen when opening game */
+      #unity-loading-bar { display: none !important; visibility: hidden !important; }
+      /* Minimal loading hint so user sees something while game loads */
+      #game-loading-hint { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; color: rgba(255,204,0,0.9); font-size: 14px; font-family: system-ui, sans-serif; pointer-events: none; }
+      #game-loading-hint.hidden { display: none !important; }
+      #unity-progress-bar-empty { width: 100%; height: 6px; margin-top: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; overflow: hidden; }
+      #unity-progress-bar-full { width: 0%; height: 100%; background: #FFCC00; transition: width 0.2s; }
+      #loading-text { color: #FFCC00; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; text-align: center; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
+  </head>
+  <body>
+    <!-- Shown in landscape: ask user to rotate to portrait (game is vertical only) -->
+    <div id="rotate-overlay" aria-live="polite">
+      <span class="icon" aria-hidden="true">📱</span>
+      <p>Please rotate your device to portrait to play</p>
+    </div>
+    <div id="game-loading-hint">Loading…</div>
+    <!-- Back to Home: invisible but clickable in top-left, goes to home page -->
+    <button type="button" id="html-back-btn" title="Back to Home" style="position:fixed;top:0;left:0;z-index:2147483647;width:60px;height:60px;padding:0;margin:0;border:none;background:transparent;color:transparent;cursor:pointer;font-size:0;">←</button>
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+      <div id="unity-loading-bar" aria-hidden="true" style="display:none!important;visibility:hidden!important;position:absolute;left:-9999px;">
+        <div id="loading-text">Loading Game...</div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <script>(function(){var L=document.getElementById("unity-loading-bar");if(L){L.style.display="none";L.style.visibility="hidden";}})();</script>
+      <div id="unity-warning"> </div>
+      <div id="unity-footer">
+        <div id="unity-logo-title-footer"></div>
+        <div id="unity-fullscreen-button"></div>
+        <div id="unity-build-title">Gundu Ata</div>
+      </div>
+    </div>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      if (!canvas) {
+        document.body.innerHTML = "<div style='color:#fff;padding:20px;text-align:center'>Game canvas not found.</div>";
+        throw new Error("unity-canvas not found");
+      }
+
+      // Catch "cannot read properties of null reading 'style'" from loader or our code
+      function handleStyleError() {
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        if (loadingBar && loadingBar.style) loadingBar.style.display = "none";
+        var hint = document.getElementById("game-loading-hint");
+        if (hint) hint.classList.add("hidden");
+        var warning = document.querySelector("#unity-warning");
+        if (warning) {
+          warning.innerHTML = "<div style='background:red;padding:10px'>Game failed to load. Please refresh the page.</div>";
+          warning.style.display = "block";
+        }
+      }
+      window.addEventListener("error", function(e) {
+        var msg = (e.message || e.error && e.error.message || "") + "";
+        if (msg.indexOf("reading 'style'") !== -1 || msg.indexOf("null") !== -1 && msg.indexOf("style") !== -1) {
+          handleStyleError();
+          e.preventDefault();
+          e.stopPropagation();
+          return true;
+        }
+      }, true);
+      window.addEventListener("unhandledrejection", function(e) {
+        var msg = (e.reason && (e.reason.message || e.reason + "")) || "";
+        if (msg.indexOf("reading 'style'") !== -1 || msg.indexOf("null") !== -1 && msg.indexOf("style") !== -1) {
+          handleStyleError();
+          e.preventDefault();
+        }
+      });
+
+      function unityShowBanner(msg, type) {
+        var warningBanner = document.querySelector("#unity-warning");
+        if (!warningBanner) return;
+        function updateBannerVisibility() {
+          if (warningBanner) warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            if (warningBanner && div.parentNode === warningBanner) warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      var buildUrl = "Build";
+      var cacheBust = "?v=2";
+      var loaderUrl = buildUrl + "/WebGL.loader.js" + cacheBust;
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/WebGL.data" + cacheBust,
+        frameworkUrl: buildUrl + "/WebGL.framework.js" + cacheBust,
+        codeUrl: buildUrl + "/WebGL.wasm" + cacheBust,
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "Gundu Ata",
+        productVersion: "0.1",
+        showBanner: unityShowBanner,
+      };
+
+      var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        var head = document.getElementsByTagName('head')[0];
+        if (head) {
+          var meta = document.createElement('meta');
+          meta.name = 'viewport';
+          meta.content = 'width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+          head.appendChild(meta);
+        }
+        var container = document.querySelector("#unity-container");
+        if (container) container.className = "unity-mobile";
+        canvas.className = "unity-mobile";
+        (function lockPortrait() {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('portrait').catch(function() {});
+          }
+        })();
+        function checkOrientation() {
+          var landscape = window.innerWidth > window.innerHeight;
+          var overlay = document.getElementById('rotate-overlay');
+          if (overlay) overlay.classList.toggle('show', landscape);
+        }
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('orientationchange', checkOrientation);
+        checkOrientation();
+      } else {
+        canvas.style.width = "960px";
+        canvas.style.height = "600px";
+      }
+
+      function goToHomepage() {
+        window.top.location.href = window.location.origin + '/';
+      }
+      window.GoToHomepage = goToHomepage;
+
+      // When user logs out on the website (another tab), tokens are cleared; redirect this game tab to home
+      window.addEventListener('storage', function(e) {
+        if (e.key === 'sikwin_access' && e.newValue === null) {
+          goToHomepage();
+        }
+      });
+
+      var backBtn = document.getElementById('html-back-btn');
+      if (backBtn) backBtn.onclick = function() { goToHomepage(); };
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = function() {
+        try {
+          createUnityInstance(canvas, config, function(progress) {
+            try {
+              var bar = document.querySelector("#unity-progress-bar-full");
+              if (bar && bar.style) bar.style.width = 100 * progress + "%";
+            } catch (e) { /* ignore */ }
+          }).then(function(unityInstance) {
+            var loadingBar = document.querySelector("#unity-loading-bar");
+            if (loadingBar && loadingBar.style) loadingBar.style.display = "none";
+            var hint = document.getElementById("game-loading-hint");
+            if (hint) hint.classList.add("hidden");
+            var fullscreenBtn = document.querySelector("#unity-fullscreen-button");
+            if (fullscreenBtn) fullscreenBtn.onclick = function() {
+              unityInstance.SetFullscreen(1);
+            };
+
+            var accessToken = localStorage.getItem('sikwin_access');
+            var refreshToken = localStorage.getItem('sikwin_refresh');
+            if (accessToken && refreshToken) {
+              try {
+                unityInstance.SendMessage('GameManager', 'SetAccessAndRefreshToken', JSON.stringify({
+                  accessToken: accessToken,
+                  refreshToken: refreshToken
+                }));
+              } catch (e) {
+                console.warn('Could not pass tokens to game:', e);
+              }
+            }
+          }).catch(function(message) {
+            var loadingBar = document.querySelector("#unity-loading-bar");
+            if (loadingBar && loadingBar.style) loadingBar.style.display = "none";
+            var hint = document.getElementById("game-loading-hint");
+            if (hint) hint.classList.add("hidden");
+            var msg = (typeof message === 'string') ? message : (message && message.message) ? message.message : 'Game failed to load.';
+            unityShowBanner(msg, 'error');
+          });
+        } catch (e) {
+          var loadingBar = document.querySelector("#unity-loading-bar");
+          if (loadingBar && loadingBar.style) loadingBar.style.display = "none";
+          var hint = document.getElementById("game-loading-hint");
+          if (hint) hint.classList.add("hidden");
+          unityShowBanner("Game failed to start: " + (e && e.message ? e.message : String(e)), 'error');
+        }
+      };
+      script.onerror = function() {
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        if (loadingBar && loadingBar.style) loadingBar.style.display = "none";
+        var hint = document.getElementById("game-loading-hint");
+        if (hint) hint.classList.add("hidden");
+        unityShowBanner("Failed to load game files. Check your connection and try again.", 'error');
+      };
+      document.body.appendChild(script);
+    </script>
+  </body>
+</html>

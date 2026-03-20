@@ -5,6 +5,7 @@ import {
   apiBettingHistory,
   apiMyDeposits,
   apiMyWithdrawals,
+  normalizeListResponse,
   type Bet,
   type DepositRequest,
   type WithdrawRequest,
@@ -26,17 +27,17 @@ export function TransactionRecordPage() {
     setLoading(true);
     if (tab === 'Deposit') {
       apiMyDeposits()
-        .then((r) => setDeposits(r.data ?? []))
+        .then((r) => setDeposits(normalizeListResponse(r.data)))
         .catch(() => setDeposits([]))
         .finally(() => setLoading(false));
     } else if (tab === 'Withdraw') {
       apiMyWithdrawals()
-        .then((r) => setWithdrawals(r.data ?? []))
+        .then((r) => setWithdrawals(normalizeListResponse(r.data)))
         .catch(() => setWithdrawals([]))
         .finally(() => setLoading(false));
     } else {
       apiBettingHistory()
-        .then((r) => setBetting(r.data ?? []))
+        .then((r) => setBetting(normalizeListResponse(r.data)))
         .catch(() => setBetting([]))
         .finally(() => setLoading(false));
     }
@@ -54,7 +55,7 @@ export function TransactionRecordPage() {
     <div className="mobile-frame min-h-dvh bg-[#1A1A1A]">
       {/* Header: yellow back + yellow title */}
       <header className="sticky top-0 z-40 bg-[#1A1A1A]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
           <button
             type="button"
             onClick={() => nav(-1)}
@@ -119,7 +120,7 @@ export function TransactionRecordPage() {
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primaryYellow border-t-transparent" />
           </div>
         ) : (
-          <div className="mt-4 space-y-3 pb-8">
+          <div className="mt-4 min-h-0 space-y-3 pb-24">
             {tab === 'Deposit' &&
               filteredDeposits.map((d) => (
                 <div

@@ -44,7 +44,7 @@ export function PartnerPage() {
     return (
       <div className="mobile-frame min-h-dvh bg-[#121212]">
         <header className="sticky top-0 z-40 bg-[#121212]">
-          <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+          <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
             <button
               type="button"
               onClick={() => nav(-1)}
@@ -57,7 +57,7 @@ export function PartnerPage() {
             <div className="w-11" />
           </div>
         </header>
-        <div className="mx-auto max-w-[430px] px-4 py-8 text-center">
+        <div className="mx-auto max-w-[460px] px-4 py-8 text-center">
           <p className="text-white">Thanks for your interest! We&apos;ll get in touch soon.</p>
         </div>
       </div>
@@ -67,7 +67,7 @@ export function PartnerPage() {
   return (
     <div className="mobile-frame min-h-dvh bg-[#121212]">
       <header className="sticky top-0 z-40 bg-[#121212]">
-        <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
           <button
             type="button"
             onClick={() => nav(-1)}
@@ -81,7 +81,7 @@ export function PartnerPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[430px] px-4 pb-10 pt-4">
+      <div className="mx-auto max-w-[460px] px-4 pb-10 pt-4">
         <p className="mb-6 text-[#E0E0E0]">
           Partner with Gundu Ata at 50% discount. Enter your details below and we&apos;ll get in touch.
         </p>

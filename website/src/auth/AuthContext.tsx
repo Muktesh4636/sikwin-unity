@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS } from '../config';
-import { apiLogin, apiProfile, type User } from '../api/endpoints';
+import { apiLogin, apiProfile, type User, type AuthResponse } from '../api/endpoints';
 
 type AuthState = {
   user: User | null;
@@ -13,6 +13,7 @@ type AuthContextValue = AuthState & {
   login: (username: string, password: string) => Promise<void>;
   logout: (reason?: string) => void;
   refreshUser: () => Promise<void>;
+  setSession: (data: AuthResponse) => void;
 };
 
 const Ctx = createContext<AuthContextValue | null>(null);
@@ -54,6 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(resp.data.user);
   }, []);
 
+  const setSession = useCallback((data: AuthResponse) => {
+    localStorage.setItem(STORAGE_KEYS.access, data.access);
+    localStorage.setItem(STORAGE_KEYS.refresh, data.refresh);
+    setState((s) => ({
+      ...s,
+      accessToken: data.access,
+      refreshToken: data.refresh,
+    }));
+    setUser(data.user);
+  }, []);
+
   const refreshUser = useCallback(async () => {
     try {
       const resp = await apiProfile();
@@ -82,8 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       refreshUser,
+      setSession,
     }),
-    [state, login, logout, refreshUser]
+    [state, login, logout, refreshUser, setSession]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

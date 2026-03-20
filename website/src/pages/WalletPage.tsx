@@ -3,24 +3,20 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { apiWallet, type Wallet } from '../api/endpoints';
 
-/** Faint wallet icon on gold card - APK size 100.dp, White 20% alpha, padding end 16 top 8 */
+/** Faint wallet icon on gold card — same as APK Icons.Default.AccountBalanceWallet, white 20% */
 function WalletIconFaint() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="absolute right-4 top-2 h-[100px] w-[100px] text-white/20" aria-hidden>
-      <path fill="currentColor" fillRule="evenodd" d="M15 6L8 6Q6 6 6 8L6 16Q6 18 8 18L15 18L15 6z M11.5 6v12h3.5V6h-3.5z" />
-      <path fill="currentColor" d="M14.5 9.5L16.5 9.5Q17.5 9.5 17.5 10.5L17.5 14.5Q17.5 15.5 16.5 15.5L14.5 15.5Q13.5 15.5 13.5 14.5L13.5 10.5Q13.5 9.5 14.5 9.5z" />
-      <circle cx="16" cy="12" r="1.15" fill="currentColor" />
+    <svg viewBox="0 0 24 24" fill="currentColor" className="absolute right-4 top-2 h-[100px] w-[100px] text-white/20" aria-hidden>
+      <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
     </svg>
   );
 }
 
-/** Dark wallet icon for Main wallet card - APK size 48.dp */
+/** Dark wallet icon for Main wallet card — same as APK Icons.Default.AccountBalanceWallet */
 function WalletIconDark() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-12 w-12 shrink-0 text-[#A9A9A9]" aria-hidden>
-      <path fill="currentColor" stroke="#1a1a1a" strokeWidth="0.5" strokeLinejoin="round" fillRule="evenodd" d="M15 6L8 6Q6 6 6 8L6 16Q6 18 8 18L15 18L15 6z M11.5 6v12h3.5V6h-3.5z" />
-      <path fill="currentColor" stroke="#1a1a1a" strokeWidth="0.4" strokeLinejoin="round" d="M14.5 9.5L16.5 9.5Q17.5 9.5 17.5 10.5L17.5 14.5Q17.5 15.5 16.5 15.5L14.5 15.5Q13.5 15.5 13.5 14.5L13.5 10.5Q13.5 9.5 14.5 9.5z" />
-      <circle cx="16" cy="12" r="1.15" fill="#0a0a0a" />
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-12 w-12 shrink-0 text-[#A9A9A9]" aria-hidden>
+      <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
     </svg>
   );
 }
@@ -75,7 +71,7 @@ export function WalletPage() {
       {/* Header: golden back + golden title to match APK */}
       {/* APK: header padding 16.dp, back 24.dp, title 20.sp Bold */}
       <header className="sticky top-0 z-40 bg-[#1A1A1A]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
           <button
             type="button"
             onClick={() => nav(-1)}

@@ -82,7 +82,7 @@ export function HelpCenterPage() {
   return (
     <div className="mobile-frame min-h-dvh bg-[#121212]">
       <header className="sticky top-0 z-40 bg-[#121212]">
-        <div className="mx-auto flex max-w-[430px] items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[460px] items-center gap-3 px-4 py-4">
           <button
             type="button"
             className="flex h-11 w-11 items-center justify-center rounded text-[#FFCC00] transition-opacity hover:opacity-90"
@@ -96,7 +96,7 @@ export function HelpCenterPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[430px] px-4 pb-8 pt-2">
+      <div className="mx-auto max-w-[460px] px-4 pb-8 pt-2">
         {loading && (
           <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-[#1E1E1E]">
             <div className="h-full w-1/2 animate-pulse bg-[#DAA520]" />
