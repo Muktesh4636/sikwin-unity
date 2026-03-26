@@ -32,7 +32,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import com.sikwin.app.BuildConfig
 import com.sikwin.app.R
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import androidx.compose.ui.text.font.FontWeight
@@ -44,9 +43,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.text.style.TextAlign
-
-private fun referralShareMessage(referralCode: String) =
-    "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: ${BuildConfig.PUBLIC_SITE_URL}/signup?ref=$referralCode"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -193,7 +189,7 @@ fun AffiliateScreen(
                         ) {
                             Button(
                                 onClick = {
-                                    val shareMessage = referralShareMessage(referralCode)
+                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.com/signup?ref=$referralCode"
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)
@@ -220,7 +216,7 @@ fun AffiliateScreen(
                             
                             Button(
                                 onClick = {
-                                    val shareMessage = referralShareMessage(referralCode)
+                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.com/signup?ref=$referralCode"
                                     val genericIntent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)

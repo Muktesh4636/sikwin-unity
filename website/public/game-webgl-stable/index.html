@@ -51,7 +51,7 @@
     <div id="game-loading-hint">Loading…</div>
     <div id="unity-container" class="unity-mobile">
       <button type="button" id="html-back-btn" title="Back to Home" style="position:absolute;top:0;left:0;z-index:2147483647;width:60px;height:60px;padding:0;margin:0;border:none;background:transparent;color:transparent;cursor:pointer;font-size:0;">←</button>
-      <canvas id="unity-canvas" width="720" height="1280" tabindex="-1"></canvas>
+      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
       <div id="unity-loading-bar" aria-hidden="true" style="display:none!important;visibility:hidden!important;position:absolute;left:-9999px;">
         <div id="loading-text">Loading Game...</div>
         <div id="unity-progress-bar-empty">
@@ -89,13 +89,12 @@
       }
 
       var buildUrl = "Build";
-      var cacheBust = "?v=4";
-      var loaderUrl = buildUrl + "/WebGL.loader.js" + cacheBust;
+      var loaderUrl = buildUrl + "/WebGL.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/WebGL.data" + cacheBust,
-        frameworkUrl: buildUrl + "/WebGL.framework.js" + cacheBust,
-        codeUrl: buildUrl + "/WebGL.wasm" + cacheBust,
+        dataUrl: buildUrl + "/WebGL.data",
+        frameworkUrl: buildUrl + "/WebGL.framework.js",
+        codeUrl: buildUrl + "/WebGL.wasm",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Gundu Ata",
@@ -142,12 +141,6 @@
         goToHomepage();
       };
 
-      function hideLoadingHint() {
-        var hint = document.getElementById('game-loading-hint');
-        if (hint) hint.classList.add('hidden');
-      }
-
-      function appendUnityLoaderScript() {
       var script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = function() {
@@ -164,50 +157,44 @@
             unityInstance.SetFullscreen(1);
           };
 
-          (function passSessionToUnity() {
-            var tokenPairs = [
-              { accessKey: 'sikwin_access', refreshKey: 'sikwin_refresh' },
-              { accessKey: 'kiran_access', refreshKey: 'kiran_refresh' },
-              { accessKey: 'sai_access', refreshKey: 'sai_refresh' },
-              { accessKey: 'jittu_access', refreshKey: 'jittu_refresh' }
-            ];
-            var accessToken = null;
-            var refreshToken = null;
-            var i, k, a, r, base;
-            for (i = 0; i < tokenPairs.length; i++) {
-              a = localStorage.getItem(tokenPairs[i].accessKey);
-              r = localStorage.getItem(tokenPairs[i].refreshKey);
-              if (a && r) { accessToken = a; refreshToken = r; break; }
+          // Franchise-safe token passing.
+          var tokenPairs = [
+            { accessKey: 'sikwin_access', refreshKey: 'sikwin_refresh' },
+            { accessKey: 'kiran_access', refreshKey: 'kiran_refresh' },
+            { accessKey: 'sai_access', refreshKey: 'sai_refresh' }
+          ];
+          var accessToken = null;
+          var refreshToken = null;
+          for (var i = 0; i < tokenPairs.length; i++) {
+            var a = localStorage.getItem(tokenPairs[i].accessKey);
+            var r = localStorage.getItem(tokenPairs[i].refreshKey);
+            if (a && r) {
+              accessToken = a;
+              refreshToken = r;
+              break;
             }
-            if (!accessToken) {
-              try {
-                for (i = 0; i < localStorage.length; i++) {
-                  k = localStorage.key(i);
-                  if (!k || k.length < 8 || !k.endsWith('_access')) continue;
-                  base = k.substring(0, k.length - 7);
-                  a = localStorage.getItem(k);
-                  r = localStorage.getItem(base + '_refresh');
-                  if (a && r) { accessToken = a; refreshToken = r; break; }
-                }
-              } catch (e) { /* ignore */ }
-            }
-            if (!accessToken || !refreshToken) return;
-            var payload = JSON.stringify({
-              accessToken: accessToken,
-              refreshToken: refreshToken,
-              access: accessToken,
-              refresh: refreshToken,
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
-            function sendOnce() {
+          }
+
+          if (accessToken && refreshToken) {
+            try {
+              var payload = JSON.stringify({
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+                access: accessToken,
+                refresh: refreshToken,
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                accessTokenLower: accessToken,
+                refreshTokenLower: refreshToken
+              });
+
+              // Try multiple method names for compatibility.
               try { unityInstance.SendMessage('GameManager', 'SetAccessAndRefreshToken', payload); } catch (e) {}
               try { unityInstance.SendMessage('GameManager', 'SetAccessAndRefreshTokens', payload); } catch (e) {}
+            } catch (e) {
+              console.warn('Could not pass tokens to game:', e);
             }
-            sendOnce();
-            setTimeout(sendOnce, 200);
-            setTimeout(sendOnce, 900);
-          })();
+          }
         }).catch(function(message) {
           var loadingBar = document.querySelector("#unity-loading-bar");
           if (loadingBar) loadingBar.style.display = "none";
@@ -240,25 +227,6 @@
         } catch (err) { /* ignore */ }
       };
       document.body.appendChild(script);
-      }
-
-      var frameworkProbeUrl = config.frameworkUrl;
-      fetch(frameworkProbeUrl, { method: 'HEAD', cache: 'no-store' })
-        .then(function(r) {
-          var ct = (r.headers.get('content-type') || '').toLowerCase();
-          if (!r.ok || ct.indexOf('text/html') !== -1) {
-            hideLoadingHint();
-            unityShowBanner(
-              'Game files are missing or the server sent HTML instead of game JavaScript (console: syntax error). Deploy the full Unity WebGL Build/ (framework, data, wasm) or run website/copy-webgl-build.sh.',
-              'error'
-            );
-            return;
-          }
-          appendUnityLoaderScript();
-        })
-        .catch(function() {
-          appendUnityLoaderScript();
-        });
     </script>
   </body>
 </html>

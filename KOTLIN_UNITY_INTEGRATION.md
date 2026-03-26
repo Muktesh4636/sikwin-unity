@@ -11,7 +11,7 @@ The Sikwin app and the Gundu Ata Unity game are integrated into **one APK**. Tap
 ### 1. Single APK layout
 - **App**: `com.sikwin.app` (Kotlin/Compose) – main launcher, home, login, wallet, etc.
 - **Unity**: Embedded via `unityLibrary` – same APK, no separate install.
-- **Build output**: `sikwin/app/build/outputs/apk/sikwin/debug/Gunduata-debug.apk`.
+- **Build output**: `sikwin/app/build/outputs/apk/debug/Sikwin-debug.apk`.
 
 ### 2. Sikwin `unityLibrary` (embedded Unity)
 - **Native libs** (from Gundu Ata.apk): `libgame.so`, `libunity.so`, `libil2cpp.so`, `libmain.so`, `libswappywrapper.so`, `libc++_shared.so` in `unityLibrary/src/main/jniLibs/arm64-v8a/`.
@@ -95,24 +95,11 @@ Full instructions: **`unity/UNITY_READ_TOKENS_FROM_ANDROID.md`**
 
 ---
 
-## Refresh embedded Unity from a Unity-built APK (v1.2, etc.)
-
-When you have a new **Gundu Ata** APK from Unity (same IL2CPP/game version you want inside Sikwin):
-
-```bash
-cd sikwin && ./scripts/sync-unity-from-apk.sh
-# or: ./scripts/sync-unity-from-apk.sh /path/to/Your.apk
-```
-
-This replaces `unityLibrary/src/main/jniLibs/arm64-v8a/*.so` and `unityLibrary/src/main/assets/bin/Data/` from that APK. Then rebuild the app.
-
----
-
 ## Build and install
 
 - **Build**: `cd sikwin && ./gradlew assembleDebug`
-- **APK**: `sikwin/app/build/outputs/apk/sikwin/debug/Gunduata-debug.apk`
-- **Install**: `adb install -r path/to/Gunduata-debug.apk`
+- **APK**: `sikwin/app/build/outputs/apk/debug/Sikwin-debug.apk`
+- **Install**: `adb install -r path/to/Sikwin-debug.apk`
 
 One APK contains both Kotlin app and Unity game; no separate Gundu Ata install.
 

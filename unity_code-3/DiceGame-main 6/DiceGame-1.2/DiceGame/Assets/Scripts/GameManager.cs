@@ -149,26 +149,16 @@ public class GameManager : MonoBehaviour
         // If Start() not yet executed, defer initialization until Start completes.
         if (!started)
         {
-            onInitializationCompelete += () => ApplyTokensFromBridge(data);
+            onInitializationCompelete += () =>
+            {
+                PlayerPrefs.SetString("accessToken", data.accessToken);
+                PlayerPrefs.SetString("refreshToken", data.refreshToken);
+                PlayerPrefs.Save();
+                UIManager.Instance.AutoLoginIfPossible();
+            };
             return;
         }
 
-        // WebGL: SendMessage runs after createUnityInstance — Start() has already run.
-        ApplyTokensFromBridge(data);
-    }
-
-    private void ApplyTokensFromBridge(TokenData data)
-    {
-        if (data == null || string.IsNullOrEmpty(data.accessToken) || string.IsNullOrEmpty(data.refreshToken))
-        {
-            Debug.LogWarning("ApplyTokensFromBridge: missing access or refresh token");
-            return;
-        }
-
-        PlayerPrefs.SetString("accessToken", data.accessToken);
-        PlayerPrefs.SetString("refreshToken", data.refreshToken);
-        PlayerPrefs.Save();
-        UIManager.Instance.AutoLoginIfPossible();
     }
 
     // Called from Kotlin with {"username":"...","password":"..."},
@@ -200,24 +190,14 @@ public class GameManager : MonoBehaviour
         // If Start() not yet executed, defer login until Start completes.
         if (!started)
         {
-            onInitializationCompelete += () => ApplyCredentialsFromBridge(data);
+            onInitializationCompelete += () =>
+            {
+                PlayerPrefs.SetString("username", data.username);
+                PlayerPrefs.SetString("password", data.password);
+                PlayerPrefs.Save();
+                UIManager.Instance.AutoLoginIfPossible();
+            };
             return;
         }
-
-        ApplyCredentialsFromBridge(data);
-    }
-
-    private void ApplyCredentialsFromBridge(UserData data)
-    {
-        if (data == null || string.IsNullOrEmpty(data.username) || string.IsNullOrEmpty(data.password))
-        {
-            Debug.LogWarning("ApplyCredentialsFromBridge: missing username or password");
-            return;
-        }
-
-        PlayerPrefs.SetString("username", data.username);
-        PlayerPrefs.SetString("password", data.password);
-        PlayerPrefs.Save();
-        UIManager.Instance.AutoLoginIfPossible();
     }
 }

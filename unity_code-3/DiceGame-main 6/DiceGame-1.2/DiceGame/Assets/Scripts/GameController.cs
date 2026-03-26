@@ -568,34 +568,9 @@ public class GameController : MonoBehaviour
         });
     }
 
-    private IEnumerator RetryOnPlayerJoinOrResume(int currentTime, string roundid)
-    {
-        // Poll until GameSettings is populated (normally < 1 s after login)
-        float waited = 0f;
-        while (GameManager.Instance.GameSettings == null && waited < 10f)
-        {
-            yield return new WaitForSeconds(0.2f);
-            waited += 0.2f;
-        }
-
-        if (GameManager.Instance.GameSettings == null)
-        {
-            Debug.LogWarning("[GameController] GameSettings still null after 10 s — giving up.");
-            yield break;
-        }
-
-        OnPlayerJoinOrResume(currentTime, roundid);
-    }
-
     private void OnPlayerJoinOrResume(int currentTime, string roundid)
     {
-        if (GameManager.Instance.GameSettings == null)
-        {
-            // GameSettings not loaded yet (async fetch still in flight after login).
-            // Retry after a short delay instead of silently dropping the call.
-            StartCoroutine(RetryOnPlayerJoinOrResume(currentTime, roundid));
-            return;
-        }
+        if (GameManager.Instance.GameSettings == null) return;
 
         FetchCurrentRound();
 

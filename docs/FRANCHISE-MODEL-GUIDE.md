@@ -98,6 +98,7 @@ productFlavors {
     sikwin {
         dimension "franchise"
         resValue "string", "app_name", "Gundu Ata"
+        archivesBaseName = "Sikwin"
         buildConfigField "String", "BASE_URL", '"https://gunduata.club/api/"'
         buildConfigField "String", "APK_DOWNLOAD_URL", '"https://gunduata.com/download"'
     }
@@ -105,15 +106,9 @@ productFlavors {
         dimension "franchise"
         applicationId "com.sai.gunduata"
         resValue "string", "app_name", "Sai"
+        archivesBaseName = "Sai"
         buildConfigField "String", "BASE_URL", '"https://api.sai.example.com/api/"'  // franchise API
         buildConfigField "String", "APK_DOWNLOAD_URL", '"https://sai.example.com/download"'
-    }
-    jittu {
-        dimension "franchise"
-        applicationId "com.jittu.gunduata"
-        resValue "string", "app_name", "Gundu Ata"
-        buildConfigField "String", "BASE_URL", '"https://gunduata.club/api/"'
-        buildConfigField "String", "APK_DOWNLOAD_URL", '"https://jittu.gunduata.online/gundu-ata.apk"'
     }
     // Add more flavors per franchise...
 }

@@ -26,39 +26,19 @@ DEPLOY_USER="${DEPLOY_USER:-root}"
 REMOTE_PATH="${REMOTE_PATH:-/var/www/gunduata.club}"
 DEPLOY_TO_ALL="${DEPLOY_TO_ALL:-0}"
 
-# Nginx runs as www-data; rsync from macOS often leaves 700 dirs + uid 501 — fix every deploy.
-fix_web_permissions_remote() {
-  local host="$1"
-  local ssh_cmd=(ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}")
-  if [ -n "${DEPLOY_SSH_PASSWORD}" ]; then
-    ssh_cmd=(sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}")
-  fi
-  "${ssh_cmd[@]}" "chown -R www-data:www-data ${REMOTE_PATH} && find ${REMOTE_PATH} -type d -exec chmod 755 {} \\; && find ${REMOTE_PATH} -type f -exec chmod 644 {} \\;"
-}
-
-# Unity requests WebGL.data / .wasm / .framework.js (no .gz). If only .gz exists, try_files falls through to SPA HTML → "Unknown data format".
-uncompress_webgl_gz_remote() {
-  local host="$1"
-  local ssh_cmd=(ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}")
-  if [ -n "${DEPLOY_SSH_PASSWORD}" ]; then
-    ssh_cmd=(sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}")
-  fi
-  "${ssh_cmd[@]}" "cd ${REMOTE_PATH}/game/Build 2>/dev/null && for f in WebGL.framework.js.gz WebGL.data.gz WebGL.wasm.gz; do [ -f \"\$f\" ] && zcat \"\$f\" > \"\${f%.gz}\" && chown www-data:www-data \"\${f%.gz}\"; done; true"
-}
-
 deploy_one() {
   local host="$1"
   echo "==> Deploying to ${DEPLOY_USER}@${host}:${REMOTE_PATH}"
   if [ -n "${DEPLOY_SSH_PASSWORD}" ]; then
     sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "mkdir -p ${REMOTE_PATH}"
     sshpass -p "${DEPLOY_SSH_PASSWORD}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=accept-new" dist/ "${DEPLOY_USER}@${host}:${REMOTE_PATH}/"
-    uncompress_webgl_gz_remote "$host"
-    fix_web_permissions_remote "$host"
+    # Uncompress WebGL .gz so Nginx can serve plain files (avoids Cloudflare breaking Content-Encoding)
+    sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "cd ${REMOTE_PATH}/game/Build 2>/dev/null && for f in WebGL.framework.js.gz WebGL.data.gz WebGL.wasm.gz; do [ -f \"\$f\" ] && zcat \"\$f\" > \"\${f%.gz}\" && chown www-data:www-data \"\${f%.gz}\"; done; true"
+    # Fix ownership so Nginx (www-data) can read files (rsync leaves owner as your Mac user)
+    sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "chown -R www-data:www-data ${REMOTE_PATH}"
   else
     ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "mkdir -p ${REMOTE_PATH}"
     rsync -avz --delete -e ssh dist/ "${DEPLOY_USER}@${host}:${REMOTE_PATH}/"
-    uncompress_webgl_gz_remote "$host"
-    fix_web_permissions_remote "$host"
   fi
 }
 

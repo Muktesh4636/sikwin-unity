@@ -9,8 +9,6 @@
     "build": "node node_modules/typescript/lib/tsc.js -b && node node_modules/vite/bin/vite.js build",
     "build:kiran": "node node_modules/typescript/lib/tsc.js -b && node node_modules/vite/bin/vite.js build --mode kiran",
     "dev:kiran": "node node_modules/vite/bin/vite.js --mode kiran",
-    "build:jittu": "node node_modules/typescript/lib/tsc.js -b && node node_modules/vite/bin/vite.js build --mode jittu",
-    "dev:jittu": "node node_modules/vite/bin/vite.js --mode jittu",
     "lint": "eslint .",
     "preview": "node node_modules/vite/bin/vite.js preview"
   },

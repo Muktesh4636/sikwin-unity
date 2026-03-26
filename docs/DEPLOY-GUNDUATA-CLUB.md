@@ -57,12 +57,6 @@ nginx -t && systemctl reload nginx
 
 ---
 
-## Franchise subdomains (player site only)
-
-If you host a franchise build on e.g. `jittu.gunduata.online`, nginx there should serve **only** the static/React player site (`root` → that `dist/`, plus `/game/` assets). Keep **`/game-admin/`** on the **primary domain** (e.g. `https://gunduata.club/game-admin/`) so the Django admin URL does not change. Avoid a `location /game-admin` on the franchise host that proxies to the app unless you intend a second admin entry point.
-
----
-
 ## Game admin at `/game-admin/` shows the Unity game instead
 
 That usually means Nginx has a **`location /game`** block **without** a trailing slash. In Nginx, that prefix matches **`/game-admin`** as well as `/game/...`, so admin URLs are served from the WebGL folder (or the wrong file).
@@ -83,35 +77,6 @@ That usually means Nginx has a **`location /game`** block **without** a trailing
 ## Step 3: Check
 
 Open **https://gunduata.club** in your browser. You should see the Gundu Ata React app (login, home, wallet, etc.), not the "Roll with Royalty" page.
-
----
-
-## 500 Internal Server Error (`rewrite or internal redirection cycle … /index.html`)
-
-`website/deploy-to-server.sh` uploads the built site to **`/var/www/gunduata.club/`** (so `index.html` is **`/var/www/gunduata.club/index.html`**).
-
-If Nginx is configured with **`root /var/www/gunduata.club/website`** (or any path where `index.html` does not exist), `try_files … /index.html` can loop and Nginx returns **500**. Fix on the LB:
-
-- Set **`root /var/www/gunduata.club;`** (no `/website` suffix) in both HTTP and HTTPS `server` blocks for this domain.
-- If you use **`location ^~ /webgl/`** with **`alias`**, point it at the same deploy root (e.g. **`alias /var/www/gunduata.club/;`**) or remove the block if unused.
-
-Then: **`nginx -t && systemctl reload nginx`**. Check **`tail -30 /var/log/nginx/error.log`** if anything still fails.
-
----
-
-## 403 / 500 and `Permission denied` in `/var/log/nginx/error.log`
-
-If the web root is **`drwx------` (700)** or owned only by your Mac user (**uid 501**), **nginx** (`www-data`) cannot **`stat()`** `index.html` → **403**, or **`try_files`** loops → **500**.
-
-After each deploy, ensure:
-
-```bash
-chown -R www-data:www-data /var/www/gunduata.club
-find /var/www/gunduata.club -type d -exec chmod 755 {} \;
-find /var/www/gunduata.club -type f -exec chmod 644 {} \;
-```
-
-`website/deploy-to-server.sh` runs this automatically (with or without `DEPLOY_SSH_PASSWORD`).
 
 ---
 

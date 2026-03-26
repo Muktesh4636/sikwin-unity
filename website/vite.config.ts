@@ -35,11 +35,6 @@ function unityWebGLGzip() {
         res.setHeader('Content-Encoding', 'gzip')
         res.setHeader('Content-Type', contentType)
         res.setHeader('Cache-Control', 'public, max-age=31536000')
-        if (req.method === 'HEAD') {
-          res.statusCode = 200
-          res.end()
-          return
-        }
         fs.createReadStream(gzPath).pipe(res)
       })
     },

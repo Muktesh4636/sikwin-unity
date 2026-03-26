@@ -5,13 +5,6 @@ export const API_BASE_URL =
 export const CANONICAL_SITE_URL =
   (import.meta as any).env?.VITE_CANONICAL_SITE_URL?.toString()?.trim() || '';
 
-/**
- * Main domain where the Django/game admin panel lives (e.g. https://gunduata.club).
- * Franchise player sites (jittu.*, kiran.*) only replace the public SPA; do not move /game-admin/ to those hosts.
- */
-export const ADMIN_PANEL_BASE_URL =
-  (import.meta as any).env?.VITE_ADMIN_PANEL_BASE_URL?.toString()?.trim() || '';
-
 /** Hosts that are valid for this site (no redirect). Subdomains like gunduata1.gunduata.club are allowed. */
 export const ALLOWED_HOSTS: string[] =
   (import.meta as any).env?.VITE_ALLOWED_HOSTS?.toString()
@@ -33,19 +26,6 @@ export const STORAGE_KEYS = {
   get user() { return `${STORAGE_KEY_PREFIX}_user`; },
   get contactsCache() { return `${STORAGE_KEY_PREFIX}_support_contacts_cache`; },
 } as const;
-
-/**
- * Sent on every API request as `X-Franchise-Code` when set (backend may use it to scope users under a franchise admin).
- */
-export const FRANCHISE_CODE =
-  (import.meta as any).env?.VITE_FRANCHISE_CODE?.toString()?.trim() || '';
-
-/**
- * If set, sign-ups send this as `referral_code` when the user leaves the field empty (ties them to Jittu’s tree in admin).
- * Replace with the real code from your backend / Jittu’s admin referral.
- */
-export const DEFAULT_REFERRAL_CODE =
-  (import.meta as any).env?.VITE_DEFAULT_REFERRAL_CODE?.toString()?.trim() || '';
 
 /**
  * Unity WebGL shell URL. Do NOT append a new timestamp on every open — that bypasses the browser cache

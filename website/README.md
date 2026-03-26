@@ -80,13 +80,6 @@ Create a `.env` file (or add to it):
 
 Restart the dev server after changing `.env`.
 
-## Franchise websites (Kiran, Jittu, …)
-
-Franchise builds only replace the **public game website** (login, home, wallet, WebGL at `/game/`, APK download).  
-The **admin panel** stays on the **main site URL** (e.g. `https://gunduata.club/game-admin/`) — do not move Django admin to franchise subdomains unless you set that up on purpose in nginx.
-
----
-
 ## Franchise website (Kiran)
 
 To create a **separate website for the Kiran franchise** (same codebase, different branding and config):
@@ -114,26 +107,6 @@ To create a **separate website for the Kiran franchise** (same codebase, differe
    - Edit `.env.kiran` and set `VITE_API_BASE_URL` if Kiran uses a different API.  
    - Set `VITE_CANONICAL_SITE_URL` and `VITE_ALLOWED_HOSTS` to your real Kiran domain before production deploy.
 
-## Franchise website (Jittu)
-
-Same pattern as Kiran, for **jittu.gunduata.online**:
-
-1. **Env:** `website/.env.jittu` — `VITE_APP_NAME=Jittu`, `VITE_STORAGE_KEY_PREFIX=jittu`, canonical URL and allowed hosts for Jittu’s domain.  
-2. **Franchise scoping (backend):**  
-   - `VITE_FRANCHISE_CODE=jittu` is sent as header **`X-Franchise-Code`** on API calls — your Django/API must read it if you use it to attach users to Jittu’s admin.  
-   - Optionally set **`VITE_DEFAULT_REFERRAL_CODE`** to Jittu’s master referral code so sign-ups without a code still register under his tree.  
-3. **Build / deploy**
-   ```bash
-   cd website && npm run build:jittu
-   ```
-   Deploy `dist/` to the host for `jittu.gunduata.online`. Nginx for that host should serve **only** the player SPA + static `/game/` (and `/gundu-ata.apk` if you host the APK there). **`/game-admin/`** remains on **`gunduata.club`** (or your primary domain), not on `jittu.*`.  
-4. **APK (Kotlin + Unity):** from repo root, build in a path **without `:`** if needed:
-   ```bash
-   cp -a sikwin /tmp/SikwinKotlinUnity && cd /tmp/SikwinKotlinUnity
-   java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain assembleJittuRelease
-   ```
-   Output: **`Gunduata-release.apk`** in **`sikwin/jittu/`** and **`app/build/outputs/apk/jittu/release/`** (same filename as main franchise build; different folder / package `com.jittu.gunduata`).
-
 ## WebGL game load time
 
 The Unity build at `public/game/` can be large (`.wasm`, `.data`).
@@ -148,15 +121,11 @@ The Unity build at `public/game/` can be large (`.wasm`, `.data`).
 
 ## Download APK
 
-The **Home** page **Download APK** button opens **`/gundu-ata.apk`** (Chrome and other browsers download it as **`GunduAta.apk`**).
+The **Home** page has a **Download APK** button (below the promotional banners). To enable it, place your Android APK at:
 
-Refresh that file from your latest **Kotlin + Unity** build (preferred) or fallback APK:
+- `website/public/gundu-ata.apk`
 
-```bash
-cd website && ./copy-apk-for-download.sh
-```
-
-The script writes **`public/gundu-ata.apk`**. Deploy the site so production serves the same file at **`https://<domain>/gundu-ata.apk`**.
+The link serves the file and triggers a download as `GunduAta.apk`.
 
 ## Notes
 

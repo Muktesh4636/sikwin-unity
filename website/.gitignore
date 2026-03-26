@@ -8,9 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-# Local WebGL rollback snapshot (large); remove this line to track in git
-public/game-webgl-previous
-
 dist
 dist-ssr
 *.local
