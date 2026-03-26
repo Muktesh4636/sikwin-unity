@@ -663,13 +663,14 @@ fun HotGamesGrid(
         var supportMenuExpanded by remember { mutableStateOf(false) }
         var supportMenuClosing by remember { mutableStateOf(false) }  // Keeps popup in tree during exit animation
         val scaleAlpha = remember { Animatable(0f) }
-        // Support contacts from https://gunduata.club/api/support/contacts/
+        // Support contacts from https://gunduata.club/api/support/contacts/?package=<applicationId>
         var supportWhatsApp by remember { mutableStateOf<String?>(null) }
         var supportTelegram by remember { mutableStateOf<String?>(null) }
+        val supportPackageName = LocalContext.current.packageName
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 try {
-                    val response = RetrofitClient.apiService.getSupportContacts()
+                    val response = RetrofitClient.apiService.getSupportContacts(supportPackageName)
                     if (response.isSuccessful) {
                         response.body()?.let { c ->
                             supportWhatsApp = c.whatsapp_number
@@ -1160,7 +1161,7 @@ fun WhatsAppSupportButton() {
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
-                val response = RetrofitClient.apiService.getSupportContacts()
+                val response = RetrofitClient.apiService.getSupportContacts(context.packageName)
                 if (response.isSuccessful) whatsappNumber = response.body()?.whatsapp_number
             } catch (_: Exception) {}
         }

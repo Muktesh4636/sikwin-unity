@@ -4,12 +4,15 @@ import { useAuth } from '../auth/AuthContext';
 import { apiWallet, type Wallet } from '../api/endpoints';
 import { useTranslations } from '../context/LocaleContext';
 import { useLoginSignupModal } from '../context/LoginSignupModalContext';
+import { GAME_PAGE_HREF } from '../config';
 import { prefetchGameAssets } from '../utils/prefetchGameAssets';
 
-const GAME_URL = '/game/index.html';
-
 function openGame() {
-  window.location.href = GAME_URL + '?v=' + Date.now();
+  // Start downloading Unity assets immediately, then navigate a moment later.
+  prefetchGameAssets();
+  window.setTimeout(() => {
+    window.location.href = GAME_PAGE_HREF;
+  }, 200);
 }
 
 function SearchBar({ placeholder, onSearch }: { placeholder: string; onSearch?: (query: string) => void }) {
@@ -321,8 +324,6 @@ function HotGamesSection({ onPlayGame }: { onPlayGame: () => void }) {
         <button
           type="button"
           onClick={onPlayGame}
-          onMouseEnter={prefetchGameAssets}
-          onFocus={prefetchGameAssets}
           className="mx-auto w-full max-w-[165px] overflow-hidden rounded-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-primaryYellow"
           aria-label="Play Gundu Ata"
         >
@@ -399,8 +400,6 @@ export function HomePage() {
         <button
           type="button"
           onClick={openGameOrShowLogin}
-          onMouseEnter={prefetchGameAssets}
-          onFocus={prefetchGameAssets}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           aria-label="Play Gundu Ata"
         >

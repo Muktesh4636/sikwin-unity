@@ -11,6 +11,15 @@ buildscript {
         classpath 'com.google.gms:google-services:4.4.0'
     }
 }
+
+// Workaround: project path contains ":" which Java treats as a classpath separator on Unix.
+// Redirect every subproject's build directory to a colon-free path so the Kotlin compiler
+// can resolve R.jar and classes.jar without the path being split at the colon.
+def safeBuildRoot = new File(System.getProperty('user.home'), 'sikwin-build')
+allprojects {
+    buildDir = new File(safeBuildRoot, project.name + '/build')
+}
+
 task clean(type: Delete) {
-    delete rootProject.buildDir
+    delete safeBuildRoot
 }

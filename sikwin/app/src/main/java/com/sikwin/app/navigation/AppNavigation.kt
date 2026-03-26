@@ -89,6 +89,15 @@ fun AppNavigation(
         }
     }
 
+    // Re-check maintenance periodically while user is in the app, so if admin enables
+    // maintenance they see the screen without having to reopen the app.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000) // every 30 seconds
+            viewModel.checkMaintenanceStatus()
+        }
+    }
+
     if (viewModel.maintenanceActive) {
         MaintenanceScreen(
             message = viewModel.maintenanceMessage ?: "App under maintenance. Please come back soon.",

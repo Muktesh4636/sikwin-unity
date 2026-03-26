@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { AuthTabs } from '../components/AuthTabs';
 import { apiSendOtp, apiRegister } from '../api/endpoints';
+import { APP_NAME, DEFAULT_REFERRAL_CODE } from '../config';
 
 export function SignupPage() {
   const auth = useAuth();
@@ -11,7 +12,7 @@ export function SignupPage() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [referralCode, setReferralCode] = useState('');
+  const [referralCode, setReferralCode] = useState(DEFAULT_REFERRAL_CODE);
   const [showReferral, setShowReferral] = useState(false);
   const [busy, setBusy] = useState(false);
   const [otpBusy, setOtpBusy] = useState(false);
@@ -47,7 +48,8 @@ export function SignupPage() {
         phone_number: phoneFull,
         otp_code: otp.trim(),
       };
-      if (referralCode.trim()) data.referral_code = referralCode.trim();
+      const ref = referralCode.trim() || DEFAULT_REFERRAL_CODE;
+      if (ref) data.referral_code = ref;
       const resp = await apiRegister(data);
       auth.setSession(resp.data);
       nav('/', { replace: true });
@@ -72,7 +74,7 @@ export function SignupPage() {
           Back
         </Link>
         <div className="mt-4 text-2xl font-extrabold text-[#FFCC00]">Sign up</div>
-        <div className="mt-1 text-sm text-textGrey">Welcome to Gundu Ata</div>
+        <div className="mt-1 text-sm text-textGrey">Welcome to {APP_NAME}</div>
 
         <div className="mt-6 space-y-4">
           <div>

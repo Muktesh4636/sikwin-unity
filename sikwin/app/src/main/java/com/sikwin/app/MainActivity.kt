@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         
-                        // Handle referral deep link: https://gunduata.com/signup?ref=CODE
+                        // Handle referral deep link: {PUBLIC_SITE}/signup?ref=CODE (host matches flavor)
                         intent?.data?.let { uri ->
                             if (uri.path == "/signup") {
                                 val refCode = uri.getQueryParameter("ref")

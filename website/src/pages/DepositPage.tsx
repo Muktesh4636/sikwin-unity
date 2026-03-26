@@ -6,6 +6,7 @@ import {
   apiUploadDepositProof,
   type PaymentMethod as ApiPaymentMethod,
 } from '../api/endpoints';
+import { APP_NAME } from '../config';
 
 type DepositMethod = 'Bank' | 'UPI' | 'USDT';
 type PayApp = 'google_pay' | 'paytm' | 'phone_pe' | 'upi';
@@ -66,7 +67,8 @@ function BankDetailRow({
   );
 }
 
-const PAYEE_NAME = 'Gundu Ata';
+// Used for UPI payment description (franchise name from config)
+const PAYEE_NAME = APP_NAME;
 const TRANSACTION_NOTE = 'Deposit';
 
 function buildUpiParams(upiId: string, amount: string, payeeName: string, note: string): string {

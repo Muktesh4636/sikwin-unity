@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Color;
-import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -51,15 +50,8 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
     private static final String LOGIN_METHOD = "SetLoginCredential";
     private boolean mCredsSentToUnity = false;
 
-    private static final String SOUND_ICON_ON = "\uD83D\uDD0A";  // 🔊
-    private static final String SOUND_ICON_OFF = "\uD83D\uDD07";   // 🔇
-    private boolean soundMuted = false;
-    private int savedVolumeBeforeMute = -1;
-
     private View backOverlayView;
     private View balanceOverlayView;
-    private View soundOverlayView;
-    private View micOverlayView;
     private View lightningOverlayView;
 
     private static final String FREQUENCY_API_URL = "https://gunduata.club/api/game/frequency/";
@@ -73,8 +65,6 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
     private final ExecutorService frequencyExecutor = Executors.newSingleThreadExecutor();
     private final Handler imeHideHandler = new Handler(Looper.getMainLooper());
     private Runnable imeHideRunnable;
-    private final Handler micOverlayHandler = new Handler(Looper.getMainLooper());
-    private Runnable micOverlayRunnable;
 
     class GameActivitySurfaceView extends InputEnabledSurfaceView
     {
@@ -250,44 +240,6 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
         balanceLp.topMargin = 0;
         frameLayout.addView(balanceOverlayView, balanceLp);
 
-        // Sound icon (mute/unmute) below the exposure (EXP) row, top-right
-        int soundSizePx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 40, getResources().getDisplayMetrics());
-        int soundTopPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 76, getResources().getDisplayMetrics()); // under exposure row
-        int soundRightPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8, getResources().getDisplayMetrics());
-        soundOverlayView = new TextView(this);
-        ((TextView) soundOverlayView).setText(SOUND_ICON_ON);
-        ((TextView) soundOverlayView).setTextSize(22);
-        ((TextView) soundOverlayView).setGravity(Gravity.CENTER);
-        soundOverlayView.setBackgroundColor(0x33000000);
-        soundOverlayView.setClickable(true);
-        soundOverlayView.setFocusable(true);
-        soundOverlayView.setOnClickListener(v -> toggleSoundMute((TextView) soundOverlayView));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) soundOverlayView.setElevation(overlayElevationPx);
-        FrameLayout.LayoutParams soundLp = new FrameLayout.LayoutParams(soundSizePx, soundSizePx);
-        soundLp.gravity = Gravity.END | Gravity.TOP;
-        soundLp.topMargin = soundTopPx;
-        soundLp.rightMargin = soundRightPx;
-        frameLayout.addView(soundOverlayView, soundLp);
-
-        // Mic icon overlay: show 15 seconds after game opens
-        int micSizePx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 40, getResources().getDisplayMetrics());
-        int micTopPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 124, getResources().getDisplayMetrics());
-        int micRightPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8, getResources().getDisplayMetrics());
-        micOverlayView = new TextView(this);
-        ((TextView) micOverlayView).setText("\uD83C\uDFA4"); // 🎤
-        ((TextView) micOverlayView).setTextSize(22);
-        ((TextView) micOverlayView).setGravity(Gravity.CENTER);
-        micOverlayView.setBackgroundColor(0x33000000);
-        micOverlayView.setClickable(false);
-        micOverlayView.setFocusable(false);
-        micOverlayView.setVisibility(View.GONE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) micOverlayView.setElevation(overlayElevationPx);
-        FrameLayout.LayoutParams micLp = new FrameLayout.LayoutParams(micSizePx, micSizePx);
-        micLp.gravity = Gravity.END | Gravity.TOP;
-        micLp.topMargin = micTopPx;
-        micLp.rightMargin = micRightPx;
-        frameLayout.addView(micOverlayView, micLp);
-
         // Lightning effect overlay: full-screen glow when any number has frequency > 2 (no Unity rebuild)
         FrameLayout lightningContainer = new FrameLayout(this);
         lightningContainer.setBackgroundColor(Color.argb(100, 255, 255, 200));
@@ -312,25 +264,6 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
     private void bringOverlaysToFront() {
         if (backOverlayView != null) backOverlayView.bringToFront();
         if (balanceOverlayView != null) balanceOverlayView.bringToFront();
-        if (soundOverlayView != null) soundOverlayView.bringToFront();
-        if (micOverlayView != null) micOverlayView.bringToFront();
-    }
-
-    private void toggleSoundMute(TextView soundIcon) {
-        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        if (am == null) return;
-        if (soundMuted) {
-            int maxVol = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            int restore = savedVolumeBeforeMute >= 0 ? savedVolumeBeforeMute : maxVol / 2;
-            am.setStreamVolume(AudioManager.STREAM_MUSIC, restore, 0);
-            soundMuted = false;
-            soundIcon.setText(SOUND_ICON_ON);
-        } else {
-            savedVolumeBeforeMute = am.getStreamVolume(AudioManager.STREAM_MUSIC);
-            am.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0);
-            soundMuted = true;
-            soundIcon.setText(SOUND_ICON_OFF);
-        }
     }
 
     private String getAccessTokenForApi() {
@@ -483,14 +416,6 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
         // Note: we want Java onPause callbacks to be processed before the native part processes the onPause callback
         mUnityPlayer.onPause();
         super.onPause();
-
-        // Stop any pending mic overlay show when leaving game
-        if (micOverlayRunnable != null) {
-            micOverlayHandler.removeCallbacks(micOverlayRunnable);
-        }
-        if (micOverlayView != null) {
-            micOverlayView.setVisibility(View.GONE);
-        }
     }
 
     // Resume Unity
@@ -511,20 +436,6 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
             mainHandler.postDelayed(this::fetchWinningFrequencyAndShowLightning, LIGHTNING_CHECK_DELAY_MS);
         }
         scheduleHideImeDuringLoading();
-
-        // Show mic icon after 15 seconds from game open
-        if (micOverlayRunnable != null) {
-            micOverlayHandler.removeCallbacks(micOverlayRunnable);
-        }
-        micOverlayRunnable = () -> {
-            try {
-                if (micOverlayView != null) {
-                    micOverlayView.setVisibility(View.VISIBLE);
-                    bringOverlaysToFront();
-                }
-            } catch (Throwable ignored) {}
-        };
-        micOverlayHandler.postDelayed(micOverlayRunnable, 15000);
     }
 
     private void scheduleHideImeDuringLoading() {
@@ -597,17 +508,25 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
     }
 
     private static final String PREFS_NAME = "gunduata_prefs";
-    /** All SharedPreferences Unity / SessionManager may read (PlayerPrefs and app prefs). */
-    private static final String[] UNITY_PREF_NAMES = {
-        "com.company.dicegame.v2.playerprefs",
-        "com.sikwin.app.v2.playerprefs",
-        "com.sikwin.app.playerprefs",
-        "gunduata_prefs",
-        "UnityPlayerPrefs",
-        "dicegame.v2.playerprefs",
-        "PlayerPrefs",
-        "com.sikwin.app_playerprefs"
-    };
+
+    /** All prefs names including current package (so Kiran/franchise apps get tokens in their Unity PlayerPrefs). */
+    private String[] getUnityPrefNames() {
+        String pkg = getPackageName();
+        return new String[] {
+            "com.company.dicegame.v2.playerprefs",
+            "com.sikwin.app.v2.playerprefs",
+            "com.sikwin.app.playerprefs",
+            "gunduata_prefs",
+            "UnityPlayerPrefs",
+            "dicegame.v2.playerprefs",
+            "PlayerPrefs",
+            "com.sikwin.app_playerprefs",
+            pkg + ".v2.playerprefs",
+            pkg + ".playerprefs",
+            pkg.replace('.', '_') + ".playerprefs",
+            pkg + "_playerprefs"
+        };
+    }
 
     /** Write tokens to every prefs file Unity might read (PlayerPrefs on Android = SharedPreferences). */
     private void writeTokensToAllPrefs(String access, String refresh) {
@@ -615,7 +534,7 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
         String acc = access != null ? access : "";
         String ref = refresh != null ? refresh : "";
         android.content.Context ctx = getApplicationContext();
-        for (String name : UNITY_PREF_NAMES) {
+        for (String name : getUnityPrefNames()) {
             try {
                 SharedPreferences p = ctx.getSharedPreferences(name, MODE_PRIVATE);
                 SharedPreferences.Editor e = p.edit();
@@ -652,7 +571,7 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
         String user = username != null ? username : "";
         String pass = password != null ? password : "";
         android.content.Context ctx = getApplicationContext();
-        for (String name : UNITY_PREF_NAMES) {
+        for (String name : getUnityPrefNames()) {
             try {
                 // Never write raw credentials into Kotlin app prefs.
                 // This prevents Unity from auto-login later and invalidating Kotlin session.

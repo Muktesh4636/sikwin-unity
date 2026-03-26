@@ -17,12 +17,7 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="theme-color" content="#121212" />
     <title>Gundu Ata</title>
-    <!-- Preload/prefetch game assets so they're in cache when user taps Play -->
-    <link rel="prefetch" href="/game/index.html" />
-    <link rel="preload" href="/game/Build/WebGL.loader.js" as="script" />
-    <link rel="prefetch" href="/game/Build/WebGL.framework.js" />
-    <link rel="prefetch" href="/game/Build/WebGL.data" />
-    <link rel="prefetch" href="/game/Build/WebGL.wasm" />
+    <!-- WebGL lives at /game/index.html only — do not prefetch Unity assets here so the main app stays light -->
   </head>
   <body>
     <div id="root"></div>
@@ -43,20 +38,5 @@
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Start prefetching heavy game assets after main app has loaded (so we don't block first paint)
-      window.addEventListener('load', function() {
-        setTimeout(function() {
-          var base = '/game/Build/';
-          var names = ['WebGL.framework.js', 'WebGL.data', 'WebGL.wasm'];
-          for (var i = 0; i < names.length; i++) {
-            var link = document.createElement('link');
-            link.rel = 'prefetch';
-            link.href = base + names[i];
-            document.head.appendChild(link);
-          }
-        }, 300);
-      });
-    </script>
   </body>
 </html>

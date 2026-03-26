@@ -2,9 +2,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useTranslations } from '../context/LocaleContext';
 import { useLoginSignupModal } from '../context/LoginSignupModalContext';
+import { GAME_PAGE_HREF } from '../config';
 import { prefetchGameAssets } from '../utils/prefetchGameAssets';
-
-const GAME_URL = '/game/index.html';
 
 function HomeIcon({ active }: { active: boolean }) {
   return (
@@ -55,7 +54,12 @@ export function BottomNav() {
   const location = useLocation();
   const isMeActive = location.pathname === '/me';
   const handlePlayClick = () => {
-    if (loggedIn) window.location.href = GAME_URL + '?v=' + Date.now();
+    if (loggedIn) {
+      prefetchGameAssets();
+      window.setTimeout(() => {
+        window.location.href = GAME_PAGE_HREF;
+      }, 200);
+    }
     else showLoginSignupModal();
   };
   const handleMeClick = (e: React.MouseEvent) => {
@@ -87,8 +91,6 @@ export function BottomNav() {
         <button
           type="button"
           onClick={handlePlayClick}
-          onMouseEnter={prefetchGameAssets}
-          onFocus={prefetchGameAssets}
           className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold text-[#BDBDBD]"
         >
           <DiceIcon active={false} />

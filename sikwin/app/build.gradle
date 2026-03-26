@@ -12,13 +12,40 @@ android {
     namespace 'com.sikwin.app'
     compileSdk 34
 
+    flavorDimensions += "franchise"
+    productFlavors {
+        sikwin {
+            dimension "franchise"
+            resValue "string", "app_name", "Gundu Ata"
+        }
+        sai {
+            dimension "franchise"
+            applicationId "com.sai.gunduata"
+            resValue "string", "app_name", "Sai"
+        }
+        kiran {
+            dimension "franchise"
+            applicationId "com.kiran.gunduata"
+            resValue "string", "app_name", "Kiran"
+            buildConfigField "String", "PUBLIC_SITE_URL", '"https://kiran.gunduata.club"'
+            manifestPlaceholders = [deepLinkHost: "kiran.gunduata.club"]
+        }
+        jittu {
+            dimension "franchise"
+            applicationId "com.jittu.gunduata"
+            // Same display name as main app; franchise is distinguished by applicationId + website.
+            resValue "string", "app_name", "Gundu Ata"
+            buildConfigField "String", "PUBLIC_SITE_URL", '"https://jittu.gunduata.online"'
+            manifestPlaceholders = [deepLinkHost: "jittu.gunduata.online"]
+        }
+    }
+
     defaultConfig {
         applicationId "com.sikwin.app"
         minSdk 25
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
-        archivesBaseName = "Sikwin"
+        versionCode 2
+        versionName "1.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += ["en", "te", "hi"]
@@ -26,6 +53,10 @@ android {
             useSupportLibrary true
         }
         // Let Unity library determine supported architectures automatically
+
+        // Player-facing website (signup / share links). Override per franchise flavor below.
+        buildConfigField "String", "PUBLIC_SITE_URL", '"https://gunduata.club"'
+        manifestPlaceholders = [deepLinkHost: "gunduata.club"]
     }
 
     signingConfigs {
@@ -54,6 +85,7 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.8'
@@ -65,6 +97,73 @@ android {
         }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+}
+
+// APK base names per franchise (do not use archivesBaseName on each flavor — last flavor wins for all variants in AGP 8).
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+        switch (variant.flavorName) {
+            case "sikwin":
+                output.outputFileName = "Gunduata-${variant.buildType.name}.apk"
+                break
+            case "sai":
+                output.outputFileName = "Sai-${variant.buildType.name}.apk"
+                break
+            case "kiran":
+                output.outputFileName = "Kiran-${variant.buildType.name}.apk"
+                break
+            case "jittu":
+                output.outputFileName = "Gunduata-${variant.buildType.name}.apk"
+                break
+            default:
+                break
+        }
+    }
+}
+
+// Remove macOS ._ resource fork files that break the Android resource parser
+// Copy Kiran APK to a dedicated "kiran" folder at sikwin root
+afterEvaluate {
+    tasks.matching { it.name.contains('parse') && it.name.contains('LocalResources') }.configureEach { task ->
+        task.doFirst {
+            def packagedRes = file("${project.buildDir}/intermediates/packaged_res")
+            if (packagedRes.exists()) {
+                fileTree(dir: packagedRes, includes: ['**/._*']).each { f -> f.delete() }
+            }
+        }
+    }
+    android.applicationVariants.all { variant ->
+        if (variant.flavorName == "kiran") {
+            variant.assembleProvider.get().doLast {
+                def kiranDir = file("${rootProject.projectDir}/kiran")
+                kiranDir.mkdirs()
+                variant.outputs.all { output ->
+                    if (output.outputFile?.exists()) {
+                        copy {
+                            from output.outputFile
+                            into kiranDir
+                            rename { "Kiran-${variant.buildType.name}.apk" }
+                        }
+                    }
+                }
+            }
+        }
+        if (variant.flavorName == "jittu") {
+            variant.assembleProvider.get().doLast {
+                def jittuDir = file("${rootProject.projectDir}/jittu")
+                jittuDir.mkdirs()
+                variant.outputs.all { output ->
+                    if (output.outputFile?.exists()) {
+                        copy {
+                            from output.outputFile
+                            into jittuDir
+                            rename { "Gunduata-${variant.buildType.name}.apk" }
+                        }
+                    }
+                }
+            }
         }
     }
 }

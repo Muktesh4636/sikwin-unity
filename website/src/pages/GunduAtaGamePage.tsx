@@ -1,15 +1,18 @@
 import { useEffect } from 'react';
-
-const GAME_URL = '/game/index.html';
+import { GAME_PAGE_HREF } from '../config';
+import { prefetchGameAssets } from '../utils/prefetchGameAssets';
 
 /**
  * Redirects to the Unity WebGL game. The game must be present at public/game/
  * (run website/copy-webgl-build.sh after building the Unity WebGL project).
- * Cache-busting ?v= ensures the latest game page (no loading screen) is loaded.
+ * Uses stable GAME_PAGE_HREF so the browser can cache the shell; bump VITE_GAME_VERSION when you ship a new WebGL build.
  */
 export function GunduAtaGamePage() {
   useEffect(() => {
-    window.location.href = GAME_URL + '?v=' + Date.now();
+    prefetchGameAssets();
+    window.setTimeout(() => {
+      window.location.href = GAME_PAGE_HREF;
+    }, 200);
   }, []);
 
   return (

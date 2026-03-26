@@ -53,6 +53,19 @@ server {
     root /var/www/gunduata.club;
     index index.html;
 
+    # Game admin (Django). ^~ beats a wrong "location /game" that would match /game-admin.
+    location ^~ /game-admin {
+        proxy_pass http://app_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 75s;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
+    }
+
     location = /game/Build/WebGL.framework.js {
         gzip off;
         alias /var/www/gunduata.club/game/Build/WebGL.framework.js.gz;

@@ -132,8 +132,7 @@ fun LuckyDrawScreen(
 
                     lastResult = "₹$amount"
 
-                    // Refresh wallet balance after successful claim
-                    viewModel.fetchWallet()
+                    // Wallet will be refreshed when spin stops (in finishedListener)
 
                     // Calculate spin animation
                     val extraRotations = 10 + Random.nextInt(5)
@@ -180,6 +179,8 @@ fun LuckyDrawScreen(
             if (rotationAngle != 0f) {
                 isSpinning = false
                 showResultDialog = true
+                // Add money to wallet only after spin has stopped
+                viewModel.fetchWallet()
             }
         }
     )

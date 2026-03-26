@@ -632,6 +632,9 @@ fun PaymentScreen(
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
+
+            // Bottom padding so "Submit Payment Proof" and upload section are never cut off by nav/gesture bar
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

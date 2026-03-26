@@ -34,8 +34,32 @@ android {
     }
 }
 
+// Workaround: project path containing ":" (e.g. "Kotlin:Unity") breaks Java classpath on Unix.
+// Copy Unity JARs to a path without colon so javac can find them.
+def unityLibsCacheDir = new File(gradle.gradleUserHomeDir, "unity-libs-cache")
+def projectPathHasColon = project.projectDir.absolutePath.contains(':')
+if (projectPathHasColon) {
+    unityLibsCacheDir.mkdirs()
+    copy {
+        from fileTree(dir: 'src/main/libs', include: ['*.jar'])
+        into unityLibsCacheDir
+    }
+}
+
+// Remove macOS ._ resource fork files that break the Android resource parser
+afterEvaluate {
+    tasks.matching { it.name.contains('parse') && it.name.contains('LocalResources') }.configureEach { task ->
+        task.doFirst {
+            def packagedRes = file("${project.buildDir}/intermediates/packaged_res")
+            if (packagedRes.exists()) {
+                fileTree(dir: packagedRes, includes: ['**/._*']).each { f -> f.delete() }
+            }
+        }
+    }
+}
+
 dependencies {
-    implementation fileTree(dir: 'src/main/libs', include: ['*.jar'])
+    implementation fileTree(dir: projectPathHasColon ? unityLibsCacheDir.absolutePath : 'src/main/libs', include: ['*.jar'])
     implementation 'androidx.activity:activity:1.8.2'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.core:core-ktx:1.12.0'

@@ -128,7 +128,7 @@ fun WithdrawScreen(
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(stringResource(R.string.unavailable_balance), color = TextGrey, fontSize = 12.sp)
-                        Text("₹${wallet.unavaliable_balance}", color = Color.Gray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("₹${wallet.unavailableBalanceDisplay}", color = Color.Gray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

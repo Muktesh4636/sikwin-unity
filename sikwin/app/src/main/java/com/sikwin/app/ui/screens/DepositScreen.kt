@@ -288,10 +288,11 @@ fun DepositScreen(
             Text(stringResource(R.string.reminder), color = Color.Red, fontWeight = FontWeight.Bold)
             Text(
                 stringResource(R.string.deposit_reminder),
-                color = TextGrey,
+                color = TextWhite,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

@@ -4,7 +4,9 @@ import './index.css';
 import App from './App.tsx';
 import { AuthProvider } from './auth/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';
-import { CANONICAL_SITE_URL, ALLOWED_HOSTS } from './config';
+import { CANONICAL_SITE_URL, ALLOWED_HOSTS, APP_NAME } from './config';
+
+if (typeof document !== 'undefined') document.title = APP_NAME;
 
 // If canonical site is set and user arrived via IP or unknown host, redirect to same page on canonical domain.
 // gunduata1.gunduata.club and other allowed hosts are not redirected.

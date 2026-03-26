@@ -57,9 +57,10 @@ fun HelpCenterScreen(
         // If we already have cached contacts, render instantly and refresh quietly.
         isLoading = (whatsappNumber == null && telegramHandle == null)
         loadError = null
+        val pkg = context.packageName
         val result = withContext(Dispatchers.IO) {
             try {
-                val response = RetrofitClient.apiService.getSupportContacts()
+                val response = RetrofitClient.apiService.getSupportContacts(pkg)
                 if (response.isSuccessful) {
                     val contacts = response.body()
                     Triple(contacts?.whatsapp_number, contacts?.telegram, null as String?)

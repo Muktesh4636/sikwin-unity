@@ -167,6 +167,8 @@ fun LuckyWheelScreen(
                 isSpinning = false
                 hasClaimedToday = true
                 showResultDialog = true
+                // Add money to wallet only after spin has stopped
+                viewModel.fetchWallet()
             }
         }
     }

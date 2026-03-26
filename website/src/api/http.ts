@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import { API_BASE_URL, STORAGE_KEYS } from '../config';
+import { API_BASE_URL, FRANCHISE_CODE, STORAGE_KEYS } from '../config';
 
 type RefreshResponse = {
   access?: string;
@@ -38,10 +38,13 @@ export const http = axios.create({
 });
 
 http.interceptors.request.use((config) => {
+  config.headers = config.headers ?? {};
   const token = getAccess();
   if (token) {
-    config.headers = config.headers ?? {};
     (config.headers as any).Authorization = `Bearer ${token}`;
+  }
+  if (FRANCHISE_CODE) {
+    (config.headers as any)['X-Franchise-Code'] = FRANCHISE_CODE;
   }
   return config;
 });

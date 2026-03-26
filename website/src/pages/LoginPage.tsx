@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { AuthTabs } from '../components/AuthTabs';
+import { APP_NAME } from '../config';
 
 export function LoginPage() {
   const auth = useAuth();
@@ -32,7 +33,7 @@ export function LoginPage() {
     <div className="mobile-frame min-h-dvh bg-appBg px-4 pt-6 pb-24">
       <AuthTabs current="login" />
       <div className="mt-8">
-        <div className="text-2xl font-extrabold text-[#FFCC00]">Gundu Ata</div>
+        <div className="text-2xl font-extrabold text-[#FFCC00]">{APP_NAME}</div>
         <div className="mt-2 text-2xl font-bold text-textWhite">Welcome back</div>
         <div className="mt-1 text-sm text-textGrey">Please enter your username and password to log in</div>
 

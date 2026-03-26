@@ -32,10 +32,17 @@ data class MaintenanceStatus(
 
 data class Wallet(
     val balance: String,
+    @com.google.gson.annotations.SerializedName("unavaliable_balance")
     val unavaliable_balance: String = "0.00",
+    @com.google.gson.annotations.SerializedName("unavailable_balance")
+    val unavailable_balance: String? = null,
     val withdrawable_balance: String = "0.00",
     val user: User? = null
-)
+) {
+    /** Unavailable balance: supports both API spellings (unavailable_balance / unavaliable_balance). */
+    val unavailableBalanceDisplay: String
+        get() = unavailable_balance?.takeIf { it.isNotBlank() } ?: unavaliable_balance.takeIf { it.isNotBlank() } ?: "0.00"
+}
 
 data class Transaction(
     val id: Int,

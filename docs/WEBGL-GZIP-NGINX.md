@@ -45,3 +45,27 @@ curl -sI "https://gunduata.club/game/Build/WebGL.framework.js" | grep -i content
 ```
 
 Headers may differ from origin; after purge, the game should load. If not, test **grey-cloud** (DNS only) temporarily to confirm origin behavior.
+
+## `Unknown data format (id=" ")` in the browser console
+
+Unity is loading **`WebGL.data`** as **HTML** (usually your React **`index.html`**) because **`/game/Build/WebGL.data`** does not exist on disk—only **`WebGL.data.gz`** was deployed—and Nginx **`try_files`** falls through to **`/index.html`**.
+
+**Fix:** After deploy, expand gzip on the server (or configure Nginx to serve `.gz` with **`Content-Encoding: gzip`** as in this doc’s LB example):
+
+```bash
+cd /var/www/gunduata.club/game/Build
+for f in WebGL.framework.js.gz WebGL.data.gz WebGL.wasm.gz; do
+  [ -f "$f" ] && zcat "$f" > "${f%.gz}" && chown www-data:www-data "${f%.gz}"
+done
+```
+
+`website/deploy-to-server.sh` runs this automatically on every deploy (SSH key or password).
+
+## StreamingAssets / “missing UI” / Addressables
+
+Unity WebGL often loads extra files from **`/game/StreamingAssets/...`**. If Nginx’s **`location /`** uses **`try_files … /index.html`**, a **missing** StreamingAssets file is replaced by the **React `index.html`**. The runtime then treats HTML as binary data → broken UI or “assets missing”.
+
+1. **Deploy the folder:** `website/copy-webgl-build.sh` copies **`StreamingAssets/`** from the Unity build output when it exists (same level as `Build/` and `TemplateData/`).
+2. **Nginx:** Add **`docs/nginx-snippet-game-streamingassets.conf`** (before `location /ws/`) on the LB so `/game/StreamingAssets/` never falls through to the SPA.
+
+After a WebGL build, confirm locally: **`website/public/game/StreamingAssets/`** is non-empty if your project uses Addressables or files in `Assets/StreamingAssets`.

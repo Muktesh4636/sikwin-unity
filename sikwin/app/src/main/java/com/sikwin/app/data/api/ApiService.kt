@@ -109,7 +109,7 @@ interface ApiService {
     suspend fun deleteBankDetail(@Path("id") id: Int): Response<Unit>
 
     @GET("support/contacts/")
-    suspend fun getSupportContacts(): Response<SupportContacts>
+    suspend fun getSupportContacts(@Query("package") packageName: String): Response<SupportContacts>
 
     @POST("whitelabel/lead/")
     suspend fun submitWhitelabelLead(@Body data: Map<String, String>): Response<Map<String, Any>>

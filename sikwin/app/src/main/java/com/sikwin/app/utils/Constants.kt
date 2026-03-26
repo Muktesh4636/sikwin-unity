@@ -6,6 +6,5 @@ object Constants {
     // Alternative: Direct IP (not recommended for HTTPS)
     // const val BASE_URL = "http://72.61.254.71/api/"
 
-    /** URL to download the APK (used by Install APK on home). Change to your APK download link. */
-    const val APK_DOWNLOAD_URL = "https://gunduata.com/download"
+    // APK / signup links for users: use BuildConfig.PUBLIC_SITE_URL (per franchise in app/build.gradle).
 }

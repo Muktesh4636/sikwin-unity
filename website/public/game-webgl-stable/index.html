@@ -8,8 +8,23 @@
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
     <style>
-      html, body { margin: 0; padding: 0; width: 100%; height: 100%; min-height: 100vh; min-height: 100dvh; overflow: hidden; background: #231F20; }
-      #unity-container.unity-mobile { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; min-height: 100vh; min-height: 100dvh; overflow: hidden; background: #121212; }
+      /* Same as mobile on desktop: centered phone-width column (matches website mobile-frame ~430px) */
+      #unity-container.unity-mobile {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(100vw, 430px);
+        max-width: 430px;
+        height: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow: hidden;
+        box-sizing: border-box;
+        background: #231F20;
+      }
       .unity-mobile #unity-canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; min-height: 100%; }
       #rotate-overlay { display: none; position: fixed; inset: 0; z-index: 99999; background: #231F20; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center; color: #FFCC00; font-family: system-ui, sans-serif; }
       #rotate-overlay.show { display: flex; }
@@ -34,10 +49,9 @@
       <p>Please rotate your device to portrait to play</p>
     </div>
     <div id="game-loading-hint">Loading…</div>
-    <!-- Back to Home: invisible but clickable in top-left, goes to home page -->
-    <button type="button" id="html-back-btn" title="Back to Home" style="position:fixed;top:0;left:0;z-index:2147483647;width:60px;height:60px;padding:0;margin:0;border:none;background:transparent;color:transparent;cursor:pointer;font-size:0;">←</button>
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+    <div id="unity-container" class="unity-mobile">
+      <button type="button" id="html-back-btn" title="Back to Home" style="position:absolute;top:0;left:0;z-index:2147483647;width:60px;height:60px;padding:0;margin:0;border:none;background:transparent;color:transparent;cursor:pointer;font-size:0;">←</button>
+      <canvas id="unity-canvas" width="720" height="1280" tabindex="-1"></canvas>
       <div id="unity-loading-bar" aria-hidden="true" style="display:none!important;visibility:hidden!important;position:absolute;left:-9999px;">
         <div id="loading-text">Loading Game...</div>
         <div id="unity-progress-bar-empty">
@@ -75,12 +89,13 @@
       }
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/WebGL.loader.js";
+      var cacheBust = "?v=4";
+      var loaderUrl = buildUrl + "/WebGL.loader.js" + cacheBust;
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/WebGL.data",
-        frameworkUrl: buildUrl + "/WebGL.framework.js",
-        codeUrl: buildUrl + "/WebGL.wasm",
+        dataUrl: buildUrl + "/WebGL.data" + cacheBust,
+        frameworkUrl: buildUrl + "/WebGL.framework.js" + cacheBust,
+        codeUrl: buildUrl + "/WebGL.wasm" + cacheBust,
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Gundu Ata",
@@ -88,14 +103,13 @@
         showBanner: unityShowBanner,
       };
 
+      canvas.className = "unity-mobile";
       var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (isMobile) {
         var meta = document.createElement('meta');
         meta.name = 'viewport';
         meta.content = 'width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=yes';
         document.getElementsByTagName('head')[0].appendChild(meta);
-        document.querySelector("#unity-container").className = "unity-mobile";
-        canvas.className = "unity-mobile";
         (function lockPortrait() {
           if (screen.orientation && screen.orientation.lock) {
             screen.orientation.lock('portrait').catch(function() {});
@@ -108,9 +122,6 @@
         window.addEventListener('resize', checkOrientation);
         window.addEventListener('orientationchange', checkOrientation);
         checkOrientation();
-      } else {
-        canvas.style.width = "960px";
-        canvas.style.height = "600px";
       }
 
       function goToHomepage() {
@@ -120,15 +131,23 @@
 
       // When user logs out on the website (another tab), tokens are cleared; redirect this game tab to home
       window.addEventListener('storage', function(e) {
-        if (e.key === 'sikwin_access' && e.newValue === null) {
-          goToHomepage();
-        }
+        try {
+          if (e && e.key && typeof e.key === 'string' && e.key.endsWith('_access') && e.newValue === null) {
+            goToHomepage();
+          }
+        } catch (err) { /* ignore */ }
       });
 
       document.getElementById('html-back-btn').onclick = function() {
         goToHomepage();
       };
 
+      function hideLoadingHint() {
+        var hint = document.getElementById('game-loading-hint');
+        if (hint) hint.classList.add('hidden');
+      }
+
+      function appendUnityLoaderScript() {
       var script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = function() {
@@ -145,19 +164,50 @@
             unityInstance.SetFullscreen(1);
           };
 
-          // Pass website auth tokens to Unity so user is logged in inside the game
-          var accessToken = localStorage.getItem('sikwin_access');
-          var refreshToken = localStorage.getItem('sikwin_refresh');
-          if (accessToken && refreshToken) {
-            try {
-              unityInstance.SendMessage('GameManager', 'SetAccessAndRefreshToken', JSON.stringify({
-                accessToken: accessToken,
-                refreshToken: refreshToken
-              }));
-            } catch (e) {
-              console.warn('Could not pass tokens to game:', e);
+          (function passSessionToUnity() {
+            var tokenPairs = [
+              { accessKey: 'sikwin_access', refreshKey: 'sikwin_refresh' },
+              { accessKey: 'kiran_access', refreshKey: 'kiran_refresh' },
+              { accessKey: 'sai_access', refreshKey: 'sai_refresh' },
+              { accessKey: 'jittu_access', refreshKey: 'jittu_refresh' }
+            ];
+            var accessToken = null;
+            var refreshToken = null;
+            var i, k, a, r, base;
+            for (i = 0; i < tokenPairs.length; i++) {
+              a = localStorage.getItem(tokenPairs[i].accessKey);
+              r = localStorage.getItem(tokenPairs[i].refreshKey);
+              if (a && r) { accessToken = a; refreshToken = r; break; }
             }
-          }
+            if (!accessToken) {
+              try {
+                for (i = 0; i < localStorage.length; i++) {
+                  k = localStorage.key(i);
+                  if (!k || k.length < 8 || !k.endsWith('_access')) continue;
+                  base = k.substring(0, k.length - 7);
+                  a = localStorage.getItem(k);
+                  r = localStorage.getItem(base + '_refresh');
+                  if (a && r) { accessToken = a; refreshToken = r; break; }
+                }
+              } catch (e) { /* ignore */ }
+            }
+            if (!accessToken || !refreshToken) return;
+            var payload = JSON.stringify({
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+              access: accessToken,
+              refresh: refreshToken,
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+            function sendOnce() {
+              try { unityInstance.SendMessage('GameManager', 'SetAccessAndRefreshToken', payload); } catch (e) {}
+              try { unityInstance.SendMessage('GameManager', 'SetAccessAndRefreshTokens', payload); } catch (e) {}
+            }
+            sendOnce();
+            setTimeout(sendOnce, 200);
+            setTimeout(sendOnce, 900);
+          })();
         }).catch(function(message) {
           var loadingBar = document.querySelector("#unity-loading-bar");
           if (loadingBar) loadingBar.style.display = "none";
@@ -173,8 +223,42 @@
         var hint = document.getElementById("game-loading-hint");
         if (hint) hint.classList.add("hidden");
         unityShowBanner("Failed to load game files. Check your connection and try again.", 'error');
+        try {
+          var warningBanner = document.querySelector("#unity-warning");
+          if (warningBanner) {
+            var retryBtn = document.createElement('button');
+            retryBtn.textContent = 'Retry';
+            retryBtn.style.marginTop = '12px';
+            retryBtn.style.padding = '10px 14px';
+            retryBtn.style.background = '#FFCC00';
+            retryBtn.style.border = '0';
+            retryBtn.style.borderRadius = '10px';
+            retryBtn.style.fontWeight = '700';
+            retryBtn.onclick = function() { window.location.reload(); };
+            warningBanner.appendChild(retryBtn);
+          }
+        } catch (err) { /* ignore */ }
       };
       document.body.appendChild(script);
+      }
+
+      var frameworkProbeUrl = config.frameworkUrl;
+      fetch(frameworkProbeUrl, { method: 'HEAD', cache: 'no-store' })
+        .then(function(r) {
+          var ct = (r.headers.get('content-type') || '').toLowerCase();
+          if (!r.ok || ct.indexOf('text/html') !== -1) {
+            hideLoadingHint();
+            unityShowBanner(
+              'Game files are missing or the server sent HTML instead of game JavaScript (console: syntax error). Deploy the full Unity WebGL Build/ (framework, data, wasm) or run website/copy-webgl-build.sh.',
+              'error'
+            );
+            return;
+          }
+          appendUnityLoaderScript();
+        })
+        .catch(function() {
+          appendUnityLoaderScript();
+        });
     </script>
   </body>
 </html>

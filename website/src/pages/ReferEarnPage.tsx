@@ -73,14 +73,13 @@ function WalletIcon({ className }: { className?: string }) {
   );
 }
 
+// Milestone tiers shown in the website UI.
+// Per your new rules: 3 -> ₹500, 12 -> ₹2400, 20 -> ₹4000.
+// If you also have a 4th tier, tell me the referral count and reward and I’ll add it.
 const MILESTONES: { count: number; reward: string; description?: string }[] = [
-  { count: 3, reward: '₹500' },
-  { count: 5, reward: '₹1000' },
-  { count: 10, reward: '₹5000' },
-  { count: 20, reward: '₹10000' },
-  { count: 30, reward: 'Mega Spin', description: 'Referrals Mega Spin (up to ₹1 Lakh)' },
-  { count: 50, reward: '₹25000' },
-  { count: 100, reward: '₹50000' },
+  { count: 3, reward: '₹500', description: 'Reward for 3 referrals' },
+  { count: 12, reward: '₹2400', description: 'Reward for 12 referrals' },
+  { count: 20, reward: '₹4000', description: 'Reward for 20 referrals' },
 ];
 
 const HOW_IT_WORKS = [
@@ -129,7 +128,11 @@ export function ReferEarnPage() {
   const depositedCount = referralData?.referrals?.filter((r) => r.has_deposit).length ?? 0;
   const totalEarned = referralData?.total_earnings ?? '0';
   const nextMilestoneFromApi = referralData?.next_milestone;
-  const nextMilestone = MILESTONES[0];
+  const nextMilestoneCount = nextMilestoneFromApi?.next_milestone ?? MILESTONES[0].count;
+  const nextMilestoneMatch = MILESTONES.find((m) => m.count === nextMilestoneCount) ?? MILESTONES[0];
+  const nextMilestoneReward =
+    nextMilestoneFromApi?.next_bonus_display ??
+    (typeof nextMilestoneFromApi?.next_bonus === 'number' ? `₹${nextMilestoneFromApi.next_bonus}` : nextMilestoneMatch.reward);
   const currentProgress = nextMilestoneFromApi?.current_progress ?? 0;
 
   return (
@@ -221,10 +224,10 @@ export function ReferEarnPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-xs text-[#BDBDBD]">Next reward</div>
-                    <div className="mt-1 text-xl font-bold text-[#FFCC00]">{nextMilestone.reward}</div>
+                    <div className="mt-1 text-xl font-bold text-[#FFCC00]">{nextMilestoneReward}</div>
                   </div>
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-[#4a4a4a] text-sm font-medium text-white">
-                    {currentProgress}/{nextMilestone.count}
+                    {currentProgress}/{nextMilestoneCount}
                   </div>
                 </div>
               </div>
