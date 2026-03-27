@@ -239,6 +239,7 @@
     <string name="step_share_code">दोस्तों के साथ अपना कोड शेयर करें</string>
     <string name="step_friend_deposits">दोस्त रजिस्टर करता है और ₹100+ जमा करता है</string>
     <string name="step_get_bonus">आपको तुरंत ₹100 मिलता है!</string>
+    <string name="referral_milestone_auto_credit_note">हर चरण पूरा होने पर माइलस्टोन नकद (₹500, ₹2,200) आपके वॉलेट में अपने आप जमा हो जाता है। अंतिम चरण (25 रेफ़रल) Spin &amp; Win खोलता है — अपने आप नकद नहीं।</string>
     <string name="step_milestone_bonuses">चरण: 3 रेफरल → ₹500, फिर 12 और (0/12) → ₹2,200 (कुल 15), फिर 25 → स्पिन (कुल 40)</string>
     <string name="milestone_complete_next_level">%1$d/%2$d रेफरल पूरे — माइलस्टोन पूरा। अगला स्तर: %3$d रेफरल।</string>
     <string name="milestone_step2_resets">चरण 1 पूरा (%1$d/%1$d)। चरण 2 शून्य से — इस चरण में %2$d रेफरल (1 और 2 के लिए कुल %3$d)।</string>

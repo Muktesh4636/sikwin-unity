@@ -73,19 +73,18 @@ function WalletIcon({ className }: { className?: string }) {
   );
 }
 
-// Milestone tiers shown in the website UI.
-// Per your new rules: 3 -> ₹500, 12 -> ₹2400, 20 -> ₹4000.
-// If you also have a 4th tier, tell me the referral count and reward and I’ll add it.
+// Milestone tiers (per-step counts; must match API / APK). Cash tiers credit via backend wallet.
+// Step 3 (25 in step) = Spin & Win only — no automatic cash deposit.
 const MILESTONES: { count: number; reward: string; description?: string }[] = [
-  { count: 3, reward: '₹500', description: 'Reward for 3 referrals' },
-  { count: 12, reward: '₹2400', description: 'Reward for 12 referrals' },
-  { count: 20, reward: '₹4000', description: 'Reward for 20 referrals' },
+  { count: 3, reward: '₹500', description: '3 referrals in step 1 — auto-credited to wallet' },
+  { count: 12, reward: '₹2,200', description: '12 referrals in step 2 — auto-credited to wallet' },
+  { count: 25, reward: 'Spin & Win', description: '25 referrals in step 3 — mega spin (not cash)' },
 ];
 
 const HOW_IT_WORKS = [
   'Share your code with friends',
   'Friend registers & deposits ₹100+',
-  'You get ₹100 instantly!',
+  'You get ₹100 instantly; milestone cash (₹500 / ₹2,200) is added to your wallet automatically. At 25 referrals in the final step you unlock Spin & Win instead of a cash payout.',
 ];
 
 export function ReferEarnPage() {

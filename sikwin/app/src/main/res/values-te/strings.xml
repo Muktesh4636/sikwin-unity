@@ -239,6 +239,7 @@
     <string name="step_share_code">స్నేహితులతో మీ కోడ్ షేర్ చేయండి</string>
     <string name="step_friend_deposits">స్నేహితుడు నమోదు చేసి ₹100+ జమ చేస్తాడు</string>
     <string name="step_get_bonus">మీకు వెంటనే ₹100 లభిస్తుంది!</string>
+    <string name="referral_milestone_auto_credit_note">ప్రతి దశ పూర్తయినప్పుడు మైలురాళ్ల నగదు (₹500, ₹2,200) మీ వాలెట్‌కు ఆటోమేటిక్‌గా జమ అవుతుంది. చివరి దశ (25 రెఫరల్స్) Spin &amp; Winను అన్‌లాక్ చేస్తుంది — ఆటోమేటిక్ నగదు కాదు.</string>
     <string name="step_milestone_bonuses">అంచెలు: 3 రిఫరల్స్ → ₹500, తర్వాత 12 (0/12) → ₹2,200 (15 మొత్తం), తర్వాత 25 → స్పిన్ (40 మొత్తం)</string>
     <string name="milestone_complete_next_level">%1$d/%2$d రిఫరల్స్ పూర్తయ్యాయి — మైలురాయి పూర్తి. తదుపరి స్థాయి: %3$d రిఫరల్స్.</string>
     <string name="milestone_step2_resets">అంచె 1 పూర్తి (%1$d/%1$d). అంచె 2 లో 0 నుండి — ఈ అంచెలో మాత్రమే %2$d రిఫరల్స్ (1 &amp; 2 కు %3$d మొత్తం).</string>

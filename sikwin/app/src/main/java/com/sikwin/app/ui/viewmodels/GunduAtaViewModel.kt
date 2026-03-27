@@ -427,6 +427,8 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                         userProfile = it.user
                         loginSuccess = true
                         registerFcmTokenIfNeeded()
+                        fetchWallet()
+                        fetchProfile()
                     }
                 } else {
                     val errorBody = response.errorBody()?.string()
@@ -508,6 +510,8 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                         loginSuccess = true
                         otpSent = false // Reset OTP state
                         registerFcmTokenIfNeeded()
+                        fetchWallet()
+                        fetchProfile()
                     }
                 } else {
                     val errorBody = response.errorBody()?.string()
@@ -583,6 +587,8 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                         userProfile = it.user
                         sessionManager.saveReferralCode(it.user.referral_code)
                         loginSuccess = true
+                        fetchWallet()
+                        fetchProfile()
                     }
                 } else {
                     val errorBody = response.errorBody()?.string()
@@ -1095,15 +1101,15 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
 
     /**
      * Mega spin APIs sometimes return both lucky_draw.amount and reward.amount with different values.
-     * Wallet credit follows the ledger field — prefer reward, then optional credited_amount.
+     * Prefer credited_amount. If they disagree, lucky_draw matches the credited prize; reward can be lower.
      */
     private fun resolveMegaSpinRupeeAmount(body: Map<String, Any>?): Int {
         if (body == null) return 0
         body["credited_amount"]?.let { parseAmountToInt(it) }?.let { return it }
         val ld = (body["lucky_draw"] as? Map<*, *>)?.get("amount")?.let { parseAmountToInt(it) }
         val rw = (body["reward"] as? Map<*, *>)?.get("amount")?.let { parseAmountToInt(it) }
-        if (ld != null && rw != null && ld != rw) return rw
-        return rw ?: ld ?: 0
+        if (ld != null && rw != null && ld != rw) return ld
+        return ld ?: rw ?: 0
     }
 
     private fun resolveMegaSpinRupeeAmountOrNull(body: Map<String, Any>?): Int? {
@@ -1111,8 +1117,8 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         body["credited_amount"]?.let { parseAmountToInt(it) }?.let { return it }
         val ld = (body["lucky_draw"] as? Map<*, *>)?.get("amount")?.let { parseAmountToInt(it) }
         val rw = (body["reward"] as? Map<*, *>)?.get("amount")?.let { parseAmountToInt(it) }
-        if (ld != null && rw != null && ld != rw) return rw
-        return rw ?: ld
+        if (ld != null && rw != null && ld != rw) return ld
+        return ld ?: rw
     }
 
     // Optional: Sync contacts to backend

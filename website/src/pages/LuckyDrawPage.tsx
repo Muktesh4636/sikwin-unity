@@ -30,7 +30,8 @@ function parsePositiveAmount(raw: unknown): number | null {
 
 /**
  * Mega spin: some APIs return both lucky_draw.amount and reward.amount with different values.
- * The wallet is credited from the ledger side — prefer reward, then optional credited_amount.
+ * Prefer credited_amount when present. If they disagree, lucky_draw matches the credited spin prize;
+ * reward can be stale/smaller (e.g. UI showed ₹100 while ₹200 was credited).
  */
 function resolveMegaSpinAmountFromClaimBody(body: Record<string, unknown> | undefined): number {
   if (!body) return 0;
@@ -42,8 +43,8 @@ function resolveMegaSpinAmountFromClaimBody(body: Record<string, unknown> | unde
   const ld = parsePositiveAmount(ldRaw);
   const rw = parsePositiveAmount(rwRaw);
 
-  if (ld != null && rw != null && ld !== rw) return rw;
-  return rw ?? ld ?? 0;
+  if (ld != null && rw != null && ld !== rw) return ld;
+  return ld ?? rw ?? 0;
 }
 
 function resolveMegaSpinAmountFromStatus(status: LuckyDrawStatus | undefined): number | null {
@@ -52,8 +53,8 @@ function resolveMegaSpinAmountFromStatus(status: LuckyDrawStatus | undefined): n
   const ld = parsePositiveAmount(status.lucky_draw?.amount);
   const top = parsePositiveAmount(status.credited_amount);
   if (top != null) return top;
-  if (ld != null && rw != null && ld !== rw) return rw;
-  return rw ?? ld ?? null;
+  if (ld != null && rw != null && ld !== rw) return ld;
+  return ld ?? rw ?? null;
 }
 
 function amountToIndex(amount: number): number {

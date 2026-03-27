@@ -1,5 +1,7 @@
 package com.sikwin.app.data.models
 
+import com.google.gson.annotations.JsonAdapter
+
 data class User(
     val id: Int,
     val username: String,
@@ -30,11 +32,11 @@ data class MaintenanceStatus(
     val remaining_minutes: Int? = null
 )
 
+@JsonAdapter(WalletDeserializer::class)
 data class Wallet(
-    val balance: String,
-    @com.google.gson.annotations.SerializedName("unavaliable_balance")
+    val id: Int? = null,
+    val balance: String = "0.00",
     val unavaliable_balance: String = "0.00",
-    @com.google.gson.annotations.SerializedName("unavailable_balance")
     val unavailable_balance: String? = null,
     val withdrawable_balance: String = "0.00",
     val user: User? = null

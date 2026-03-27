@@ -295,6 +295,14 @@ fun AffiliateScreen(
                         StepItem("3", stringResource(R.string.step_get_bonus))
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.referral_milestone_auto_credit_note),
+                    color = TextGrey,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Milestone bonuses (3, 12, 25) — progress derived from total_referrals so UI matches reality

@@ -271,6 +271,7 @@
     <string name="step_share_code">Share your code with friends</string>
     <string name="step_friend_deposits">Friend registers &amp; deposits ₹100+</string>
     <string name="step_get_bonus">You get ₹100 instantly!</string>
+    <string name="referral_milestone_auto_credit_note">Milestone cash (₹500, ₹2,200) is added to your wallet automatically when you finish each step. The final step (25 referrals) unlocks Spin &amp; Win — not an automatic cash deposit.</string>
     <string name="step_milestone_bonuses">Steps: 3 refs → ₹500, then 12 more (0/12) → ₹2,200 (15 total), then 25 more → Spin (40 total)</string>
     <string name="milestone_complete_next_level">%1$d/%2$d referrals done — milestone complete. Next level: %3$d referrals.</string>
     <string name="milestone_step2_resets">Step 1 complete (%1$d/%1$d). Step 2 starts at 0 — %2$d referrals in this step only (%3$d total for steps 1 &amp; 2).</string>
