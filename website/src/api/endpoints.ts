@@ -27,6 +27,9 @@ export type Wallet = {
 };
 
 export type SupportContacts = {
+  /** API field from gunduata.club (matches Android `SupportContacts.whatsapp_number`) */
+  whatsapp_number?: string | null;
+  /** Legacy/alternate key if backend ever sends camelCase */
   whatsapp?: string | null;
   telegram?: string | null;
   phone?: string | null;
@@ -222,7 +225,14 @@ export type ReferralData = {
     target?: number;
     tier?: number;
   };
-  milestones?: Array<{ count: number; bonus: number; bonus_display?: string }>;
+  milestones?: Array<{
+    count: number;
+    bonus: number;
+    bonus_display?: string;
+    achieved?: boolean;
+    progress_current?: number;
+    target?: number;
+  }>;
   referrals?: Array<{ id: number; username: string; has_deposit?: boolean }>;
 };
 
@@ -251,8 +261,13 @@ export async function apiClaimDailyReward() {
 export type LuckyDrawStatus = {
   claimed?: boolean;
   message?: string;
+  /** Wallet/ledger amount (prefer when present). */
   reward?: { amount?: number };
+  /** Some APIs duplicate this; may disagree with reward — clients should reconcile. */
+  lucky_draw?: { amount?: number };
   deposit_amount?: number;
+  /** If backend sends the actual credited rupees, use for UI. */
+  credited_amount?: number;
 };
 
 export async function apiCheckLuckyDrawStatus() {
@@ -263,6 +278,7 @@ export async function apiClaimLuckyDraw() {
   return http.post<{
     lucky_draw?: { amount?: number };
     reward?: { amount?: number };
+    credited_amount?: number;
     message?: string;
   }>('auth/lucky-draw/');
 }

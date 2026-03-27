@@ -32,8 +32,8 @@ deploy_one() {
   if [ -n "${DEPLOY_SSH_PASSWORD}" ]; then
     sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "mkdir -p ${REMOTE_PATH}"
     sshpass -p "${DEPLOY_SSH_PASSWORD}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=accept-new" dist/ "${DEPLOY_USER}@${host}:${REMOTE_PATH}/"
-    # Uncompress WebGL .gz so Nginx can serve plain files (avoids Cloudflare breaking Content-Encoding)
-    sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "cd ${REMOTE_PATH}/game/Build 2>/dev/null && for f in WebGL.framework.js.gz WebGL.data.gz WebGL.wasm.gz; do [ -f \"\$f\" ] && zcat \"\$f\" > \"\${f%.gz}\" && chown www-data:www-data \"\${f%.gz}\"; done; true"
+    # Game uses WebGL.*.gz URLs — keep compressed files on disk (tiny vs ~100MB+ uncompressed). Drop legacy unpacked blobs.
+    sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "cd ${REMOTE_PATH}/game/Build 2>/dev/null && rm -f WebGL.data WebGL.framework.js WebGL.wasm 2>/dev/null; true"
     # Fix ownership so Nginx (www-data) can read files (rsync leaves owner as your Mac user)
     sshpass -p "${DEPLOY_SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${host}" "chown -R www-data:www-data ${REMOTE_PATH}"
   else

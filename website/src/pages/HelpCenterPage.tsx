@@ -66,11 +66,17 @@ export function HelpCenterPage() {
     refresh();
   }, []);
 
-  const whatsapp = contacts?.whatsapp ?? '';
+  const whatsappRaw = (contacts?.whatsapp_number ?? contacts?.whatsapp ?? '').trim();
   const telegram = contacts?.telegram ?? '';
 
+  const whatsappDisplay = whatsappRaw
+    ? whatsappRaw.startsWith('+')
+      ? whatsappRaw
+      : `+${whatsappRaw}`
+    : '';
+
   const openWhatsApp = () => {
-    const num = whatsapp.replace(/\D/g, '');
+    const num = whatsappRaw.replace(/\D/g, '');
     if (num) window.open(`https://wa.me/${num}`, '_blank', 'noopener');
   };
 
@@ -121,14 +127,14 @@ export function HelpCenterPage() {
           type="button"
           onClick={openWhatsApp}
           className="mt-4 flex w-full items-center gap-4 rounded-2xl bg-[#1B3F30] px-4 py-4 text-left transition-opacity active:opacity-90 disabled:opacity-60"
-          disabled={!whatsapp}
+          disabled={!whatsappRaw}
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#255F43] text-white">
             <WhatsAppIcon className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-bold text-white">WhatsApp Support</div>
-            <div className="mt-0.5 text-sm font-medium text-[#4CAF50]">{whatsapp || '—'}</div>
+            <div className="mt-0.5 text-sm font-medium text-[#4CAF50]">{whatsappDisplay || '—'}</div>
             <div className="mt-0.5 text-xs text-[#BDBDBD]">Get instant help from our support team</div>
           </div>
           <ChevronRightIcon className="h-6 w-6 shrink-0 text-[#4CAF50]" />

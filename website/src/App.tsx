@@ -27,10 +27,16 @@ import { DailyRewardPage } from './pages/DailyRewardPage';
 import { LuckyDrawPage } from './pages/LuckyDrawPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { GunduAtaGamePage } from './pages/GunduAtaGamePage';
+import { isAdminUrlPath } from './utils/adminPath';
 
 function AppRoutes() {
   const { pathname } = useLocation();
-  const hideNav = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+  const hideNav =
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/forgot-password' ||
+    isAdminUrlPath(pathname);
+
   return (
     <>
       <Routes>
@@ -60,6 +66,8 @@ function AppRoutes() {
         <Route path="/lucky-draw" element={<LuckyDrawPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/game-guidelines" element={<GameGuidelinesPage />} />
+        {/* Do not send /admin to HomePage — that looked like a redirect away from Django admin */}
+        <Route path="/admin/*" element={null} />
         <Route path="*" element={<HomePage />} />
       </Routes>
       {!hideNav && <BottomNav />}

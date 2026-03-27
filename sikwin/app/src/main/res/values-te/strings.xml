@@ -115,6 +115,9 @@
     <string name="whatsapp">వాట్సాప్</string>
     <string name="share">షేర్ చేయండి</string>
     <string name="next_reward">తదుపరి రివార్డ్</string>
+    <string name="next_reward_this_step">తదుపరి రివార్డ్ (ఈ అంచె)</string>
+    <string name="great_job_title">అద్భుతం!</string>
+    <string name="great_job_three_complete">3/3 రిఫరల్స్ — అంచె 1 పూర్తి</string>
     <string name="view_all">అన్నీ చూడండి</string>
     <string name="view_all_more">అన్నీ చూడండి (%d మరింత)</string>
     <string name="view_less">తక్కువ చూడండి</string>
@@ -236,5 +239,10 @@
     <string name="step_share_code">స్నేహితులతో మీ కోడ్ షేర్ చేయండి</string>
     <string name="step_friend_deposits">స్నేహితుడు నమోదు చేసి ₹100+ జమ చేస్తాడు</string>
     <string name="step_get_bonus">మీకు వెంటనే ₹100 లభిస్తుంది!</string>
-    <string name="step_milestone_bonuses">బహుమతులను అన్లాక్ చేయండి: 12 రిఫరల్స్ → ₹3,000, 20 → ₹7,500, 25 → స్పిన్ (₹30K వరకు)</string>
+    <string name="step_milestone_bonuses">అంచెలు: 3 రిఫరల్స్ → ₹500, తర్వాత 12 (0/12) → ₹2,200 (15 మొత్తం), తర్వాత 25 → స్పిన్ (40 మొత్తం)</string>
+    <string name="milestone_complete_next_level">%1$d/%2$d రిఫరల్స్ పూర్తయ్యాయి — మైలురాయి పూర్తి. తదుపరి స్థాయి: %3$d రిఫరల్స్.</string>
+    <string name="milestone_step2_resets">అంచె 1 పూర్తి (%1$d/%1$d). అంచె 2 లో 0 నుండి — ఈ అంచెలో మాత్రమే %2$d రిఫరల్స్ (1 &amp; 2 కు %3$d మొత్తం).</string>
+    <string name="milestone_step3_resets">అంచెలు 1–2 పూర్తి (%1$d రిఫరల్స్). అంచె 3 లో 0 నుండి — ఈ అంచె %2$d (%3$d మొత్తం).</string>
+    <string name="refer_more_this_step">అన్లాక్ కోసం ఈ అంచెలో మరో %d రిఫరల్స్</string>
+    <string name="referral_all_milestones_unlocked">అన్ని మైలురాయి బహుమతులు అన్లాక్ అయ్యాయి.</string>
 </resources>

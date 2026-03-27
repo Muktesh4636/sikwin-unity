@@ -147,6 +147,9 @@
     <string name="whatsapp">WhatsApp</string>
     <string name="share">Share</string>
     <string name="next_reward">Next Reward</string>
+    <string name="next_reward_this_step">Next reward (this step)</string>
+    <string name="great_job_title">Great job!</string>
+    <string name="great_job_three_complete">3/3 referrals — step 1 complete</string>
     <string name="view_all">View All</string>
     <string name="view_all_more">View All (%d more)</string>
     <string name="view_less">View Less</string>
@@ -268,5 +271,10 @@
     <string name="step_share_code">Share your code with friends</string>
     <string name="step_friend_deposits">Friend registers &amp; deposits ₹100+</string>
     <string name="step_get_bonus">You get ₹100 instantly!</string>
-    <string name="step_milestone_bonuses">Unlock rewards: 12 refs → ₹3,000, 20 → ₹7,500, 25 → Spin (up to ₹30K)</string>
+    <string name="step_milestone_bonuses">Steps: 3 refs → ₹500, then 12 more (0/12) → ₹2,200 (15 total), then 25 more → Spin (40 total)</string>
+    <string name="milestone_complete_next_level">%1$d/%2$d referrals done — milestone complete. Next level: %3$d referrals.</string>
+    <string name="milestone_step2_resets">Step 1 complete (%1$d/%1$d). Step 2 starts at 0 — %2$d referrals in this step only (%3$d total for steps 1 &amp; 2).</string>
+    <string name="milestone_step3_resets">Steps 1–2 complete (%1$d referrals). Step 3 starts at 0 — %2$d in this step (%3$d total for all three).</string>
+    <string name="refer_more_this_step">%d more referrals in this step to unlock</string>
+    <string name="referral_all_milestones_unlocked">All milestone rewards unlocked.</string>
 </resources>

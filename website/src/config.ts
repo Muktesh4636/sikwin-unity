@@ -1,3 +1,5 @@
+import { GAME_ASSET_VERSION } from './utils/gameAssetVersion';
+
 export const API_BASE_URL =
   (import.meta as any).env?.VITE_API_BASE_URL?.toString() || 'https://gunduata.club/api/';
 
@@ -35,5 +37,5 @@ const GAME_INDEX_PATH = '/game/index.html';
 const gameVersion = (import.meta as any).env?.VITE_GAME_VERSION?.toString()?.trim();
 export const GAME_PAGE_HREF = gameVersion
   ? `${GAME_INDEX_PATH}?v=${encodeURIComponent(gameVersion)}`
-  : GAME_INDEX_PATH;
+  : `${GAME_INDEX_PATH}?v=${GAME_ASSET_VERSION}`;
 

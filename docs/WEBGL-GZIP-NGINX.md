@@ -1,4 +1,16 @@
-# Unity WebGL `.gz` + `Content-Encoding: gzip`
+# Unity WebGL hosting
+
+## Current setup (website v3+): explicit `.gz` URLs
+
+`public/game/index.html` points `dataUrl` / `frameworkUrl` / `codeUrl` at **`WebGL.*.gz`**. Browsers download **~25MB compressed** instead of **~100MB+** if the server was serving unpacked files.
+
+- **Deploy:** `website/deploy-to-server.sh` no longer runs `zcat`; it removes legacy `WebGL.data`, `WebGL.framework.js`, `WebGL.wasm` on the server so huge files are not served by mistake.
+- **Nginx:** Serve the `.gz` files as static content **without** `Content-Encoding: gzip` (Unity decompresses). See **`docs/nginx-snippet-webgl-gzip.conf`**.
+- **Cloudflare:** Purge `/game/Build/` after changes; optional cache bypass for that path while testing.
+
+---
+
+## Older setup: uncompressed names + `Content-Encoding: gzip`
 
 If the game shows:
 

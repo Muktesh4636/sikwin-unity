@@ -5,6 +5,7 @@ import App from './App.tsx';
 import { AuthProvider } from './auth/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';
 import { CANONICAL_SITE_URL, ALLOWED_HOSTS, APP_NAME } from './config';
+import { isAdminUrlPath } from './utils/adminPath';
 
 if (typeof document !== 'undefined') document.title = APP_NAME;
 
@@ -29,7 +30,10 @@ if (typeof window !== 'undefined' && CANONICAL_SITE_URL) {
   }
 }
 
-if (!willRedirect) {
+const skipSpaBoot =
+  typeof window !== 'undefined' && isAdminUrlPath(window.location.pathname);
+
+if (!willRedirect && !skipSpaBoot) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <AuthProvider>

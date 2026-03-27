@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
+    <!-- Root-relative base: if the address bar is /game (no slash), relative "Build/…" wrongly resolves to /Build/… -->
+    <base href="/game/" />
     <title>Gundu Ata | Dice Game</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
@@ -126,15 +128,17 @@
         updateBannerVisibility();
       }
 
-      var buildUrl = "Build";
-      var cacheBust = "?v=2";
+      // Always use root-relative URLs so fetch()/script src work even when the page URL is /game (no trailing slash).
+      var buildUrl = "/game/Build";
+      // v=4: bump when WebGL build or asset paths change (keeps CDN/browser caches aligned).
+      var cacheBust = "?v=4";
       var loaderUrl = buildUrl + "/WebGL.loader.js" + cacheBust;
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/WebGL.data" + cacheBust,
         frameworkUrl: buildUrl + "/WebGL.framework.js" + cacheBust,
         codeUrl: buildUrl + "/WebGL.wasm" + cacheBust,
-        streamingAssetsUrl: "StreamingAssets",
+        streamingAssetsUrl: "/game/StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Gundu Ata",
         productVersion: "0.1",

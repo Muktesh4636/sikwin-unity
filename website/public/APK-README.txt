@@ -1,10 +1,11 @@
-Download APK (Gundu Ata)
-========================
+Download APK (Sikwin — Kotlin + Unity)
+=======================================
 
-Place the latest Gundu Ata Android APK here with this exact filename:
+This file must be named exactly:
 
   gundu-ata.apk
 
-Replace the file whenever you release a new build so the website always serves the latest version.
+It should be the latest Sikwin debug/release APK (full app with embedded Unity). Update by running
+website/copy-apk-for-download.sh after building sikwin/app (or copy Sikwin-debug.apk here manually).
 
-The Home page "Download APK" button serves this file (with cache-busting so users get the fresh APK).
+The Home page "Download APK" button serves this URL (cache-busted so users get the new APK).

@@ -115,6 +115,9 @@
     <string name="whatsapp">व्हाट्सएप</string>
     <string name="share">शेयर करें</string>
     <string name="next_reward">अगला इनाम</string>
+    <string name="next_reward_this_step">अगला इनाम (यह चरण)</string>
+    <string name="great_job_title">शाबाश!</string>
+    <string name="great_job_three_complete">3/3 रेफरल — चरण 1 पूरा</string>
     <string name="view_all">सभी देखें</string>
     <string name="view_all_more">सभी देखें (%d और)</string>
     <string name="view_less">कम देखें</string>
@@ -236,5 +239,10 @@
     <string name="step_share_code">दोस्तों के साथ अपना कोड शेयर करें</string>
     <string name="step_friend_deposits">दोस्त रजिस्टर करता है और ₹100+ जमा करता है</string>
     <string name="step_get_bonus">आपको तुरंत ₹100 मिलता है!</string>
-    <string name="step_milestone_bonuses">इनाम अनलॉक करें: 12 रेफरल → ₹3,000, 20 → ₹7,500, 25 → स्पिन (₹30K तक)</string>
+    <string name="step_milestone_bonuses">चरण: 3 रेफरल → ₹500, फिर 12 और (0/12) → ₹2,200 (कुल 15), फिर 25 → स्पिन (कुल 40)</string>
+    <string name="milestone_complete_next_level">%1$d/%2$d रेफरल पूरे — माइलस्टोन पूरा। अगला स्तर: %3$d रेफरल।</string>
+    <string name="milestone_step2_resets">चरण 1 पूरा (%1$d/%1$d)। चरण 2 शून्य से — इस चरण में %2$d रेफरल (1 और 2 के लिए कुल %3$d)।</string>
+    <string name="milestone_step3_resets">चरण 1–2 पूरे (%1$d रेफरल)। चरण 3 शून्य से — इस चरण %2$d (कुल %3$d)।</string>
+    <string name="refer_more_this_step">अनलॉक के लिए इस चरण में %d और रेफरल</string>
+    <string name="referral_all_milestones_unlocked">सभी माइलस्टोन इनाम अनलॉक हो गए।</string>
 </resources>

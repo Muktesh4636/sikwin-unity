@@ -44,6 +44,39 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.text.style.TextAlign
 
+/** Referrals required in this step only (step 2 is 0/12 after 3/3, not 3/12 lifetime). */
+private data class ReferralTierConfig(val referralsInStep: Int, val bonus: Int, val bonusDisplay: String? = null)
+
+private val REFERRAL_TIER_CONFIGS = listOf(
+    ReferralTierConfig(3, 500),
+    ReferralTierConfig(12, 2200),
+    ReferralTierConfig(25, 0, "Spin & Win (up to ₹1 Lakh)")
+)
+
+private data class ActiveReferralTier(
+    val tierIndex: Int,
+    val config: ReferralTierConfig,
+    val cumulativeStart: Int,
+    val progressInStep: Int
+)
+
+/** Current step; null if all steps done. `progressInStep` resets each step (e.g. 0 right after 3/3). */
+private fun deriveActiveReferralTier(totalReferrals: Int): ActiveReferralTier? {
+    var start = 0
+    REFERRAL_TIER_CONFIGS.forEachIndexed { index, tier ->
+        val end = start + tier.referralsInStep
+        if (totalReferrals < end) {
+            val inStep = (totalReferrals - start).coerceIn(0, tier.referralsInStep)
+            return ActiveReferralTier(index, tier, start, inStep)
+        }
+        start = end
+    }
+    return null
+}
+
+private fun cumulativeBeforeTierIndex(index: Int): Int =
+    REFERRAL_TIER_CONFIGS.take(index).sumOf { it.referralsInStep }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AffiliateScreen(
@@ -61,7 +94,10 @@ fun AffiliateScreen(
     }
     
     val referralData = viewModel.referralData
-    val referralCode = referralData?.referral_code ?: viewModel.userProfile?.referral_code ?: "ABC123"
+    val referralCode = referralData?.referral_code
+        ?: viewModel.userProfile?.referral_code
+        ?: viewModel.savedReferralCode
+        ?: ""
     
     Column(
         modifier = Modifier
@@ -155,7 +191,7 @@ fun AffiliateScreen(
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(BlackBackground.copy(alpha = 0.5f))
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
-                                .clickable {
+                                .clickable(enabled = referralCode.isNotEmpty()) {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                     val clip = android.content.ClipData.newPlainText("Referral Code", referralCode)
                                     clipboard.setPrimaryClip(clip)
@@ -188,8 +224,9 @@ fun AffiliateScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Button(
+                                enabled = referralCode.isNotEmpty(),
                                 onClick = {
-                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.com/signup?ref=$referralCode"
+                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.club/signup?ref=$referralCode"
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)
@@ -215,8 +252,9 @@ fun AffiliateScreen(
                             }
                             
                             Button(
+                                enabled = referralCode.isNotEmpty(),
                                 onClick = {
-                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.com/signup?ref=$referralCode"
+                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.club/signup?ref=$referralCode"
                                     val genericIntent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)
@@ -259,7 +297,7 @@ fun AffiliateScreen(
                 }
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Milestone bonuses (12, 20, 25)
+                // Milestone bonuses (3, 12, 25) — progress derived from total_referrals so UI matches reality
                 Text(
                     stringResource(R.string.milestone_bonuses),
                     color = TextWhite,
@@ -269,18 +307,28 @@ fun AffiliateScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Next Milestone
-                referralData?.next_milestone?.let { next ->
-                    val targetVal = next.target ?: next.next_milestone ?: 12
-                    val nextRewardAmount = when (targetVal) {
-                        12 -> 3000
-                        20 -> 7500
-                        25 -> 0
-                        else -> next.next_bonus.toInt()
+                val totalRefs = referralData?.total_referrals ?: 0
+                val activeTier = deriveActiveReferralTier(totalRefs)
+                val firstTierStep = REFERRAL_TIER_CONFIGS[0].referralsInStep
+                val totalForSteps12 = firstTierStep + REFERRAL_TIER_CONFIGS[1].referralsInStep
+
+                if (activeTier != null) {
+                    val showGreatJobBanner = totalRefs >= firstTierStep && activeTier.tierIndex >= 1
+                    val targetVal = activeTier.config.referralsInStep
+                    val currentProgress = activeTier.progressInStep
+                    val remaining = (targetVal - currentProgress).coerceAtLeast(0)
+                    val defaultRewardLabel = activeTier.config.bonusDisplay ?: "₹${activeTier.config.bonus}"
+                    val apiNext = referralData?.next_milestone
+                    val apiTarget = apiNext?.target ?: apiNext?.next_milestone
+                    val rewardLabel = if (apiNext != null && apiTarget == targetVal && apiNext.next_bonus_display != null) {
+                        apiNext.next_bonus_display!!
+                    } else {
+                        defaultRewardLabel
                     }
-                    val nextRewardDisplay = when (targetVal) {
-                        25 -> "Spin (up to ₹30K)"
-                        else -> null
+                    val progressPct = if (targetVal > 0) {
+                        (currentProgress.toDouble() / targetVal.toDouble() * 100.0).coerceIn(0.0, 100.0)
+                    } else {
+                        0.0
                     }
                     Surface(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -289,65 +337,152 @@ fun AffiliateScreen(
                         border = BorderStroke(1.dp, PrimaryYellow.copy(alpha = 0.5f))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
+                            if (showGreatJobBanner) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = GreenSuccess.copy(alpha = 0.18f),
+                                    border = BorderStroke(2.dp, GreenSuccess.copy(alpha = 0.85f))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 10.dp, horizontal = 12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.great_job_title),
+                                            color = GreenSuccess,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                        Text(
+                                            stringResource(R.string.great_job_three_complete),
+                                            color = TextWhite,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
-                                    Text(stringResource(R.string.next_reward), color = TextGrey, fontSize = 12.sp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(stringResource(R.string.next_reward_this_step), color = TextGrey, fontSize = 12.sp)
                                     Text(
-                                        text = next.next_bonus_display ?: nextRewardDisplay ?: "₹$nextRewardAmount",
+                                        text = rewardLabel,
                                         color = PrimaryYellow,
-                                        fontSize = if (next.next_bonus_display != null || nextRewardDisplay != null) 18.sp else 24.sp,
+                                        fontSize = if (activeTier.config.bonusDisplay != null) 18.sp else 22.sp,
                                         fontWeight = FontWeight.Black
                                     )
+                                    when (activeTier.tierIndex) {
+                                        1 -> {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                stringResource(
+                                                    R.string.milestone_step2_resets,
+                                                    firstTierStep,
+                                                    targetVal,
+                                                    totalForSteps12
+                                                ),
+                                                color = GreenSuccess,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                        2 -> {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                stringResource(
+                                                    R.string.milestone_step3_resets,
+                                                    totalForSteps12,
+                                                    targetVal,
+                                                    totalForSteps12 + targetVal
+                                                ),
+                                                color = GreenSuccess,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
                                 }
-                                val current = next.current_progress
                                 Box(contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(
-                                        progress = { (next.progress_percentage / 100).toFloat().coerceIn(0f, 1f) },
+                                        progress = { (progressPct / 100.0).toFloat().coerceIn(0f, 1f) },
                                         modifier = Modifier.size(60.dp),
                                         color = PrimaryYellow,
                                         trackColor = Color.DarkGray,
                                         strokeWidth = 6.dp
                                     )
                                     Text(
-                                        "$current/$targetVal",
+                                        "$currentProgress/$targetVal",
                                         color = TextWhite,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            val remaining = targetVal - next.current_progress
+                            if (remaining > 0) {
+                                Text(
+                                    stringResource(R.string.refer_more_this_step, remaining),
+                                    color = TextWhite,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = SurfaceColor,
+                        border = BorderStroke(1.dp, GreenSuccess.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = GreenSuccess,
+                                modifier = Modifier.size(28.dp)
+                            )
                             Text(
-                                stringResource(R.string.refer_more_to_unlock, remaining),
+                                stringResource(R.string.referral_all_milestones_unlocked),
                                 color = TextWhite,
-                                fontSize = 13.sp
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
                 }
 
-                val milestoneCounts = listOf(12, 20, 25)
                 val apiMilestones = referralData?.milestones ?: emptyList()
                 fun findMilestone(displayCount: Int) = apiMilestones.find { it.count == displayCount }
-                val defaultBonus = mapOf(12 to 3000, 20 to 7500, 25 to 0)
-                fun defaultBonusDisplay(count: Int) = when (count) {
-                    25 -> "Spin (up to ₹30K)"
-                    else -> null
-                }
 
-                milestoneCounts.forEach { count ->
+                REFERRAL_TIER_CONFIGS.forEachIndexed { tierIndex, tier ->
+                    val count = tier.referralsInStep
                     val m = findMilestone(count)
-                    val bonus = m?.let { when (it.count) { 12 -> 3000; 20 -> 7500; 25 -> 0; else -> it.bonus } } ?: (defaultBonus[count] ?: 0)
-                    val bonusDisplay = m?.bonus_display ?: defaultBonusDisplay(count)
-                    val achieved = m?.achieved ?: false
-                    val progressCurrent = m?.progress_current ?: 0
-                    val target = m?.target ?: count
+                    val bonus = m?.bonus ?: tier.bonus
+                    val bonusDisplay = m?.bonus_display ?: tier.bonusDisplay
+                    val tierStart = cumulativeBeforeTierIndex(tierIndex)
+                    val tierEnd = tierStart + tier.referralsInStep
+                    val target = m?.target?.takeIf { it == count } ?: count
+                    val achieved = m?.achieved ?: (totalRefs >= tierEnd)
+                    val progressCurrent =
+                        if (achieved) target else (totalRefs - tierStart).coerceIn(0, target)
                     val label = stringResource(R.string.referrals_count, count)
+                    val celebrateFirst = tierIndex == 0 && achieved
                     MilestoneCard(
                         count = count,
                         bonus = bonus,
@@ -355,7 +490,8 @@ fun AffiliateScreen(
                         achieved = achieved,
                         progressCurrent = progressCurrent,
                         target = target,
-                        label = label
+                        label = label,
+                        celebrateFirstMilestone = celebrateFirst
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -541,83 +677,109 @@ fun MilestoneCard(
     target: Int = count,
     labelResId: Int? = null,
     labelFormatArgs: Array<Any> = emptyArray(),
-    label: String? = null
+    label: String? = null,
+    celebrateFirstMilestone: Boolean = false
 ) {
     val resolvedLabel = when {
         labelResId != null -> if (labelFormatArgs.isEmpty()) stringResource(labelResId) else stringResource(labelResId, *labelFormatArgs)
         label != null -> label
         else -> "$count Referrals"
     }
+    val highlightGreen = celebrateFirstMilestone && achieved
+    val borderColor = when {
+        highlightGreen -> GreenSuccess
+        achieved -> PrimaryYellow
+        else -> BorderColor
+    }
+    val borderWidth = if (achieved || highlightGreen) 2.dp else 1.dp
+    val bgColor = when {
+        highlightGreen -> GreenSuccess.copy(alpha = 0.12f)
+        achieved -> PrimaryYellow.copy(alpha = 0.1f)
+        else -> SurfaceColor
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = if (achieved) PrimaryYellow.copy(alpha = 0.1f) else SurfaceColor,
-        border = androidx.compose.foundation.BorderStroke(
-            width = if (achieved) 2.dp else 1.dp,
-            color = if (achieved) PrimaryYellow else BorderColor
-        )
+        color = bgColor,
+        border = androidx.compose.foundation.BorderStroke(width = borderWidth, color = borderColor)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(20.dp)
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Progress circle: X/3 or X/5
-                val progress = if (target > 0) (progressCurrent.toFloat() / target).coerceIn(0f, 1f) else 0f
-                Box(contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.size(44.dp),
-                        color = if (achieved) PrimaryYellow else PrimaryYellow.copy(alpha = 0.6f),
-                        trackColor = Color.DarkGray,
-                        strokeWidth = 4.dp
-                    )
-                    if (achieved) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = BlackBackground,
-                            modifier = Modifier.size(18.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    val progress = if (target > 0) (progressCurrent.toFloat() / target).coerceIn(0f, 1f) else 0f
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.size(44.dp),
+                            color = when {
+                                highlightGreen -> GreenSuccess
+                                achieved -> PrimaryYellow
+                                else -> PrimaryYellow.copy(alpha = 0.6f)
+                            },
+                            trackColor = Color.DarkGray,
+                            strokeWidth = 4.dp
                         )
-                    } else {
+                        if (achieved) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = if (highlightGreen) Color.White else BlackBackground,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else {
+                            Text(
+                                "$progressCurrent/$target",
+                                color = TextWhite,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column {
                         Text(
-                            "$progressCurrent/$target",
-                            color = TextWhite,
-                            fontSize = 11.sp,
+                            resolvedLabel,
+                            color = when {
+                                highlightGreen -> GreenSuccess
+                                achieved -> PrimaryYellow
+                                else -> TextWhite
+                            },
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            when {
+                                highlightGreen -> stringResource(R.string.great_job_three_complete)
+                                achieved -> stringResource(R.string.achieved)
+                                else -> "$progressCurrent / $target"
+                            },
+                            color = if (highlightGreen) GreenSuccess.copy(alpha = 0.9f) else TextGrey,
+                            fontSize = 12.sp,
+                            fontWeight = if (highlightGreen) FontWeight.SemiBold else FontWeight.Normal
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
-                    Text(
-                        resolvedLabel,
-                        color = if (achieved) PrimaryYellow else TextWhite,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        if (achieved) stringResource(R.string.achieved) else "$progressCurrent / $target",
-                        color = TextGrey,
-                        fontSize = 12.sp
-                    )
-                }
+                Text(
+                    text = bonusDisplay ?: "₹$bonus",
+                    color = if (highlightGreen) GreenSuccess else if (achieved) PrimaryYellow else TextGrey,
+                    fontSize = if (bonusDisplay != null) 14.sp else 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-
-            Text(
-                text = bonusDisplay ?: "₹$bonus",
-                color = if (achieved) PrimaryYellow else TextGrey,
-                fontSize = if (bonusDisplay != null) 14.sp else 20.sp,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }

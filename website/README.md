@@ -121,11 +121,11 @@ The Unity build at `public/game/` can be large (`.wasm`, `.data`).
 
 ## Download APK
 
-The **Home** page has a **Download APK** button (below the promotional banners). To enable it, place your Android APK at:
+The **Home** page has a **Download APK** button (below the promotional banners). The served file must live at:
 
 - `website/public/gundu-ata.apk`
 
-The link serves the file and triggers a download as `GunduAta.apk`.
+After building Sikwin (`assembleDebug` / release), run `./copy-apk-for-download.sh` from `website/` (or copy `Sikwin-debug.apk` there and rename). The browser download is named `Sikwin.apk`.
 
 ## Notes
 

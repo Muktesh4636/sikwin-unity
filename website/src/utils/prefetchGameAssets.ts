@@ -1,7 +1,11 @@
-const GAME_BUILD_BASE = '/game/Build/'
-const ASSETS = ['WebGL.framework.js', 'WebGL.data', 'WebGL.wasm']
+import { gameBuildQuery } from './gameAssetVersion';
 
-let prefetched = false
+const GAME_BUILD_BASE = '/game/Build/';
+const ASSETS = ['WebGL.framework.js', 'WebGL.data', 'WebGL.wasm'];
+
+const q = gameBuildQuery();
+
+let prefetched = false;
 
 function addPrefetch(href: string): void {
   if (typeof document === 'undefined') return
@@ -21,10 +25,10 @@ export function prefetchGameAssets(): void {
   prefetched = true
 
   // Warm the game shell first (Unity loader HTML is small but important).
-  addPrefetch('/game/index.html')
+  addPrefetch('/game/index.html' + q);
 
   for (const name of ASSETS) {
-    addPrefetch(GAME_BUILD_BASE + name)
+    addPrefetch(GAME_BUILD_BASE + name + q);
   }
 }
 

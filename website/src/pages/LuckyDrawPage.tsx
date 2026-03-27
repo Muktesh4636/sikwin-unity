@@ -5,6 +5,7 @@ import {
   apiCheckLuckyDrawStatus,
   apiClaimLuckyDraw,
   apiWallet,
+  type LuckyDrawStatus,
   type Wallet,
 } from '../api/endpoints';
 
@@ -18,11 +19,59 @@ const WHEEL_SEGMENTS = [
   { label: '₹100', color: '#00CED1' },
 ];
 
+const PRIZE_VALUES = [10000, 5000, 1000, 500, 300, 100] as const;
+
+function parsePositiveAmount(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
+
+/**
+ * Mega spin: some APIs return both lucky_draw.amount and reward.amount with different values.
+ * The wallet is credited from the ledger side — prefer reward, then optional credited_amount.
+ */
+function resolveMegaSpinAmountFromClaimBody(body: Record<string, unknown> | undefined): number {
+  if (!body) return 0;
+  const topCredited = parsePositiveAmount(body.credited_amount);
+  if (topCredited != null) return topCredited;
+
+  const ldRaw = (body.lucky_draw as { amount?: unknown } | undefined)?.amount;
+  const rwRaw = (body.reward as { amount?: unknown } | undefined)?.amount;
+  const ld = parsePositiveAmount(ldRaw);
+  const rw = parsePositiveAmount(rwRaw);
+
+  if (ld != null && rw != null && ld !== rw) return rw;
+  return rw ?? ld ?? 0;
+}
+
+function resolveMegaSpinAmountFromStatus(status: LuckyDrawStatus | undefined): number | null {
+  if (!status?.claimed) return null;
+  const rw = parsePositiveAmount(status.reward?.amount);
+  const ld = parsePositiveAmount(status.lucky_draw?.amount);
+  const top = parsePositiveAmount(status.credited_amount);
+  if (top != null) return top;
+  if (ld != null && rw != null && ld !== rw) return rw;
+  return rw ?? ld ?? null;
+}
+
 function amountToIndex(amount: number): number {
   const map: Record<number, number> = {
     10000: 0, 5000: 1, 1000: 2, 500: 3, 300: 4, 100: 5,
   };
-  return map[amount] ?? 0;
+  if (map[amount] !== undefined) return map[amount];
+  // Wheel only lists fixed segments; snap to closest for display animation (e.g. ₹200 → ₹100 or ₹300).
+  let bestIdx = 0;
+  let bestDiff = Infinity;
+  PRIZE_VALUES.forEach((p, i) => {
+    const d = Math.abs(p - amount);
+    if (d < bestDiff) {
+      bestDiff = d;
+      bestIdx = i;
+    }
+  });
+  return bestIdx;
 }
 
 export function LuckyDrawPage() {
@@ -38,6 +87,7 @@ export function LuckyDrawPage() {
   const segmentHalf = segmentDeg / 2;
   const rotationRef = useRef(0);
   const wheelRef = useRef<HTMLDivElement>(null);
+  const claimInFlightRef = useRef(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -50,9 +100,8 @@ export function LuckyDrawPage() {
       setHasClaimed(!!status?.claimed);
       const dep = status?.deposit_amount;
       setEligibleAmount(dep != null && dep > 0 ? dep : null);
-      if (status?.claimed && status?.reward?.amount != null) {
-        setClaimedAmount(String(status.reward.amount));
-      }
+      const claimed = resolveMegaSpinAmountFromStatus(status);
+      if (claimed != null) setClaimedAmount(String(claimed));
     } catch {
       setHasClaimed(false);
       setEligibleAmount(null);
@@ -83,13 +132,14 @@ export function LuckyDrawPage() {
 
   const performSpin = useCallback(async () => {
     if (spinning || hasClaimed || eligibleAmount == null || eligibleAmount <= 0) return;
+    if (claimInFlightRef.current) return;
+    claimInFlightRef.current = true;
     setSpinning(true);
 
     try {
       const res = await apiClaimLuckyDraw();
-      const body = res.data;
-      const reward = body?.lucky_draw ?? body?.reward;
-      const amount = reward?.amount != null ? Number(reward.amount) : 0;
+      const body = res.data as Record<string, unknown> | undefined;
+      const amount = resolveMegaSpinAmountFromClaimBody(body);
       const targetIndex = amountToIndex(amount);
       const lastResult = `₹${amount}`;
 
@@ -112,12 +162,14 @@ export function LuckyDrawPage() {
         setResultDialog({
           message: `Congratulations! You won ${lastResult}`,
         });
+        claimInFlightRef.current = false;
         fetchStatus();
       }, 3800);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       const msg = err?.response?.data?.detail ?? 'Failed to claim. Try again.';
       setSpinning(false);
+      claimInFlightRef.current = false;
       setResultDialog({ message: msg });
     }
   }, [spinning, hasClaimed, eligibleAmount, fetchStatus, segmentDeg, segmentHalf]);

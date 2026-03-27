@@ -76,14 +76,14 @@ export function WithdrawPage() {
     : '';
 
   return (
-    <div className="mx-auto w-full max-w-[500px] min-h-dvh bg-appBg">
-      {/* Header: yellow back + yellow "Online withdrawal" */}
-      <header className="sticky top-0 z-40 border-b border-border bg-appBg/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[500px] items-center gap-3 px-4 py-4">
+    <div className="mx-auto w-full max-w-[460px] min-h-dvh bg-appBg">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-appBg">
+        <div className="flex items-center gap-3 px-4 py-3.5">
           <button
             type="button"
             onClick={() => nav(-1)}
-            className="flex h-11 w-11 items-center justify-center rounded text-primaryYellow transition-opacity hover:opacity-90"
+            className="flex h-10 w-10 items-center justify-center rounded text-primaryYellow"
             aria-label="Back"
           >
             <BackArrow />
@@ -91,31 +91,31 @@ export function WithdrawPage() {
           <h1 className="flex-1 text-center text-xl font-bold text-primaryYellow">
             Online Withdrawal
           </h1>
-          <div className="w-11" />
+          <div className="w-10" />
         </div>
       </header>
 
-      <div className="px-4 py-5 pb-24">
-        {/* Withdrawal method: Bank Account (yellow + underline) */}
-        <div className="mb-6">
-          <span className="relative inline-block text-xl font-bold text-primaryYellow">
-            Bank Account
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primaryYellow" />
-          </span>
+      <div className="px-4 pb-20 pt-2">
+        {/* Bank Account tab */}
+        <div className="mb-4 flex flex-col items-center">
+          <span className="text-base font-bold text-primaryYellow py-2">Bank Account</span>
+          <div className="h-0.5 w-16 bg-primaryYellow" />
         </div>
 
-        {/* Balance card: Available (yellow) | Unavailable (grey) */}
-        <div className="rounded-xl border border-border bg-surface px-5 py-5">
-          <div className="flex items-start justify-between gap-4">
+        <div className="mb-1 h-px bg-border" />
+
+        {/* Balance card */}
+        <div className="mt-4 rounded-lg bg-surface px-5 py-4">
+          <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="text-base font-medium text-textGrey">Available Balance</div>
-              <div className="mt-2 text-2xl font-bold text-primaryYellow">
+              <div className="text-sm text-textGrey">Available Balance</div>
+              <div className="mt-1 text-xl font-bold text-primaryYellow">
                 ₹{loading ? '—' : withdrawable}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-base font-medium text-textGrey">Unavailable Balance</div>
-              <div className="mt-2 text-2xl font-bold text-textGrey">
+              <div className="text-sm text-textGrey">Unavailable Balance</div>
+              <div className="mt-1 text-xl font-bold text-textGrey">
                 ₹{loading ? '—' : unavailable}
               </div>
             </div>
@@ -123,32 +123,27 @@ export function WithdrawPage() {
         </div>
 
         {loading ? (
-          <div className="mt-6 text-center text-base text-textGrey">Loading…</div>
+          <div className="mt-6 text-center text-sm text-textGrey">Loading…</div>
         ) : banks.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-border bg-surface p-6">
-            <div className="text-lg font-bold text-primaryYellow">No bank account added</div>
-            <p className="mt-2.5 text-base text-textGrey">
-              Add a bank account to withdraw funds.
-            </p>
-            <button
-              type="button"
+          <div className="mt-6 px-0">
+            <p
+              className="text-sm font-medium text-primaryYellow underline cursor-pointer"
               onClick={() => nav('/withdrawal-account/add')}
-              className="mt-5 w-full rounded-xl bg-primaryYellow py-3.5 text-base font-bold text-black transition-opacity hover:opacity-95"
             >
-              + Add bank account
-            </button>
+              No Bank account added, add bank account
+            </p>
           </div>
         ) : (
-          <form onSubmit={submit} className="mt-6 space-y-5">
-            {/* Bank account dropdown (dark grey field + chevron) */}
+          <form onSubmit={submit} className="mt-5 space-y-4">
+            {/* Bank account dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowBankDropdown((v) => !v)}
-                className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-surface px-5 py-4 text-left text-base text-textWhite"
+                className="flex w-full items-center justify-between gap-2 rounded border border-border bg-appBg px-4 py-3.5 text-left text-base text-textWhite"
               >
                 <span className={selected ? '' : 'text-textGrey'}>
-                  {selected ? bankLabel : 'Select bank account'}
+                  {selected ? bankLabel : 'Select Bank Account'}
                 </span>
                 <svg
                   className={`h-5 w-5 shrink-0 text-textGrey transition-transform ${showBankDropdown ? 'rotate-180' : ''}`}
@@ -166,7 +161,7 @@ export function WithdrawPage() {
                     aria-hidden
                     onClick={() => setShowBankDropdown(false)}
                   />
-                  <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-xl border border-border bg-surface py-1">
+                  <ul className="absolute left-0 right-0 top-full z-20 mt-0.5 max-h-44 overflow-auto rounded border border-border bg-surface py-1">
                     {banks.map((b) => (
                       <li key={b.account_number}>
                         <button
@@ -175,13 +170,13 @@ export function WithdrawPage() {
                             setSelected(b);
                             setShowBankDropdown(false);
                           }}
-                          className={`w-full px-5 py-3.5 text-left text-base ${
+                          className={`w-full px-4 py-3 text-left text-base ${
                             selected?.account_number === b.account_number
                               ? 'bg-primaryYellow/20 font-medium text-primaryYellow'
                               : 'text-textWhite'
                           }`}
                         >
-                          {b.bank_name} ({b.account_number.slice(-4)})
+                          {b.bank_name}({b.account_number.slice(-4)})
                         </button>
                       </li>
                     ))}
@@ -192,9 +187,9 @@ export function WithdrawPage() {
                           setShowBankDropdown(false);
                           nav('/withdrawal-account/add');
                         }}
-                        className="w-full px-5 py-3.5 text-left text-base font-medium text-primaryYellow transition-opacity hover:opacity-90"
+                        className="w-full px-4 py-3 text-left text-base font-medium text-primaryYellow"
                       >
-                        + Add bank account
+                        Add bank account
                       </button>
                     </li>
                   </ul>
@@ -203,25 +198,25 @@ export function WithdrawPage() {
             </div>
 
             {/* Amount input */}
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-5 py-4">
-              <span className="text-2xl font-bold text-textWhite">₹</span>
+            <div className="flex items-center gap-2 rounded border border-border bg-appBg px-4 py-3.5">
+              <span className="text-xl font-bold text-textWhite">₹</span>
               <input
                 type="text"
                 inputMode="numeric"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
                 placeholder="Please enter amount"
-                className="min-w-0 flex-1 bg-transparent text-xl font-medium text-textWhite outline-none placeholder:text-textGrey"
+                className="min-w-0 flex-1 bg-transparent text-base font-medium text-textWhite outline-none placeholder:text-textGrey"
               />
             </div>
 
             {error && (
-              <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-base text-red-400">
+              <div className="text-center text-sm text-red-400">
                 {error}
               </div>
             )}
             {ok && (
-              <div className="rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-2.5 text-base text-green-400">
+              <div className="text-center text-sm text-green-400">
                 {ok}
               </div>
             )}
@@ -230,7 +225,7 @@ export function WithdrawPage() {
             <button
               type="submit"
               disabled={submitting || !amount || !selected}
-              className="w-full rounded-xl bg-primaryYellow py-4 text-lg font-bold text-black transition-opacity hover:opacity-95 disabled:opacity-50"
+              className="w-full rounded-lg bg-primaryYellow py-4 text-base font-bold text-black transition-opacity hover:opacity-95 disabled:opacity-50"
             >
               {submitting ? 'Submitting…' : 'Submit'}
             </button>
