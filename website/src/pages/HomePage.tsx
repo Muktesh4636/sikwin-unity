@@ -457,7 +457,7 @@ export function HomePage() {
         <button
           type="button"
           onClick={() => {
-            const url = `/gundu-ata.apk?t=${Date.now()}`;
+            const url = `/GunduAta.apk?t=${Date.now()}`;
             const a = document.createElement('a');
             a.href = url;
             a.download = 'GunduAta.apk';
