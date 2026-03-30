@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { AuthTabs } from '../components/AuthTabs';
 import { APP_NAME } from '../config';
+import { getRefParam, withRefQuery } from '../utils/referralLink';
 
 export function LoginPage() {
   const auth = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
+  const [searchParams] = useSearchParams();
+  const inviteRef = getRefParam(searchParams);
+  const signupHref = withRefQuery('/signup', inviteRef);
   const from = useMemo(() => (loc.state as any)?.from?.toString() || '/', [loc.state]);
 
   const [username, setUsername] = useState('');
@@ -36,6 +40,12 @@ export function LoginPage() {
         <div className="text-2xl font-extrabold text-[#FFCC00]">{APP_NAME}</div>
         <div className="mt-2 text-2xl font-bold text-textWhite">Welcome back</div>
         <div className="mt-1 text-sm text-textGrey">Please enter your username and password to log in</div>
+
+        {inviteRef ? (
+          <div className="mt-4 rounded-xl border border-[#FFCC00]/35 bg-[#FFCC00]/10 px-3 py-2 text-sm text-[#FFCC00]">
+            You opened an invite link. New here? Use <strong>Sign-up</strong> below so your account is linked to this referral.
+          </div>
+        ) : null}
 
         <div className="mt-6 space-y-4">
           <div>
@@ -74,7 +84,7 @@ export function LoginPage() {
         </div>
 
         <Link
-          to="/signup"
+          to={signupHref}
           className="mt-12 flex w-full items-center justify-center rounded-xl border-2 border-[#FFCC00] bg-transparent py-4 text-base font-semibold text-[#FFCC00]"
         >
           Sign-up

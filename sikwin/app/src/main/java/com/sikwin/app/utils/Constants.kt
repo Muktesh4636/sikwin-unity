@@ -7,4 +7,7 @@ object Constants {
     // const val BASE_URL = "http://72.61.254.71/api/"
 
     // APK / signup links for users: use BuildConfig.PUBLIC_SITE_URL (per franchise in app/build.gradle).
+
+    /** In-app IPL tab (WebView). Change to your IPL / sports page when ready. */
+    const val IPL_WEB_URL = "https://gunduata.club/"
 }

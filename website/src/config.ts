@@ -7,6 +7,21 @@ export const API_BASE_URL =
 export const CANONICAL_SITE_URL =
   (import.meta as any).env?.VITE_CANONICAL_SITE_URL?.toString()?.trim() || '';
 
+/** Origin for shareable links (e.g. `/signup?ref=`). Uses canonical domain when set, else `window.location.origin`. */
+export function getSiteOriginForLinks(): string {
+  const c = CANONICAL_SITE_URL;
+  if (c) {
+    try {
+      const withScheme = /^https?:\/\//i.test(c) ? c : `https://${c}`;
+      return new URL(withScheme).origin;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return '';
+}
+
 /** Hosts that are valid for this site (no redirect). Subdomains like gunduata1.gunduata.club are allowed. */
 export const ALLOWED_HOSTS: string[] =
   (import.meta as any).env?.VITE_ALLOWED_HOSTS?.toString()

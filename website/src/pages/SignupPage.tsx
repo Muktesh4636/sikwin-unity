@@ -1,19 +1,29 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { AuthTabs } from '../components/AuthTabs';
 import { apiSendOtp, apiRegister } from '../api/endpoints';
 import { APP_NAME } from '../config';
+import { getRefParam } from '../utils/referralLink';
 
 export function SignupPage() {
   const auth = useAuth();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [showReferral, setShowReferral] = useState(false);
+
+  useEffect(() => {
+    const code = getRefParam(searchParams);
+    if (code) {
+      setReferralCode(code);
+      setShowReferral(true);
+    }
+  }, [searchParams]);
   const [busy, setBusy] = useState(false);
   const [otpBusy, setOtpBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

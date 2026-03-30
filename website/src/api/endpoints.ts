@@ -296,6 +296,6 @@ export async function apiPartnerRequest(data: { name: string; phone_number: stri
 }
 
 export async function apiMaintenanceStatus() {
-  return http.get<Record<string, any>>('maintenance/status/', { timeout: 5000 });
+  return http.get<Record<string, any>>('maintenance/status/', { timeout: 2500 });
 }
 

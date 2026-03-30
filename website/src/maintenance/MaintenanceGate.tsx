@@ -1,12 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiMaintenanceStatus } from '../api/endpoints';
 
 type MaintenanceState =
   | { active: false }
   | { active: true; message: string };
 
+/** Same flag the APK reads from GET maintenance/status/; tolerate aliases the admin API might send. */
+function isMaintenanceActive(payload: Record<string, any> | undefined): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Record<string, unknown>;
+  if (p.maintenance === true) return true;
+  if (p.is_maintenance === true) return true;
+  if (p.under_maintenance === true) return true;
+  const settings = p.game_settings as Record<string, unknown> | undefined;
+  if (settings?.maintenance === true) return true;
+  if (settings?.is_maintenance === true) return true;
+  return false;
+}
+
 function formatMaintenanceMessage(payload: Record<string, any>): string {
-  const active = payload?.maintenance === true;
+  const active = isMaintenanceActive(payload);
   if (!active) return '';
 
   const rh = Number(payload?.remaining_hours ?? 0);
@@ -34,47 +47,62 @@ function formatMaintenanceMessage(payload: Record<string, any>): string {
   return 'App under maintenance. Please come back soon.';
 }
 
+const POLL_MS = 30_000;
+
+/** Local dev hits production API for maintenance and waits seconds — skip so the shell loads instantly. */
+function isLocalhostOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+}
+
 export function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<MaintenanceState>({ active: false });
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(() => !isLocalhostOrigin());
+  const firstLoadDone = useRef(false);
 
-  const MAINTENANCE_CHECK_TIMEOUT_MS = 5000;
-
-  const check = async () => {
+  const check = async (opts?: { forInitialGate?: boolean }) => {
+    const isInitial = opts?.forInitialGate === true;
     try {
-      setChecking(true);
+      if (isInitial && !firstLoadDone.current) setChecking(true);
       const resp = await apiMaintenanceStatus();
-      if (resp.data?.maintenance === true) {
-        setState({ active: true, message: formatMaintenanceMessage(resp.data) });
+      const data = resp.data as Record<string, any> | undefined;
+      if (isMaintenanceActive(data)) {
+        setState({ active: true, message: formatMaintenanceMessage(data ?? {}) });
       } else {
         setState({ active: false });
       }
     } catch {
-      // Network failure or timeout: do not block the app.
       setState({ active: false });
     } finally {
-      setChecking(false);
+      if (isInitial) {
+        firstLoadDone.current = true;
+        setChecking(false);
+      }
     }
   };
 
   useEffect(() => {
-    check();
+    if (isLocalhostOrigin()) {
+      firstLoadDone.current = true;
+      setChecking(false);
+      return;
+    }
+
+    void check({ forInitialGate: true });
     const onVis = () => {
-      if (document.visibilityState === 'visible') check();
+      if (document.visibilityState === 'visible') void check();
     };
     document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
+    const poll = window.setInterval(() => void check(), POLL_MS);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.clearInterval(poll);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // If we're still checking after a short time, show the app anyway so the site never appears "down"
-  const [showAnyway, setShowAnyway] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setShowAnyway(true), MAINTENANCE_CHECK_TIMEOUT_MS + 500);
-    return () => clearTimeout(t);
-  }, []);
-
-  if (checking && !showAnyway) {
+  if (checking) {
     return (
       <div className="mobile-frame app-shell grid place-items-center min-h-dvh bg-[#121212]">
         <div className="text-[#BDBDBD]">Loading…</div>

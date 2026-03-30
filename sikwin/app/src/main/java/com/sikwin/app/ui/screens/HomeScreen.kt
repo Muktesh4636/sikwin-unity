@@ -1098,6 +1098,7 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
         val items = listOf(
             BottomNavItem("Home", "home", Icons.Default.Home),
             BottomNavItem("GUNDU ATA", "gundu_ata", Icons.Default.Casino),
+            BottomNavItem("IPL", "ipl", Icons.Default.SportsCricket),
             BottomNavItem("Me", "me", Icons.Default.AccountCircle)
         )
         
@@ -1106,19 +1107,27 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                 selected = currentRoute == item.route,
                 onClick = { 
                     if (currentRoute != item.route) {
-                        if (item.route == "gundu_ata") {
-                            if (!viewModel.loginSuccess) {
-                                showLoginPopup = true
-                            } else {
-                                val now = System.currentTimeMillis()
-                                if (now - lastGameLaunchTime >= gameLaunchCooldown) {
-                                    lastGameLaunchTime = now
-                                    viewModel.syncAuthToUnity()
+                        when (item.route) {
+                            "gundu_ata" -> {
+                                if (!viewModel.loginSuccess) {
+                                    showLoginPopup = true
+                                } else {
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastGameLaunchTime >= gameLaunchCooldown) {
+                                        lastGameLaunchTime = now
+                                        viewModel.syncAuthToUnity()
+                                        onNavigate(item.route)
+                                    }
+                                }
+                            }
+                            "me", "ipl" -> {
+                                if (!viewModel.loginSuccess) {
+                                    showLoginPopup = true
+                                } else {
                                     onNavigate(item.route)
                                 }
                             }
-                        } else {
-                            onNavigate(item.route)
+                            else -> onNavigate(item.route)
                         }
                     }
                 },

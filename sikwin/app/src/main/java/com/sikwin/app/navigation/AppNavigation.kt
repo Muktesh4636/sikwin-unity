@@ -494,6 +494,16 @@ fun AppNavigation(
                             viewModel.syncAuthToUnity()
                             executeGameLaunch()
                         }
+                    } else if (route == "ipl") {
+                        if (viewModel.loginSuccess) {
+                            navController.navigate("ipl") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        } else {
+                            showAuthDialog = true
+                        }
                     } else if (route == "me") {
                         if (viewModel.loginSuccess) {
                             navController.navigate("me") {
@@ -521,6 +531,32 @@ fun AppNavigation(
             ProfileScreen(
                 viewModel = viewModel,
                 sessionManager = sessionManager,
+                onNavigate = { route ->
+                    if (route == "gundu_ata") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            viewModel.syncAuthToUnity()
+                            executeGameLaunch()
+                        }
+                    } else if (route == "home") {
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    } else if (route == "login") {
+                        navController.navigate("login") {
+                            popUpTo("home") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        navController.navigate(route)
+                    }
+                }
+            )
+        }
+        composable("ipl") {
+            IplScreen(
+                viewModel = viewModel,
                 onNavigate = { route ->
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {

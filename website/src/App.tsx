@@ -27,6 +27,7 @@ import { DailyRewardPage } from './pages/DailyRewardPage';
 import { LuckyDrawPage } from './pages/LuckyDrawPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { GunduAtaGamePage } from './pages/GunduAtaGamePage';
+import { MaintenanceGate } from './maintenance/MaintenanceGate';
 import { isAdminUrlPath } from './utils/adminPath';
 
 function AppRoutes() {
@@ -83,7 +84,9 @@ function App() {
   return (
     <BrowserRouter>
       <LoginSignupModalProvider>
-        <AppRoutes />
+        <MaintenanceGate>
+          <AppRoutes />
+        </MaintenanceGate>
       </LoginSignupModalProvider>
     </BrowserRouter>
   );

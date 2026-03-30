@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { useAuth } from '../auth/AuthContext';
 import { apiReferralData, type ReferralData as ReferralDataType } from '../api/endpoints';
+import { APP_NAME, getSiteOriginForLinks } from '../config';
 
 function GiftIcon({ className }: { className?: string }) {
   return (
@@ -95,6 +96,20 @@ export function ReferEarnPage() {
 
   const referralCode = referralData?.referral_code || user?.referral_code || '';
 
+  const referralSignupLink = useMemo(() => {
+    if (!referralCode.trim()) return '';
+    try {
+      const origin = getSiteOriginForLinks();
+      if (!origin) return '';
+      // Open login first; Sign-up keeps ?ref= so registration sends referral_code to the API.
+      const u = new URL('/login', origin);
+      u.searchParams.set('ref', referralCode.trim());
+      return u.toString();
+    } catch {
+      return '';
+    }
+  }, [referralCode]);
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -105,23 +120,34 @@ export function ReferEarnPage() {
       .catch(() => setReferralData(null));
   }, []);
 
-  const copyCode = useCallback(() => {
-    navigator.clipboard.writeText(referralCode).catch(() => {});
-  }, [referralCode]);
+  const copyInviteLink = useCallback(() => {
+    const payload = referralSignupLink || referralCode;
+    navigator.clipboard.writeText(payload).catch(() => {});
+  }, [referralSignupLink, referralCode]);
 
   const shareWhatsApp = useCallback(() => {
-    const text = encodeURIComponent(`Use my referral code ${referralCode} on Sikwin!`);
-    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener');
-  }, [referralCode]);
+    const line = referralSignupLink
+      ? `Join ${APP_NAME} with my referral link:\n${referralSignupLink}`
+      : `Use my referral code ${referralCode} on ${APP_NAME}!`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(line)}`, '_blank', 'noopener');
+  }, [referralCode, referralSignupLink]);
 
   const shareNative = useCallback(() => {
-    const text = `Use my referral code ${referralCode} on Sikwin!`;
+    const text = referralSignupLink
+      ? `Join ${APP_NAME} with my referral:\n${referralSignupLink}`
+      : `Use my referral code ${referralCode} on ${APP_NAME}!`;
     if (navigator.share) {
-      navigator.share({ title: 'Refer & Earn', text }).catch(() => {});
+      navigator
+        .share(
+          referralSignupLink
+            ? { title: `Refer & Earn — ${APP_NAME}`, text: `Sign up with my link:`, url: referralSignupLink }
+            : { title: 'Refer & Earn', text }
+        )
+        .catch(() => {});
     } else {
-      navigator.clipboard.writeText(text).catch(() => {});
+      navigator.clipboard.writeText(referralSignupLink || text).catch(() => {});
     }
-  }, [referralCode]);
+  }, [referralCode, referralSignupLink]);
 
   const totalReferrals = referralData?.total_referrals ?? 0;
   const depositedCount = referralData?.referrals?.filter((r) => r.has_deposit).length ?? 0;
@@ -172,9 +198,9 @@ export function ReferEarnPage() {
             <span className="text-lg font-bold text-[#FFCC00]">{referralCode}</span>
             <button
               type="button"
-              onClick={copyCode}
+              onClick={copyInviteLink}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-[#FFCC00] transition-opacity hover:opacity-90"
-              aria-label="Copy"
+              aria-label={referralSignupLink ? 'Copy invite link' : 'Copy referral code'}
             >
               <CopyIcon className="h-5 w-5" />
             </button>
