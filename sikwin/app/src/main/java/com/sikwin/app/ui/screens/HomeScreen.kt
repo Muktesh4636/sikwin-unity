@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -418,7 +419,7 @@ fun PromotionalBanners(
     viewModel: GunduAtaViewModel,
     onNavigate: (String) -> Unit
 ) {
-    val pageCount = 5
+    val pageCount = 6
     val virtualCount = 1000 * pageCount
     val pagerState = rememberPagerState(
         initialPage = virtualCount / 2,
@@ -467,6 +468,7 @@ fun PromotionalBanners(
                 1 -> BannerData("REFER & EARN", "Earn up to ₹1 Lakh!", "INVITE", listOf(Color(0xFF455A64), Color(0xFF263238)), { handleBannerClickRequireLogin("affiliate") })
                 2 -> BannerData("MEGA SPIN", "Deposit ₹2000 or more to spin the wheel!", "SPIN NOW", listOf(Color(0xFF4A148C), Color(0xFF880E4F)), { handleBannerClickRequireLogin("lucky_draw") })
                 3 -> BannerData("USDT SPECIAL ₮", "Get 5% EXTRA CASHBACK on all USDT deposits!", "DEPOSIT NOW", listOf(Color(0xFF00897B), Color(0xFF004D40)), { handleBannerClick("deposit?method=USDT") })
+                4 -> BannerData("IPL CRICKET", "Live odds & markets — bet on matches anytime!", "BET NOW", listOf(Color(0xFF0D47A1), Color(0xFF1A237E)), { handleBannerClick("ipl") })
                 else -> BannerData("FRANCHISE", "Get Gundu Ata franchise at 50% off — Get in touch today!", "LEARN MORE", listOf(Color(0xFF795548), Color(0xFF5D4037)), { handleBannerClick("white_label_account") })
             }
 
@@ -1095,13 +1097,18 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
         containerColor = BottomNavBackground,
         tonalElevation = 8.dp
     ) {
-        val items = listOf(
+        val allNavItems = listOf(
             BottomNavItem("Home", "home", Icons.Default.Home),
             BottomNavItem("GUNDU ATA", "gundu_ata", Icons.Default.Casino),
             BottomNavItem("IPL", "ipl", Icons.Default.SportsCricket),
             BottomNavItem("Me", "me", Icons.Default.AccountCircle)
         )
-        
+        val items = if (currentRoute == "ipl") {
+            allNavItems.filter { it.route != "gundu_ata" }
+        } else {
+            allNavItems
+        }
+
         items.forEach { item ->
             NavigationBarItem(
                 selected = currentRoute == item.route,
@@ -1120,7 +1127,8 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                                     }
                                 }
                             }
-                            "me", "ipl" -> {
+                            "ipl" -> onNavigate(item.route)
+                            "me" -> {
                                 if (!viewModel.loginSuccess) {
                                     showLoginPopup = true
                                 } else {
@@ -1145,6 +1153,25 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                             )
                         } else {
                             Icon(item.icon, contentDescription = null)
+                        }
+                    } else if (item.route == "ipl") {
+                        val context = LocalContext.current
+                        val iplIconId = context.resources.getIdentifier("ic_ipl_nav", "drawable", context.packageName)
+                        val iplSelected = currentRoute == item.route
+                        if (iplIconId != 0) {
+                            Image(
+                                painter = painterResource(id = iplIconId),
+                                contentDescription = null,
+                                modifier = Modifier.size(if (iplSelected) 26.dp else 24.dp),
+                                contentScale = ContentScale.Fit,
+                                colorFilter = if (iplSelected) ColorFilter.tint(PrimaryYellow) else ColorFilter.tint(TextGrey)
+                            )
+                        } else {
+                            Icon(
+                                item.icon,
+                                contentDescription = null,
+                                tint = if (iplSelected) PrimaryYellow else TextGrey
+                            )
                         }
                     } else {
                         Icon(item.icon, contentDescription = null)

@@ -495,14 +495,10 @@ fun AppNavigation(
                             executeGameLaunch()
                         }
                     } else if (route == "ipl") {
-                        if (viewModel.loginSuccess) {
-                            navController.navigate("ipl") {
-                                popUpTo("home") { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        } else {
-                            showAuthDialog = true
+                        navController.navigate("ipl") {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
                         }
                     } else if (route == "me") {
                         if (viewModel.loginSuccess) {
@@ -675,6 +671,12 @@ fun AppNavigation(
                 title = "Betting Record",
                 initialCategory = "Betting",
                 showTabs = false,
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("cricket_betting_record") {
+            CricketBettingHistoryScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() }
             )

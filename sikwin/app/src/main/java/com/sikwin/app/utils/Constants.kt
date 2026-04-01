@@ -8,6 +8,6 @@ object Constants {
 
     // APK / signup links for users: use BuildConfig.PUBLIC_SITE_URL (per franchise in app/build.gradle).
 
-    /** In-app IPL tab (WebView). Change to your IPL / sports page when ready. */
-    const val IPL_WEB_URL = "https://gunduata.club/"
+    /** IPL tab: opens Cricket / match odds in the system browser (gunduata.club/cricket/). */
+    const val IPL_WEB_URL = "https://gunduata.club/cricket/"
 }

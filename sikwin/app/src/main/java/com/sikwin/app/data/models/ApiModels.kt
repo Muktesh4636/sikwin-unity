@@ -177,3 +177,94 @@ data class SupportContacts(
     val whatsapp_number: String? = null,
     val telegram: String? = null
 )
+
+// --- Cricket / IPL: GET /api/cricket/live/, POST /api/cricket/bet/ ---
+
+/** GET https://gunduata.club/api/cricket/live/ */
+data class CricketLiveResponse(
+    val data: CricketLiveEventData? = null,
+    val fetched_at: String? = null,
+    val source_url: String? = null
+)
+
+data class CricketLiveEventData(
+    val id: Long = 0L,
+    val description: String? = null,
+    val markets: List<CricketLiveMarket>? = null
+)
+
+data class CricketLiveMarket(
+    val id: Long = 0L,
+    val description: String? = null,
+    val status: String? = null,
+    val outcomes: List<CricketLiveOutcome>? = null
+)
+
+data class CricketLiveOutcome(
+    val id: Long = 0L,
+    val description: String? = null,
+    val consolidatedPrice: CricketConsolidatedPrice? = null
+) {
+    fun displayLabel(): String = description?.trim()?.takeIf { it.isNotEmpty() } ?: "—"
+    fun displayOdds(): String {
+        val fmt = consolidatedPrice?.currentPrice?.format?.trim()
+        if (!fmt.isNullOrEmpty()) return fmt
+        val d = consolidatedPrice?.currentPrice?.decimal
+        return if (d != null) String.format("%.2f", d) else "—"
+    }
+}
+
+data class CricketConsolidatedPrice(
+    val currentPrice: CricketCurrentPrice? = null
+)
+
+data class CricketCurrentPrice(
+    val decimal: Double? = null,
+    val format: String? = null
+)
+
+/** POST /api/cricket/bet/ */
+data class CricketBetRequest(
+    val event_id: Long,
+    val market_id: Long,
+    val outcome_id: Long,
+    val stake: Int
+)
+
+data class CricketBetResponse(
+    val id: Int? = null,
+    val event_name: String? = null,
+    val market_name: String? = null,
+    val outcome_name: String? = null,
+    val odds: String? = null,
+    val stake: Int? = null,
+    val potential_payout: Double? = null,
+    val status: String? = null,
+    val created_at: String? = null,
+    val wallet_balance: Double? = null
+)
+
+/** One row from GET /api/cricket/bets/ */
+data class CricketBetHistoryItem(
+    val id: Int? = null,
+    val event_id: Long? = null,
+    val event_name: String? = null,
+    val market_id: Long? = null,
+    val market_name: String? = null,
+    val outcome_id: Long? = null,
+    val outcome_name: String? = null,
+    val odds: String? = null,
+    val stake: Int? = null,
+    val potential_payout: Double? = null,
+    val status: String? = null,
+    val payout_amount: Double? = null,
+    val created_at: String? = null,
+    val settled_at: String? = null
+)
+
+/** Primary shape: `{ "bets": [...] }`; also accept legacy `data` / `results`. */
+data class CricketBetListWrapper(
+    val bets: List<CricketBetHistoryItem>? = null,
+    val data: List<CricketBetHistoryItem>? = null,
+    val results: List<CricketBetHistoryItem>? = null
+)

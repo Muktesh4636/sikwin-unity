@@ -108,6 +108,18 @@ interface ApiService {
     @DELETE("auth/bank-details/{id}/")
     suspend fun deleteBankDetail(@Path("id") id: Int): Response<Unit>
 
+    /** Live event + markets + odds — see [CricketLiveResponse]. */
+    @GET("cricket/live/")
+    suspend fun getCricketLive(): Response<CricketLiveResponse>
+
+    @POST("cricket/bet/")
+    suspend fun postCricketBet(@Body body: CricketBetRequest): Response<CricketBetResponse>
+
+    /** User's cricket/IPL bets only (not dice game history). */
+    /** GET /api/cricket/bets/ — returns `{ "bets": [ ... ] }` */
+    @GET("cricket/bets/")
+    suspend fun getCricketBettingHistory(): Response<CricketBetListWrapper>
+
     @GET("support/contacts/")
     suspend fun getSupportContacts(@Query("package") packageName: String): Response<SupportContacts>
 

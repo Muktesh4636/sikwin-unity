@@ -117,7 +117,7 @@ export function MaintenanceGate({ children }: { children: React.ReactNode }) {
           <div className="text-primaryYellow text-sm font-black tracking-widest">MAINTENANCE</div>
           <div className="mt-2 text-lg font-extrabold">App under maintenance</div>
           <div className="mt-2 text-textGrey">{state.message}</div>
-          <button className="btn-primary mt-5 w-full" onClick={check}>
+          <button className="btn-primary mt-5 w-full" onClick={() => void check()}>
             Retry
           </button>
         </div>

@@ -33,3 +33,6 @@ dist-ssr/
 .vscode/
 .DS_Store
 *.log
+
+# Large local Unity export + APK drop (not tracked)
+websocket /

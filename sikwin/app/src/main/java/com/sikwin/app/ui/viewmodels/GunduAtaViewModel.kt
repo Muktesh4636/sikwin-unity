@@ -11,6 +11,7 @@ import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.data.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -213,7 +214,116 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     var withdrawRequests by mutableStateOf<List<WithdrawRequest>>(emptyList())
     var paymentMethods by mutableStateOf<List<PaymentMethod>>(emptyList())
     var bettingHistory by mutableStateOf<List<Bet>>(emptyList())
+    /** Cricket/IPL bets only — from [getCricketBettingHistory], not dice [Betting] history. */
+    var cricketBettingHistory by mutableStateOf<List<CricketBetHistoryItem>>(emptyList())
+    var cricketBetsLoading by mutableStateOf(false)
+    var cricketBetsError by mutableStateOf<String?>(null)
     var referralData by mutableStateOf<ReferralData?>(null)
+
+    /** Cricket / IPL tab — GET /api/cricket/live/ */
+    var cricketLive by mutableStateOf<CricketLiveEventData?>(null)
+    /** Bumps on each successful odds payload so list keys refresh even when [CricketLiveEventData] equals previous. */
+    var cricketLiveEpoch by mutableStateOf(0L)
+    var cricketFetchedAt by mutableStateOf<String?>(null)
+    var cricketLoading by mutableStateOf(false)
+    var cricketError by mutableStateOf<String?>(null)
+    var cricketBetPlacing by mutableStateOf(false)
+    /** True only after several consecutive failed polls (legacy blur; odds are cleared on failure so no stale odds). */
+    var cricketPollStopped by mutableStateOf(false)
+
+    /**
+     * Single fetch for GET /api/cricket/live/. Returns true only when [response has data] and updates [cricketLive].
+     * On any failure, empty body, or missing `data`, clears live odds so the UI shows nothing until a good response.
+     */
+    suspend fun cricketFetchOnce(): Boolean {
+        val showSpinner = cricketLive == null && cricketError == null
+        if (showSpinner) cricketLoading = true
+        return try {
+            val resp = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getCricketLive()
+            }
+            if (resp.isSuccessful) {
+                val body = resp.body()
+                val data = body?.data
+                cricketFetchedAt = body?.fetched_at
+                if (data != null) {
+                    cricketLive = data
+                    cricketLiveEpoch++
+                    cricketError = null
+                    true
+                } else {
+                    android.util.Log.w("CricketLive", "Empty data in response")
+                    clearCricketLive("No live data")
+                    false
+                }
+            } else {
+                logoutIfUnauthorized(resp.code())
+                val err = resp.errorBody()?.string()
+                val msg = parseError(err)
+                android.util.Log.w("CricketLive", "HTTP ${resp.code()} $err")
+                clearCricketLive(msg)
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketLive", "Failed", e)
+            clearCricketLive(e.message ?: "Could not load cricket odds.")
+            false
+        } finally {
+            if (showSpinner) cricketLoading = false
+        }
+    }
+
+    private fun clearCricketLive(message: String?) {
+        cricketLive = null
+        cricketFetchedAt = null
+        cricketLiveEpoch = 0L
+        cricketError = message?.takeIf { it.isNotBlank() } ?: "Could not load cricket odds."
+    }
+
+    fun refreshCricketFeed() {
+        viewModelScope.launch {
+            cricketFetchOnce()
+        }
+    }
+
+    /**
+     * POST /api/cricket/bet/. [onDone] is invoked on the main thread with null on success, or an error message.
+     */
+    fun placeCricketBet(
+        eventId: Long,
+        marketId: Long,
+        outcomeId: Long,
+        stake: Int,
+        onDone: (error: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            cricketBetPlacing = true
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    RetrofitClient.apiService.postCricketBet(
+                        CricketBetRequest(
+                            event_id = eventId,
+                            market_id = marketId,
+                            outcome_id = outcomeId,
+                            stake = stake
+                        )
+                    )
+                }
+                if (resp.isSuccessful) {
+                    fetchWallet()
+                    onDone(null)
+                } else {
+                    logoutIfUnauthorized(resp.code())
+                    val err = resp.errorBody()?.string()
+                    onDone(parseError(err))
+                }
+            } catch (e: Exception) {
+                onDone(e.message ?: "Could not place bet.")
+            } finally {
+                cricketBetPlacing = false
+            }
+        }
+    }
 
     /** Show customer support popup only when app is opened fresh (cold start or resumed from background), not when navigating within app (e.g. profile -> home). */
     var showSupportPopupOnNextHomeVisit by mutableStateOf(true)
@@ -741,6 +851,32 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                 android.util.Log.e("GunduAtaViewModel", "Fetch betting history failed: ${e.message}")
             } finally {
                 isLoading = false
+            }
+        }
+    }
+
+    fun fetchCricketBettingHistory() {
+        viewModelScope.launch {
+            cricketBetsLoading = true
+            cricketBetsError = null
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.apiService.getCricketBettingHistory()
+                }
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    val list = body?.bets ?: body?.data ?: body?.results ?: emptyList()
+                    cricketBettingHistory = list
+                } else {
+                    logoutIfUnauthorized(response.code())
+                    cricketBetsError = parseError(response.errorBody()?.string())
+                    cricketBettingHistory = emptyList()
+                }
+            } catch (e: Exception) {
+                cricketBetsError = e.message ?: "Could not load cricket bets."
+                android.util.Log.e("GunduAtaViewModel", "Fetch cricket betting history failed", e)
+            } finally {
+                cricketBetsLoading = false
             }
         }
     }
