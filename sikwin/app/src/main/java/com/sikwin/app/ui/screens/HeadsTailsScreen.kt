@@ -263,18 +263,20 @@ fun HeadsTailsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = BlackBackground,
-        bottomBar = {
-            HomeBottomNavigation(currentRoute = "coin", viewModel = viewModel, onNavigate = onNavigate)
-        },
+        bottomBar = {},
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        stringResource(R.string.heads_tails_title),
-                        color = TextWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            stringResource(R.string.heads_tails_title),
+                            color = PrimaryYellow,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -284,16 +286,9 @@ fun HeadsTailsScreen(
                 actions = {
                     // Coin bets are checked against wallet.balance on the server.
                     val bal = viewModel.wallet?.balance ?: viewModel.wallet?.withdrawable_balance ?: "0"
-                    Column(
-                        modifier = Modifier.padding(end = 12.dp),
-                        horizontalAlignment = Alignment.End
+                    Box(
+                        modifier = Modifier.padding(end = 12.dp)
                     ) {
-                        Text(
-                            stringResource(R.string.heads_tails_balance_label),
-                            color = TextGrey,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
                         Text(
                             text = "₹$bal",
                             color = PrimaryYellow,
