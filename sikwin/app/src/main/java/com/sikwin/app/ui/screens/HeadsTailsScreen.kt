@@ -39,7 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -265,9 +265,9 @@ fun HeadsTailsScreen(
         containerColor = BlackBackground,
         bottomBar = {},
         topBar = {
-            CenterAlignedTopAppBar(
+            TopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(horizontalAlignment = Alignment.Start) {
                         Text(
                             stringResource(R.string.heads_tails_title),
                             color = PrimaryYellow,
@@ -284,10 +284,16 @@ fun HeadsTailsScreen(
                     }
                 },
                 actions = {
-                    // Coin bets are checked against wallet.balance on the server.
                     val bal = viewModel.wallet?.balance ?: viewModel.wallet?.withdrawable_balance ?: "0"
-                    Box(
-                        modifier = Modifier.padding(end = 12.dp)
+                    Row(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF1C1C1E))
+                            .clickable { onNavigate("deposit") }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = "₹$bal",
@@ -295,9 +301,23 @@ fun HeadsTailsScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
                         )
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(PrimaryYellow),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "+",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BlackBackground)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BlackBackground)
             )
         }
     ) { padding ->

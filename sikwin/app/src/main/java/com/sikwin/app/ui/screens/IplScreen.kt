@@ -104,6 +104,7 @@ private data class CricketBetPick(
 @Composable
 fun IplScreen(
     viewModel: GunduAtaViewModel,
+    onBack: () -> Unit = {},
     onNavigate: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -219,6 +220,7 @@ fun IplScreen(
             CricketTopBar(
                 balance = viewModel.wallet?.balance ?: "0.00",
                 isLoggedIn = viewModel.loginSuccess,
+                onBack = onBack,
                 onWalletOrDeposit = { onNavigate("deposit") },
                 onLogin = { onNavigate("login") },
                 onBettingHistory = {
@@ -227,7 +229,7 @@ fun IplScreen(
                 }
             )
         },
-        bottomBar = { HomeBottomNavigation(currentRoute = "ipl", viewModel = viewModel, onNavigate = onNavigate) },
+        bottomBar = {},
         containerColor = CricketScreenBg
     ) { padding ->
         Column(
@@ -409,6 +411,7 @@ fun IplScreen(
 private fun CricketTopBar(
     balance: String,
     isLoggedIn: Boolean,
+    onBack: () -> Unit = {},
     onWalletOrDeposit: () -> Unit,
     onLogin: () -> Unit,
     onBettingHistory: () -> Unit
@@ -425,6 +428,18 @@ private fun CricketTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
+                // Back button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF2A2A2A))
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("←", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 Image(
                     painter = painterResource(R.drawable.ic_ipl_nav),
                     contentDescription = null,

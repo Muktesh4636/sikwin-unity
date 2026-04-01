@@ -597,6 +597,7 @@ fun AppNavigation(
         composable("ipl") {
             IplScreen(
                 viewModel = viewModel,
+                onBack = { navController.popBackStack() },
                 onNavigate = { route ->
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {

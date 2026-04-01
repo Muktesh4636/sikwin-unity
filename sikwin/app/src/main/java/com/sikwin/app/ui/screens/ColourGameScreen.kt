@@ -2,6 +2,8 @@
 
 package com.sikwin.app.ui.screens
 
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -25,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -33,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.sikwin.app.R
+import com.sikwin.app.data.models.ColourBetHistoryItem
 import com.sikwin.app.data.models.ColourPublicResultItem
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import kotlin.math.roundToInt
@@ -67,15 +70,15 @@ import kotlinx.coroutines.launch
 
 // Reference palette (COLOUR GAME)
 private val BgBlack = Color(0xFF000000)
-private val GoldTitle = Color(0xFFEAB308)
-private val GoldAccent = Color(0xFFD4AF37)
-private val GreenJoin = Color(0xFF064E3B)
-private val VioletJoin = Color(0xFF4C1D95)
-private val RedJoin = Color(0xFF7F1D1D)
+private val GoldTitle = Color(0xFFFFD700)
+private val GoldAccent = Color(0xFFFFE033)
+private val GreenJoin = Color(0xFF16A34A)
+private val VioletJoin = Color(0xFF7C3AED)
+private val RedJoin = Color(0xFFDC2626)
 private val GreenBright = Color(0xFF10B981)
 private val RedBright = Color(0xFFEF4444)
 private val VioletBright = Color(0xFF8B5CF6)
-private val TimerYellow = Color(0xFFFDE047)
+private val TimerYellow = Color(0xFFFFE500)
 private val TableBg = Color(0xFF1C1C1E)
 private val BetCardBg = Color(0xFF2C2C2E)
 private val BetCardGreyButton = Color(0xFF3A3A3C)
@@ -107,6 +110,7 @@ fun ColourGameScreen(
     val scope = rememberCoroutineScope()
     var placingBet by remember { mutableStateOf(false) }
     var betTarget by remember { mutableStateOf<ColourBetTarget?>(null) }
+    var soundEnabled by remember { mutableStateOf(true) }
 
     val round = viewModel.colourRound
     val timerSec = viewModel.colourDisplayTimerSeconds.coerceAtLeast(0)
@@ -121,6 +125,32 @@ fun ColourGameScreen(
     DisposableEffect(Unit) {
         viewModel.startColourGameSession()
         onDispose { viewModel.stopColourGameSession() }
+    }
+
+    // Soft tick sound every second while timer is running
+    val tickSoundPool = remember {
+        SoundPool.Builder()
+            .setMaxStreams(1)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .build()
+    }
+    val tickSoundId = remember(context) {
+        tickSoundPool.load(context, R.raw.colour_tick, 1)
+    }
+    DisposableEffect(Unit) {
+        onDispose { tickSoundPool.release() }
+    }
+    LaunchedEffect(timerSec) {
+        if (timerSec > 0 && soundEnabled) {
+            // Very soft tick; last 10s slightly more audible
+            val vol = if (timerSec <= 10) 0.08f else 0.04f
+            tickSoundPool.play(tickSoundId, vol, vol, 1, 0, 1f)
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -203,7 +233,7 @@ fun ColourGameScreen(
     Scaffold(
         containerColor = BgBlack,
         topBar = {
-            CenterAlignedTopAppBar(
+            TopAppBar(
                 title = {
                     Text(
                         stringResource(R.string.colour_game_title),
@@ -213,41 +243,72 @@ fun ColourGameScreen(
                         fontFamily = FontFamily.Serif
                     )
                 },
-                navigationIcon = { },
-                actions = {
-                    Row(
-                        modifier = Modifier.padding(end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                navigationIcon = {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1C1C1E))
+                            .clickable(onClick = onBack),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .border(1.dp, GoldTitle, RoundedCornerShape(20.dp))
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        Text(
+                            "←",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                actions = {
+                    // Sound mute toggle
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1C1C1E))
+                            .clickable { soundEnabled = !soundEnabled },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            if (soundEnabled) "🔊" else "🔇",
+                            fontSize = 16.sp
+                        )
+                    }
+                    // Amount + deposit button in one combined box, no border on amount
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF1C1C1E))
+                            .clickable(onClick = onDeposit)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("₹", color = GoldTitle, fontWeight = FontWeight.Bold)
-                                Text(balance, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text("₹", color = GoldTitle, fontWeight = FontWeight.Bold)
+                            Text(balance, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(GoldTitle),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "+",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
                             }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(GoldTitle)
-                                .clickable(onClick = onDeposit),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "+",
-                                color = Color.Black,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BgBlack)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgBlack)
             )
         }
     ) { padding ->
@@ -268,39 +329,22 @@ fun ColourGameScreen(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.Start
                 ) {
+                    // Round ID label
                     Text(
-                        if (round?.status.equals("no_round", ignoreCase = true)) {
-                            roundIdLine
-                        } else {
-                            stringResource(R.string.colour_game_round_id_fmt, roundIdLine)
-                        },
-                        color = TimerYellow.copy(alpha = 0.85f),
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Start
+                        text = stringResource(R.string.colour_recent_col_round_id),
+                        color = Color(0xFF9CA3AF),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Column(horizontalAlignment = Alignment.Start) {
-                        Text(
-                            text = stringResource(R.string.colour_round_number_label),
-                            color = Color(0xFF9CA3AF),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Start
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = round?.number?.let { "$it" } ?: "—",
-                            color = Color.White,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Start
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Round ID value directly below the label
+                    Text(
+                        text = roundIdLine,
+                        color = TimerYellow.copy(alpha = 0.85f),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
                 Column(
                     horizontalAlignment = Alignment.End,
@@ -386,61 +430,97 @@ fun ColourGameScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                stringResource(R.string.colour_recent_results),
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Column(
+
+            // Tab row: RECENT RESULTS | MY BETS | TRENDS
+            var selectedTab by remember { mutableIntStateOf(0) }
+            val tabs = listOf("RECENT RESULTS", "MY BETS", "TRENDS")
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(TableBg)
-                    .padding(12.dp)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        stringResource(R.string.colour_recent_col_round_id),
-                        color = Color(0xFF9CA3AF),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1.1f)
-                    )
-                    Text(
-                        stringResource(R.string.colour_recent_col_number),
-                        color = Color(0xFF9CA3AF),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(0.55f),
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        stringResource(R.string.colour_recent_col_result),
-                        color = Color(0xFF9CA3AF),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(0.85f),
-                        textAlign = TextAlign.End
-                    )
-                }
-                HorizontalDivider(color = Color(0xFF333333), modifier = Modifier.padding(vertical = 8.dp))
-                if (recentRows.isEmpty()) {
-                    Text(
-                        stringResource(R.string.colour_game_no_history),
-                        color = Color(0xFF9CA3AF),
-                        fontSize = 12.sp,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-                } else {
-                    recentRows.forEach { r ->
-                        ColourPublicResultRow(r)
+                tabs.forEachIndexed { index, label ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (selectedTab == index) Color(0xFF2C2C2E) else Color.Transparent)
+                            .clickable { selectedTab = index }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            color = if (selectedTab == index) Color.White else Color(0xFF6B7280),
+                            fontSize = 12.sp,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                            letterSpacing = 0.5.sp
+                        )
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (selectedTab == 0) {
+                // Recent Results table
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(TableBg)
+                        .padding(12.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            stringResource(R.string.colour_recent_col_round_id),
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1.1f)
+                        )
+                        Text(
+                            stringResource(R.string.colour_recent_col_number),
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(0.55f),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            stringResource(R.string.colour_recent_col_result),
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(0.85f),
+                            textAlign = TextAlign.End
+                        )
+                    }
+                    HorizontalDivider(color = Color(0xFF333333), modifier = Modifier.padding(vertical = 8.dp))
+                    if (recentRows.isEmpty()) {
+                        Text(
+                            stringResource(R.string.colour_game_no_history),
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        recentRows.forEach { r ->
+                            ColourPublicResultRow(r)
+                        }
+                    }
+                }
+            } else if (selectedTab == 1) {
+                // My Bets table
+                ColourMyBetsTable(bets = viewModel.colourBetsHistory)
+            } else {
+                // Trends
+                ColourTrendsPanel(results = viewModel.colourPublicResults)
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -611,37 +691,344 @@ private fun ColourBetAmountCard(
 
 @Composable
 private fun ColourPublicResultRow(r: ColourPublicResultItem) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            r.round_id.ifBlank { "—" },
-            color = Color.White,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.weight(1.1f)
-        )
-        Text(
-            "${r.number}",
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.weight(0.55f),
-            textAlign = TextAlign.Center
-        )
+    Column {
         Row(
-            Modifier.weight(0.85f),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            dotsFromColourResult(r.result).forEach { d ->
-                ResultDot(d)
-                Spacer(Modifier.width(4.dp))
+            Text(
+                r.round_id.ifBlank { "—" },
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1.1f)
+            )
+            Text(
+                "${r.number}",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(0.55f),
+                textAlign = TextAlign.Center
+            )
+            Row(
+                Modifier.weight(0.85f),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                dotsFromColourResult(r.result).forEach { d ->
+                    ResultDot(d)
+                    Spacer(Modifier.width(4.dp))
+                }
+            }
+        }
+        HorizontalDivider(color = Color(0xFF2A2A2A))
+    }
+}
+
+// ─── Trend helpers ────────────────────────────────────────────────────────────
+
+private data class TrendPattern(
+    val sequence: List<String>,   // e.g. ["red","red"]
+    val nextPrediction: String,   // e.g. "green"
+    val confidence: Int,          // 0-100
+    val occurrences: Int
+)
+
+/** Extracts the base colour from a result string (green_violet → green, red_violet → red). */
+private fun baseColour(result: String): String = when {
+    result.contains("green", ignoreCase = true) -> "green"
+    result.contains("red", ignoreCase = true) -> "red"
+    result.contains("violet", ignoreCase = true) -> "violet"
+    else -> result.lowercase()
+}
+
+/**
+ * Analyses last [limit] results and finds what colour followed each 2-result sequence.
+ * Returns top patterns sorted by occurrences desc.
+ */
+private fun analysePatterns(results: List<ColourPublicResultItem>, limit: Int = 50): List<TrendPattern> {
+    val colours = results.take(limit).map { baseColour(it.result) }.reversed() // oldest first
+    if (colours.size < 3) return emptyList()
+
+    // Count: given sequence of 2, what came next?
+    val followMap = mutableMapOf<Pair<String, String>, MutableMap<String, Int>>()
+    for (i in 0 until colours.size - 2) {
+        val key = Pair(colours[i], colours[i + 1])
+        val next = colours[i + 2]
+        followMap.getOrPut(key) { mutableMapOf() }.merge(next, 1, Int::plus)
+    }
+
+    val patterns = mutableListOf<TrendPattern>()
+    for ((seq, nextMap) in followMap) {
+        val total = nextMap.values.sum()
+        val (bestNext, bestCount) = nextMap.maxByOrNull { it.value } ?: continue
+        val confidence = (bestCount * 100) / total
+        patterns.add(
+            TrendPattern(
+                sequence = listOf(seq.first, seq.second),
+                nextPrediction = bestNext,
+                confidence = confidence,
+                occurrences = total
+            )
+        )
+    }
+    return patterns.sortedByDescending { it.occurrences }
+}
+
+/** Streak: how many times the same colour appeared consecutively at the end. */
+private fun currentStreak(results: List<ColourPublicResultItem>): Pair<String, Int> {
+    if (results.isEmpty()) return Pair("—", 0)
+    val latest = baseColour(results.first().result)
+    var count = 0
+    for (r in results) {
+        if (baseColour(r.result) == latest) count++ else break
+    }
+    return Pair(latest, count)
+}
+
+/** Colour frequency over last [limit] rounds. */
+private fun colourFrequency(results: List<ColourPublicResultItem>, limit: Int = 20): Map<String, Int> {
+    val freq = mutableMapOf("green" to 0, "red" to 0, "violet" to 0)
+    results.take(limit).forEach { freq.merge(baseColour(it.result), 1, Int::plus) }
+    return freq
+}
+
+@Composable
+private fun ColourTrendsPanel(results: List<ColourPublicResultItem>) {
+    val patterns = remember(results) { analysePatterns(results) }
+    val (streakColour, streakCount) = remember(results) { currentStreak(results) }
+    val freq = remember(results) { colourFrequency(results) }
+    val total20 = freq.values.sum().coerceAtLeast(1)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(TableBg)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // ── Last 20 dot strip ──────────────────────────────────────────────
+        Text("LAST 20 RESULTS", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            results.take(20).reversed().forEach { r ->
+                val c = when (baseColour(r.result)) {
+                    "green" -> GreenBright
+                    "red" -> RedBright
+                    else -> VioletBright
+                }
+                Box(
+                    Modifier
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(c)
+                )
+            }
+        }
+
+        HorizontalDivider(color = Color(0xFF2A2A2A))
+
+        // ── Frequency bar ──────────────────────────────────────────────────
+        Text("COLOUR FREQUENCY (LAST 20)", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+        listOf(
+            Triple("Green", "green", GreenBright),
+            Triple("Red", "red", RedBright),
+            Triple("Violet", "violet", VioletBright)
+        ).forEach { (label, key, colour) ->
+            val count = freq[key] ?: 0
+            val pct = count.toFloat() / total20
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, color = colour, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(46.dp))
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(Color(0xFF333333))
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(pct)
+                            .background(colour)
+                    )
+                }
+                Text("$count", color = Color.White, fontSize = 12.sp, modifier = Modifier.width(20.dp), textAlign = TextAlign.End)
+            }
+        }
+
+        HorizontalDivider(color = Color(0xFF2A2A2A))
+
+        // ── Current streak ─────────────────────────────────────────────────
+        Text("CURRENT STREAK", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+        val streakC = when (streakColour) {
+            "green" -> GreenBright; "red" -> RedBright; "violet" -> VioletBright; else -> Color.White
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(streakCount.coerceAtMost(10)) {
+                Box(Modifier.size(16.dp).clip(CircleShape).background(streakC))
+            }
+            if (streakCount > 0) {
+                Text(
+                    "${streakColour.replaceFirstChar { it.uppercase() }} × $streakCount",
+                    color = streakC,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        HorizontalDivider(color = Color(0xFF2A2A2A))
+
+        // ── Pattern predictions ────────────────────────────────────────────
+        Text("PATTERN PREDICTIONS", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+        if (patterns.isEmpty()) {
+            Text("Not enough data yet.", color = Color(0xFF6B7280), fontSize = 12.sp)
+        } else {
+            patterns.take(6).forEach { p ->
+                val predColour = when (p.nextPrediction) {
+                    "green" -> GreenBright; "red" -> RedBright; "violet" -> VioletBright; else -> Color.White
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF1C1C1E))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Sequence dots
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        p.sequence.forEach { col ->
+                            val c = when (col) { "green" -> GreenBright; "red" -> RedBright; else -> VioletBright }
+                            Box(Modifier.size(14.dp).clip(CircleShape).background(c))
+                        }
+                        Text(" →", color = Color(0xFF9CA3AF), fontSize = 14.sp)
+                        Box(Modifier.size(14.dp).clip(CircleShape).background(predColour))
+                        Text(
+                            " ${p.nextPrediction.replaceFirstChar { it.uppercase() }}",
+                            color = predColour,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    // Confidence badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(predColour.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text("${p.confidence}%", color = predColour, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+        }
+
+        // ── Disclaimer ─────────────────────────────────────────────────────
+        Text(
+            "⚠ Patterns are based on past data only. Each round is independent — no outcome is guaranteed.",
+            color = Color(0xFF4B5563),
+            fontSize = 10.sp,
+            lineHeight = 14.sp
+        )
+    }
+}
+
+@Composable
+private fun ColourMyBetsTable(bets: List<ColourBetHistoryItem>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(TableBg)
+            .padding(12.dp)
+    ) {
+        // Header
+        Row(Modifier.fillMaxWidth()) {
+            Text("ROUND ID", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.2f))
+            Text("BET ON", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
+            Text("AMT", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center)
+            Text("STATUS", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.7f), textAlign = TextAlign.End)
+        }
+        HorizontalDivider(color = Color(0xFF333333), modifier = Modifier.padding(vertical = 8.dp))
+        if (bets.isEmpty()) {
+            Text(
+                "No bets placed yet.",
+                color = Color(0xFF9CA3AF),
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        } else {
+            bets.forEach { b ->
+                Column {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            b.round_id?.takeLast(10) ?: "—",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.weight(1.2f)
+                        )
+                        val betLabel = when {
+                            b.number != null -> "#${b.number}"
+                            !b.bet_on.isNullOrBlank() -> b.bet_on.replaceFirstChar { it.uppercase() }
+                            else -> "—"
+                        }
+                        Text(
+                            betLabel,
+                            color = when (b.bet_on?.lowercase()) {
+                                "green" -> GreenBright
+                                "red" -> RedBright
+                                "violet" -> VioletBright
+                                else -> Color.White
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(0.8f),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            "₹${b.amount ?: 0}",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            modifier = Modifier.weight(0.5f),
+                            textAlign = TextAlign.Center
+                        )
+                        val statusColor = when (b.status?.lowercase()) {
+                            "won" -> GreenBright
+                            "lost" -> RedBright
+                            "pending" -> TimerYellow
+                            else -> Color(0xFF9CA3AF)
+                        }
+                        Text(
+                            b.status?.replaceFirstChar { it.uppercase() } ?: "—",
+                            color = statusColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(0.7f),
+                            textAlign = TextAlign.End
+                        )
+                    }
+                    HorizontalDivider(color = Color(0xFF2A2A2A))
+                }
             }
         }
     }

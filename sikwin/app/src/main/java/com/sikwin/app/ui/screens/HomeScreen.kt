@@ -175,6 +175,22 @@ fun HomeScreen(
                     // Banners (no Install APK or Become a partner — those are only in Profile)
                     PromotionalBanners(viewModel, onNavigate)
 
+                    // Quick-launch game icons row
+                    Spacer(modifier = Modifier.height(8.dp))
+                    QuickGamesRow(
+                        onGameClick = { gameId ->
+                            if (gameId == "more") {
+                                // scroll to hot games — just a no-op for now
+                            } else if (!viewModel.loginSuccess && gameId == "gundu_ata") {
+                                showLoginPopup = true
+                            } else {
+                                onGameClick(gameId)
+                            }
+                        },
+                        onNavigate = onNavigate
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+
                     // Hot Games
                     SectionHeader(title = stringResource(R.string.hot_games))
                     HotGamesGrid(
@@ -193,8 +209,7 @@ fun HomeScreen(
                     // Search Results
                     SectionHeader(title = stringResource(R.string.search_results))
                     val games = listOf(
-                        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)),
-                        GameItem(stringResource(R.string.game_colour_game_card), "colour_game", Color(0xFF1A1A1A))
+                        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0))
                     ).filter { it.name.contains(searchQuery, ignoreCase = true) }
                     
                     if (games.isNotEmpty()) {
@@ -389,7 +404,7 @@ fun SearchBar(onSearch: (String) -> Unit) {
         },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp),
         placeholder = { Text(stringResource(R.string.search_games), color = TextGrey) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextWhite) },
         trailingIcon = {
@@ -535,6 +550,155 @@ fun SectionHeader(title: String) {
     }
 }
 
+// ─── Quick-launch game icons row ─────────────────────────────────────────────
+
+private data class QuickGame(val id: String, val label: String, val iconRes: Int?, val gradient: List<Color>)
+
+@Composable
+fun QuickGamesRow(
+    onGameClick: (String) -> Unit,
+    onNavigate: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val iplIconRes = context.resources.getIdentifier("ic_ipl_nav", "drawable", context.packageName).takeIf { it != 0 }
+    val gunduIconRes = context.resources.getIdentifier("ic_gundu_ata_nav", "drawable", context.packageName).takeIf { it != 0 }
+
+    data class QuickEntry(val id: String, val label: String)
+    val entries = listOf(
+        QuickEntry("ipl", "IPL"),
+        QuickEntry("gundu_ata", "Gundu Ata"),
+        QuickEntry("coin", "Head & Tails"),
+        QuickEntry("colour_game", "Colour Game")
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        entries.forEach { entry ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        when (entry.id) {
+                            "ipl" -> onNavigate("ipl")
+                            "coin" -> onNavigate("coin")
+                            else -> onGameClick(entry.id)
+                        }
+                    }
+                    .padding(vertical = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(62.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (entry.id) {
+                                "ipl" -> Brush.linearGradient(listOf(Color(0xFF1A3A1A), Color(0xFF0D5C0D)))
+                                "gundu_ata" -> Brush.linearGradient(listOf(Color(0xFF0A1628), Color(0xFF1565C0)))
+                                "coin" -> Brush.linearGradient(listOf(Color(0xFF3D2B00), Color(0xFFB8860B)))
+                                else -> Brush.linearGradient(listOf(Color(0xFF0A0A0A), Color(0xFF1A1A1A)))
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (entry.id) {
+                        "ipl" -> {
+                            // Cricket bat + T20 badge
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                if (iplIconRes != null) {
+                                    Image(
+                                        painter = painterResource(id = iplIconRes),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(26.dp),
+                                        colorFilter = ColorFilter.tint(Color(0xFFFFCA28))
+                                    )
+                                } else {
+                                    Text("T20", color = Color(0xFFFFCA28), fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                                }
+                                Text("🏏", fontSize = 10.sp)
+                            }
+                        }
+                        "gundu_ata" -> {
+                            if (gunduIconRes != null) {
+                                Image(
+                                    painter = painterResource(id = gunduIconRes),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(30.dp),
+                                    colorFilter = ColorFilter.tint(Color.White)
+                                )
+                            } else {
+                                Text("🎲", fontSize = 22.sp)
+                            }
+                        }
+                        "coin" -> {
+                            // Gold coin split H | T
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFFD700)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .background(Color(0xFFFFD700)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("H", color = Color(0xFF3D2B00), fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                                    }
+                                    Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color(0xFF3D2B00)))
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .background(Color(0xFFFFA000)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("T", color = Color(0xFF3D2B00), fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                        "colour_game" -> {
+                            // Three colour circles matching the game buttons
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Box(Modifier.size(13.dp).clip(CircleShape).background(Color(0xFF16A34A)))
+                                    Box(Modifier.size(13.dp).clip(CircleShape).background(Color(0xFF7C3AED)))
+                                }
+                                Box(
+                                    modifier = Modifier.size(13.dp).clip(CircleShape).background(Color(0xFFDC2626)),
+                                    contentAlignment = Alignment.Center
+                                ) {}
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    entry.label,
+                    color = TextWhite,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun HotGamesGrid(
     viewModel: GunduAtaViewModel,
@@ -543,8 +707,7 @@ fun HotGamesGrid(
     onRequireLogin: () -> Unit
 ) {
     val games = listOf(
-        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)),
-        GameItem(stringResource(R.string.game_colour_game_card), "colour_game", Color(0xFF1A1A1A))
+        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0))
     )
     val context = LocalContext.current
     
@@ -1010,7 +1173,7 @@ fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 when (game.id) {
-                    "gundu_ata" -> VideoPlayer(videoResId = R.raw.gundu_ata_video, modifier = Modifier.fillMaxSize())
+                    "gundu_ata" -> VideoPlayer(videoResId = R.raw.gundu_ata_video, modifier = Modifier.fillMaxWidth().fillMaxHeight(0.82f))
                     "colour_game" -> {
                         Box(
                             modifier = Modifier
@@ -1144,10 +1307,9 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
             BottomNavItem("Home", "home", Icons.Default.Home),
             BottomNavItem("GUNDU ATA", "gundu_ata", Icons.Default.Casino),
             BottomNavItem("IPL", "ipl", Icons.Default.SportsCricket),
-            BottomNavItem(stringResource(R.string.heads_tails_nav), "coin", Icons.Default.Casino),
             BottomNavItem("Me", "me", Icons.Default.AccountCircle)
         )
-        val items = if (currentRoute == "ipl" || currentRoute == "coin") {
+        val items = if (currentRoute == "ipl") {
             allNavItems.filter { it.route != "gundu_ata" }
         } else {
             allNavItems
