@@ -41,6 +41,10 @@ interface ApiService {
     @GET("auth/wallet/")
     suspend fun getWallet(): Response<Wallet>
 
+    /** Coin flip — POST body: `toss` ("heads"|"tails"), `bet_amount` (number). */
+    @POST("coin/")
+    suspend fun postCoinFlip(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<CoinFlipResponse>
+
     @GET("auth/transactions/")
     suspend fun getTransactions(): Response<List<Transaction>>
 
@@ -125,6 +129,26 @@ interface ApiService {
 
     @POST("whitelabel/lead/")
     suspend fun submitWhitelabelLead(@Body data: Map<String, String>): Response<Map<String, Any>>
+
+    /** Current colour round — no auth. */
+    @GET("colour/round/")
+    suspend fun getColourRound(): Response<ColourRoundResponse>
+
+    /** Place one or more colour bets — auth required. Body: single bet, or `{ "bets": [...] }`. */
+    @POST("colour/bet/")
+    suspend fun postColourBet(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<ColourBetPlaceResponse>
+
+    /** Round result — no auth. */
+    @GET("colour/round/{roundId}/result/")
+    suspend fun getColourRoundResult(@Path("roundId") roundId: String): Response<ColourRoundResultResponse>
+
+    /** User's colour bet history — auth required. */
+    @GET("colour/bets/")
+    suspend fun getColourBets(): Response<ColourBetHistoryResponse>
+
+    /** Public recent colour round results — no auth. */
+    @GET("colour/results/")
+    suspend fun getColourPublicResults(): Response<ColourPublicResultsResponse>
 
     // Optional: Send contacts to backend (uncomment if you want to sync contacts)
     // @POST("auth/contacts/")

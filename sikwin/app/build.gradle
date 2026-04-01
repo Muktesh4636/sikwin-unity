@@ -89,29 +89,9 @@ android {
     }
 }
 
-// Workaround: project path containing ":" (e.g. "Kotlin:Unity") splits Unix classpaths.
-// Before each Kotlin compile task runs, copy any classpath JAR whose path contains ":" to a
-// colon-free cache directory and replace the entry so kotlinc receives valid paths.
-if (rootProject.projectDir.absolutePath.contains(':')) {
-    def safeCache = new File(gradle.gradleUserHomeDir, "unity-lib-compile-cache")
-    safeCache.mkdirs()
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { task ->
-        task.doFirst {
-            def safeFiles = task.libraries.files.collect { f ->
-                if (f.absolutePath.contains(':') && f.exists()) {
-                    def dest = new File(safeCache, f.name.replaceAll('[^a-zA-Z0-9._-]', '_') + '_' + f.lastModified() + '.jar')
-                    if (!dest.exists()) {
-                        dest.bytes = f.bytes
-                    }
-                    dest
-                } else {
-                    f
-                }
-            }
-            task.libraries.setFrom(safeFiles)
-        }
-    }
-}
+// Colon-in-path classpath workaround disabled: rewriting task.libraries broke kotlinc
+// (unresolved symbols in the same module). Build from a path without ":" or use Android Studio.
+// See unityLibrary/build.gradle for Unity JAR cache when only unityLibrary JARs need fixing.
 
 // Remove macOS ._ resource fork files that break the Android resource parser
 // Copy Kiran APK to a dedicated "kiran" folder at sikwin root

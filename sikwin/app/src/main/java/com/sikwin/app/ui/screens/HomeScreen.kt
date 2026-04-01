@@ -193,7 +193,8 @@ fun HomeScreen(
                     // Search Results
                     SectionHeader(title = stringResource(R.string.search_results))
                     val games = listOf(
-                        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0))
+                        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)),
+                        GameItem(stringResource(R.string.game_colour_game_card), "colour_game", Color(0xFF1A1A1A))
                     ).filter { it.name.contains(searchQuery, ignoreCase = true) }
                     
                     if (games.isNotEmpty()) {
@@ -207,11 +208,11 @@ fun HomeScreen(
                                 GameCard(
                                     game = game,
                                     modifier = Modifier.fillMaxWidth(0.5f),
-                                    onGameClick = { gameId ->
+                                    onClick = {
                                         if (!viewModel.loginSuccess) {
                                             showLoginPopup = true
                                         } else {
-                                            onGameClick(gameId)
+                                            onGameClick(game.id)
                                         }
                                     }
                                 )
@@ -541,7 +542,10 @@ fun HotGamesGrid(
     onNavigate: (String) -> Unit,
     onRequireLogin: () -> Unit
 ) {
-    val games = listOf(GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)))
+    val games = listOf(
+        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)),
+        GameItem(stringResource(R.string.game_colour_game_card), "colour_game", Color(0xFF1A1A1A))
+    )
     val context = LocalContext.current
     
     // List of fake winning names and amounts
@@ -657,7 +661,19 @@ fun HotGamesGrid(
             horizontalArrangement = Arrangement.Center
         ) {
             games.forEach { game ->
-                GameCard(game, Modifier.fillMaxWidth(0.5f), onGameClick)
+                GameCard(
+                    game = game,
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                        .padding(horizontal = 4.dp),
+                    onClick = {
+                        if (!viewModel.loginSuccess) {
+                            onRequireLogin()
+                        } else {
+                            onGameClick(game.id)
+                        }
+                    }
+                )
             }
         }
 
@@ -977,10 +993,9 @@ fun WinningTextParticle(text: String, onAnimationFinished: () -> Unit) {
 data class GameItem(val name: String, val id: String, val color: Color)
 
 @Composable
-fun GameCard(game: GameItem, modifier: Modifier, onGameClick: (String) -> Unit) {
-    val context = LocalContext.current
+fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier = modifier.clickable { onGameClick(game.id) },
+        modifier = modifier.clickable { onClick() },
         contentAlignment = Alignment.BottomCenter
     ) {
         Column(
@@ -992,24 +1007,52 @@ fun GameCard(game: GameItem, modifier: Modifier, onGameClick: (String) -> Unit) 
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(game.color),
-                contentAlignment = Alignment.BottomCenter
+                contentAlignment = Alignment.Center
             ) {
-                if (game.id == "gundu_ata") {
-                    VideoPlayer(videoResId = R.raw.gundu_ata_video, modifier = Modifier.fillMaxSize())
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.gundu_ata_bg),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Text(
-                        game.name,
-                        color = TextWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(bottom = 20.dp)
-                    )
+                when (game.id) {
+                    "gundu_ata" -> VideoPlayer(videoResId = R.raw.gundu_ata_video, modifier = Modifier.fillMaxSize())
+                    "colour_game" -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFF064E3B),
+                                            Color(0xFF4C1D95),
+                                            Color(0xFF7F1D1D)
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                stringResource(R.string.colour_game_title),
+                                color = PrimaryYellow,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                    else -> {
+                        Image(
+                            painter = painterResource(id = R.drawable.gundu_ata_bg),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        Text(
+                            game.name,
+                            color = TextWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 20.dp)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -1101,9 +1144,10 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
             BottomNavItem("Home", "home", Icons.Default.Home),
             BottomNavItem("GUNDU ATA", "gundu_ata", Icons.Default.Casino),
             BottomNavItem("IPL", "ipl", Icons.Default.SportsCricket),
+            BottomNavItem(stringResource(R.string.heads_tails_nav), "coin", Icons.Default.Casino),
             BottomNavItem("Me", "me", Icons.Default.AccountCircle)
         )
-        val items = if (currentRoute == "ipl") {
+        val items = if (currentRoute == "ipl" || currentRoute == "coin") {
             allNavItems.filter { it.route != "gundu_ata" }
         } else {
             allNavItems
@@ -1128,6 +1172,13 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                                 }
                             }
                             "ipl" -> onNavigate(item.route)
+                            "coin" -> {
+                                if (!viewModel.loginSuccess) {
+                                    showLoginPopup = true
+                                } else {
+                                    onNavigate(item.route)
+                                }
+                            }
                             "me" -> {
                                 if (!viewModel.loginSuccess) {
                                     showLoginPopup = true
@@ -1173,6 +1224,15 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                                 tint = if (iplSelected) PrimaryYellow else TextGrey
                             )
                         }
+                    } else if (item.route == "coin") {
+                        val sel = currentRoute == item.route
+                        Image(
+                            painter = painterResource(R.drawable.ic_heads_tails_nav),
+                            contentDescription = stringResource(R.string.heads_tails_nav),
+                            modifier = Modifier.size(if (sel) 26.dp else 24.dp),
+                            contentScale = ContentScale.Fit,
+                            colorFilter = if (sel) ColorFilter.tint(PrimaryYellow) else ColorFilter.tint(TextGrey)
+                        )
                     } else {
                         Icon(item.icon, contentDescription = null)
                     }

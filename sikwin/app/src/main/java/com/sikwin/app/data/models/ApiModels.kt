@@ -178,6 +178,18 @@ data class SupportContacts(
     val telegram: String? = null
 )
 
+/** POST https://gunduata.club/api/coin/ — body: `toss` (heads|tails), `bet_amount` (number). */
+data class CoinFlipResponse(
+    val toss: String? = null,
+    val result: String? = null,
+    val won: Boolean? = null,
+    val bet_amount: String? = null,
+    val ratio: Int? = null,
+    val payout: String? = null,
+    val profit: String? = null,
+    val wallet_balance: String? = null
+)
+
 // --- Cricket / IPL: GET /api/cricket/live/, POST /api/cricket/bet/ ---
 
 /** GET https://gunduata.club/api/cricket/live/ */
@@ -267,4 +279,75 @@ data class CricketBetListWrapper(
     val bets: List<CricketBetHistoryItem>? = null,
     val data: List<CricketBetHistoryItem>? = null,
     val results: List<CricketBetHistoryItem>? = null
+)
+
+// --- Colour game: GET /api/colour/round/, POST /api/colour/bet/, GET .../result/, GET /api/colour/bets/ ---
+
+/** GET /api/colour/round/ — active round or [status] == "no_round". */
+data class ColourRoundResponse(
+    val status: String,
+    val message: String? = null,
+    val round_id: String? = null,
+    val timer: Int? = null,
+    val betting_open: Boolean? = null,
+    val result: String? = null,
+    val number: Int? = null,
+    val start_time: String? = null
+)
+
+/** GET /api/colour/round/{round_id}/result/ */
+data class ColourRoundResultResponse(
+    val round_id: String? = null,
+    val status: String? = null,
+    val result: String? = null,
+    val number: Int? = null,
+    val result_time: String? = null
+)
+
+data class ColourBetPlacedLine(
+    val id: Int? = null,
+    val bet_on: String? = null,
+    val number: Int? = null,
+    val amount: Int? = null,
+    val status: String? = null
+)
+
+/** POST /api/colour/bet/ — 201 */
+data class ColourBetPlaceResponse(
+    val round_id: String? = null,
+    val bets_placed: Int? = null,
+    val total_stake: Int? = null,
+    val wallet_balance: Number? = null,
+    val bets: List<ColourBetPlacedLine>? = null
+)
+
+/** GET /api/colour/bets/ */
+data class ColourBetHistoryItem(
+    val id: Int? = null,
+    val round_id: String? = null,
+    val bet_on: String? = null,
+    val number: Int? = null,
+    val amount: Int? = null,
+    val payout: Int? = null,
+    val status: String? = null,
+    val result: String? = null,
+    val result_number: Int? = null,
+    val created_at: String? = null,
+    val settled_at: String? = null
+)
+
+data class ColourBetHistoryResponse(
+    val bets: List<ColourBetHistoryItem>? = null
+)
+
+/** GET /api/colour/results/ — public recent round outcomes (no auth). */
+data class ColourPublicResultItem(
+    val round_id: String = "",
+    val result: String = "",
+    val number: Int = 0,
+    val result_time: String? = null
+)
+
+data class ColourPublicResultsResponse(
+    val results: List<ColourPublicResultItem>? = null
 )

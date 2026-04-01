@@ -477,12 +477,25 @@ fun AppNavigation(
             HomeScreen(
                 viewModel = viewModel,
                 onGameClick = { gameId ->
-                    if (gameId == "gundu_ata") {
-                        if (!viewModel.loginSuccess) {
-                            showAuthDialog = true
-                        } else {
-                            viewModel.syncAuthToUnity()
-                            executeGameLaunch()
+                    when (gameId) {
+                        "gundu_ata" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                viewModel.syncAuthToUnity()
+                                executeGameLaunch()
+                            }
+                        }
+                        "colour_game" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("colour_game") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
                         }
                     }
                 },
@@ -494,8 +507,24 @@ fun AppNavigation(
                             viewModel.syncAuthToUnity()
                             executeGameLaunch()
                         }
+                    } else if (route == "colour_game") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("colour_game") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     } else if (route == "ipl") {
                         navController.navigate("ipl") {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    } else if (route == "coin") {
+                        navController.navigate("coin") {
                             popUpTo("home") { saveState = true }
                             launchSingleTop = true
                             restoreState = true
@@ -550,6 +579,21 @@ fun AppNavigation(
                 }
             )
         }
+        composable("colour_game") {
+            ColourGameScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onDeposit = {
+                    if (!viewModel.loginSuccess) {
+                        showAuthDialog = true
+                    } else {
+                        navController.navigate("deposit") {
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            )
+        }
         composable("ipl") {
             IplScreen(
                 viewModel = viewModel,
@@ -572,6 +616,39 @@ fun AppNavigation(
                         }
                     } else {
                         navController.navigate(route)
+                    }
+                }
+            )
+        }
+        composable("coin") {
+            HeadsTailsScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onNavigate = { route ->
+                    when {
+                        route == "gundu_ata" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                viewModel.syncAuthToUnity()
+                                executeGameLaunch()
+                            }
+                        }
+                        route == "home" -> {
+                            navController.navigate("home") {
+                                popUpTo("home") { inclusive = true }
+                            }
+                        }
+                        route == "login" -> {
+                            navController.navigate("login") {
+                                popUpTo("home") { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                        else -> navController.navigate(route) {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 }
             )

@@ -10,6 +10,9 @@ import com.sikwin.app.data.api.RetrofitClient
 import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.data.models.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -230,6 +233,112 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     var cricketBetPlacing by mutableStateOf(false)
     /** True only after several consecutive failed polls (legacy blur; odds are cleared on failure so no stale odds). */
     var cricketPollStopped by mutableStateOf(false)
+
+    /** Colour game — GET /api/colour/round/ */
+    var colourRound by mutableStateOf<ColourRoundResponse?>(null)
+    /**
+     * Seconds remaining for the colour round UI — ticks down every second locally and is
+     * re-synced from the server on each [refreshColourRound].
+     */
+    var colourDisplayTimerSeconds by mutableIntStateOf(0)
+    /** GET /api/colour/bets/ — sorted newest first in [fetchColourBetsHistory]. */
+    var colourBetsHistory by mutableStateOf<List<ColourBetHistoryItem>>(emptyList())
+    /** GET /api/colour/results/ — global recent results for Colour Game table. */
+    var colourPublicResults by mutableStateOf<List<ColourPublicResultItem>>(emptyList())
+
+    private var colourLocalTickJob: Job? = null
+    private var colourRoundPollJob: Job? = null
+    private var colourResultPollJob: Job? = null
+    private var colourPublicResultsPollJob: Job? = null
+    /** Avoid duplicate “timer hit zero” handling for the same [ColourRoundResponse.round_id]. */
+    private var colourTimerZeroHandledRoundId: String? = null
+    /** Max [ColourRoundResponse.timer] seen for the current round — used to tell 60s vs ~30s countdown. */
+    private var colourPeakTimerForCurrentRound: Int = 0
+
+    companion object {
+        /** Sync round/timer often enough that local countdown stays aligned with the server. */
+        private const val COLOUR_ROUND_POLL_INTERVAL_MS = 8_000L
+        /** Public results refresh while Colour Game is open (faster than round poll). */
+        private const val COLOUR_PUBLIC_RESULTS_POLL_MS = 4_000L
+    }
+
+    /** Call when entering Colour Game; [stopColourGameSession] when leaving. */
+    fun startColourGameSession() {
+        colourRoundPollJob?.cancel()
+        colourResultPollJob?.cancel()
+        colourPublicResultsPollJob?.cancel()
+        startColourLocalTimer()
+        colourRoundPollJob = viewModelScope.launch {
+            refreshColourRound()
+            while (isActive) {
+                delay(COLOUR_ROUND_POLL_INTERVAL_MS)
+                refreshColourRound()
+            }
+        }
+        colourPublicResultsPollJob = viewModelScope.launch {
+            fetchColourPublicResults()
+            while (isActive) {
+                delay(COLOUR_PUBLIC_RESULTS_POLL_MS)
+                fetchColourPublicResults()
+            }
+        }
+    }
+
+    fun stopColourGameSession() {
+        colourRoundPollJob?.cancel()
+        colourRoundPollJob = null
+        colourResultPollJob?.cancel()
+        colourResultPollJob = null
+        colourPublicResultsPollJob?.cancel()
+        colourPublicResultsPollJob = null
+        colourLocalTickJob?.cancel()
+        colourLocalTickJob = null
+    }
+
+    /**
+     * When the server has reported a timer above ~40s for this round, treat the round as a ~60s
+     * cycle and lock betting for the last 30s ([timerSec] 30…0). Otherwise assume a short (~30s)
+     * betting countdown and follow [ColourRoundResponse.betting_open] with [timerSec] > 0.
+     */
+    fun colourRoundUsesSixtySecondCountdown(): Boolean = colourPeakTimerForCurrentRound > 40
+
+    private fun startColourLocalTimer() {
+        if (colourLocalTickJob?.isActive == true) return
+        colourLocalTickJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1000)
+                if (colourDisplayTimerSeconds > 0) {
+                    colourDisplayTimerSeconds--
+                    if (colourDisplayTimerSeconds == 0) {
+                        onColourDisplayTimerReachedZero()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun onColourDisplayTimerReachedZero() {
+        val rid = colourRound?.round_id ?: return
+        if (colourTimerZeroHandledRoundId == rid) return
+        colourTimerZeroHandledRoundId = rid
+        colourResultPollJob?.cancel()
+        colourResultPollJob = viewModelScope.launch {
+            refreshColourRound()
+            repeat(36) {
+                delay(2000)
+                val res = fetchColourRoundResult(rid)
+                val body = res.getOrNull()
+                refreshColourRound()
+                if (loginSuccess) fetchColourBetsHistory()
+                val done = body?.status?.equals("COMPLETED", ignoreCase = true) == true ||
+                    !body?.result.isNullOrBlank()
+                if (done) {
+                    fetchColourPublicResults()
+                    return@launch
+                }
+            }
+        }
+    }
 
     /**
      * Single fetch for GET /api/cricket/live/. Returns true only when [response has data] and updates [cricketLive].
@@ -478,6 +587,7 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     }
 
     override fun onCleared() {
+        stopColourGameSession()
         try {
             sessionManager.unregisterSessionListener(sessionPrefListener)
         } catch (_: Exception) {}
@@ -743,6 +853,152 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
             } catch (e: Exception) {
                 errorMessage = handleException(e)
             }
+        }
+    }
+
+    /**
+     * POST /api/coin/ — server decides outcome. Does not update [wallet] here so the UI can
+     * refresh balance only after the coin animation ([fetchWallet] from the screen).
+     */
+    suspend fun postCoinFlip(tossHeads: Boolean, betAmount: Int): Result<CoinFlipResponse> {
+        return try {
+            val response = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.postCoinFlip(
+                    mapOf(
+                        "toss" to if (tossHeads) "heads" else "tails",
+                        "bet_amount" to betAmount
+                    )
+                )
+            }
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                logoutIfUnauthorized(response.code())
+                Result.failure(Exception(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(handleException(e)))
+        }
+    }
+
+    /** GET /api/colour/round/ — no auth. Updates [colourDisplayTimerSeconds] from server [ColourRoundResponse.timer]. */
+    suspend fun refreshColourRound() {
+        try {
+            val response = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getColourRound()
+            }
+            if (response.isSuccessful) {
+                val body = response.body()
+                val prevId = colourRound?.round_id
+                colourRound = body
+                val newId = body?.round_id
+                if (newId != null && newId != prevId) {
+                    colourTimerZeroHandledRoundId = null
+                    colourPeakTimerForCurrentRound = 0
+                }
+                val t = body?.timer
+                if (t != null) {
+                    colourPeakTimerForCurrentRound =
+                        maxOf(colourPeakTimerForCurrentRound, t.coerceAtLeast(0))
+                    colourDisplayTimerSeconds = t.coerceAtLeast(0)
+                    if (t == 0) {
+                        onColourDisplayTimerReachedZero()
+                    }
+                } else if (body?.status?.equals("no_round", ignoreCase = true) == true) {
+                    colourDisplayTimerSeconds = 0
+                    colourPeakTimerForCurrentRound = 0
+                }
+            }
+        } catch (_: Exception) {
+            // Keep last known round; avoid spamming errors while polling.
+        }
+    }
+
+    /** GET /api/colour/results/ — public recent round outcomes (no auth). */
+    suspend fun fetchColourPublicResults() {
+        try {
+            val response = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getColourPublicResults()
+            }
+            if (response.isSuccessful) {
+                colourPublicResults = response.body()?.results.orEmpty()
+            }
+        } catch (_: Exception) {
+            // Keep previous list on failure.
+        }
+    }
+
+    /** GET /api/colour/bets/ — auth required. */
+    fun fetchColourBetsHistory() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.apiService.getColourBets()
+                if (response.isSuccessful) {
+                    val list = response.body()?.bets.orEmpty()
+                    colourBetsHistory = list.sortedByDescending { it.settled_at ?: it.created_at ?: "" }
+                } else {
+                    logoutIfUnauthorized(response.code())
+                }
+            } catch (e: Exception) {
+                errorMessage = handleException(e)
+            }
+        }
+    }
+
+    /**
+     * POST /api/colour/bet/ — auth required.
+     * @param side `"red"`, `"green"`, or `"violet"`.
+     */
+    suspend fun postColourBetSide(side: String, amount: Int): Result<ColourBetPlaceResponse> {
+        return postColourBet(
+            mapOf(
+                "bet_on" to side.lowercase(),
+                "amount" to amount
+            )
+        )
+    }
+
+    /** POST number 0–9 with [postColourBet]. */
+    suspend fun postColourBetNumber(number: Int, amount: Int): Result<ColourBetPlaceResponse> {
+        return postColourBet(
+            mapOf(
+                "bet_on" to "number",
+                "number" to number,
+                "amount" to amount
+            )
+        )
+    }
+
+    /** POST /api/colour/bet/ — single payload or `{ "bets": [...] }`. */
+    suspend fun postColourBet(body: Map<String, @JvmSuppressWildcards Any>): Result<ColourBetPlaceResponse> {
+        return try {
+            val response = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.postColourBet(body)
+            }
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                logoutIfUnauthorized(response.code())
+                Result.failure(Exception(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(handleException(e)))
+        }
+    }
+
+    /** GET /api/colour/round/{roundId}/result/ — no auth. */
+    suspend fun fetchColourRoundResult(roundId: String): Result<ColourRoundResultResponse> {
+        return try {
+            val response = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getColourRoundResult(roundId)
+            }
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(handleException(e)))
         }
     }
 

@@ -278,4 +278,55 @@
     <string name="milestone_step3_resets">Steps 1–2 complete (%1$d referrals). Step 3 starts at 0 — %2$d in this step (%3$d total for all three).</string>
     <string name="refer_more_this_step">%d more referrals in this step to unlock</string>
     <string name="referral_all_milestones_unlocked">All milestone rewards unlocked.</string>
+
+    <!-- Heads & Tails (coin) — match gunduata.club/coin/ -->
+    <string name="heads_tails_title">Heads &amp; Tails</string>
+    <string name="heads_tails_last_round">Last round</string>
+    <string name="heads_tails_heads">Heads</string>
+    <string name="heads_tails_tails">Tails</string>
+    <string name="heads_tails_flip">Flip</string>
+    <string name="heads_tails_live_bets">Live Bets</string>
+    <string name="heads_tails_live_online_count">%d online</string>
+    <string name="heads_tails_tab_live100">Live</string>
+    <string name="heads_tails_tab_my">My</string>
+    <string name="heads_tails_col_name_bet">Name / Bet (₹)</string>
+    <string name="heads_tails_col_win">Win (₹)</string>
+    <string name="heads_tails_no_wins_yet">No wins yet. Play and win to see them here.</string>
+    <string name="heads_tails_winner_title">Winner</string>
+    <string name="heads_tails_you_won_exclaim">You won!</string>
+    <string name="heads_tails_double_payout">2× your bet paid out — ₹%d</string>
+    <string name="heads_tails_continue">Continue</string>
+    <string name="heads_tails_round_summary_win">You chose %1$s · Result %2$s · Won 2× your ₹%3$d stake</string>
+    <string name="heads_tails_round_summary_lose">You chose %1$s · Result %2$s · Lost ₹%3$d</string>
+    <string name="game_heads_tails_card">Heads &amp; Tails</string>
+    <string name="heads_tails_nav">H&amp;T</string>
+    <string name="heads_tails_balance_label">Balance</string>
+    <string name="heads_tails_enter_amount">Enter amount</string>
+    <string name="heads_tails_tap_to_close">Tap outside the card to close</string>
+    <string name="heads_tails_you_win_rupees">You win ₹%d</string>
+    <string name="heads_tails_round_result_badge">Result</string>
+
+    <!-- Colour Game (in-app) -->
+    <string name="colour_game_title">COLOUR GAME</string>
+    <string name="colour_game_round_id_fmt">Round ID %1$s</string>
+    <string name="colour_countdown_label">COUNT DOWN</string>
+    <string name="colour_round_number_label">Round number</string>
+    <string name="colour_join_green">Join Green</string>
+    <string name="colour_join_violet">Join Violet</string>
+    <string name="colour_join_red">Join Red</string>
+    <string name="colour_join_toast">Join %1$s (demo)</string>
+    <string name="colour_recent_results">RECENT RESULTS</string>
+    <string name="colour_recent_col_round_id">ROUND ID</string>
+    <string name="colour_recent_col_number">NUMBER</string>
+    <string name="colour_recent_col_result">RESULT</string>
+    <string name="game_colour_game_card">Colour Game</string>
+    <string name="colour_game_stake_label">Stake (₹)</string>
+    <string name="colour_game_sign_in_to_bet">Sign in to place bets.</string>
+    <string name="colour_game_bet_placed">Bet placed</string>
+    <string name="colour_game_no_history">No settled colour bets yet.</string>
+    <string name="colour_game_invalid_stake">Enter a valid stake amount.</string>
+    <string name="colour_bet_amount_title">BET AMOUNT</string>
+    <string name="colour_bet_confirm">Confirm</string>
+    <string name="colour_bet_cancel">Cancel</string>
+    <string name="colour_bet_subtitle_number">[ Number %d ]</string>
 </resources>
