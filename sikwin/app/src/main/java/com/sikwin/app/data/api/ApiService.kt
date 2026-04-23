@@ -116,6 +116,10 @@ interface ApiService {
     @GET("cricket/live/")
     suspend fun getCricketLive(): Response<CricketLiveResponse>
 
+    /** Live scorecard / ball-by-ball context — see [CricketResultResponse]. No auth required. */
+    @GET("cricket/result/")
+    suspend fun getCricketResult(@Query("match_id") matchId: Long? = null): Response<CricketResultResponse>
+
     @POST("cricket/bet/")
     suspend fun postCricketBet(@Body body: CricketBetRequest): Response<CricketBetResponse>
 

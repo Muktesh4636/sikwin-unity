@@ -1,13 +1,13 @@
 package com.sikwin.app.utils
 
 object Constants {
-    // Use HTTPS domain for secure communication
+    /** Production API — use the domain (TLS). The app never “hits the IP” unless you point [BASE_URL] at an IP. */
     const val BASE_URL = "https://gunduata.club/api/"
-    // Alternative: Direct IP (not recommended for HTTPS)
-    // const val BASE_URL = "http://72.61.254.71/api/"
+
+    /** Direct IP only for local/staging when that host is reachable (e.g. same VPN). Redis lives on the server, not in the app. */
+    // const val BASE_URL = "http://72.61.254.74/api/"
 
     // APK / signup links for users: use BuildConfig.PUBLIC_SITE_URL (per franchise in app/build.gradle).
 
-    /** IPL tab: opens Cricket / match odds in the system browser (gunduata.club/cricket/). */
     const val IPL_WEB_URL = "https://gunduata.club/cricket/"
 }

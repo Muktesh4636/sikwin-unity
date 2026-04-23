@@ -54,7 +54,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -107,6 +110,7 @@ fun ColourGameScreen(
     onDeposit: () -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var placingBet by remember { mutableStateOf(false) }
     var betTarget by remember { mutableStateOf<ColourBetTarget?>(null) }
@@ -125,6 +129,16 @@ fun ColourGameScreen(
     DisposableEffect(Unit) {
         viewModel.startColourGameSession()
         onDispose { viewModel.stopColourGameSession() }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshColourRoundNow()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Soft tick sound every second while timer is running
@@ -185,7 +199,7 @@ fun ColourGameScreen(
         viewModel.colourPublicResults.take(50)
     }
 
-    val presetAmounts = remember { listOf(10, 20, 50, 100, 200, 500, 1000) }
+    val presetAmounts = remember { listOf(50, 100, 200, 500, 1000) }
 
     fun submitBet(amount: Int, target: ColourBetTarget) {
         if (!viewModel.loginSuccess) {
@@ -235,13 +249,16 @@ fun ColourGameScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        stringResource(R.string.colour_game_title),
-                        color = GoldTitle,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        fontFamily = FontFamily.Serif
-                    )
+                    Column {
+                        Text(
+                            stringResource(R.string.colour_game_title),
+                            color = GoldTitle,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            fontFamily = FontFamily.Serif
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 },
                 navigationIcon = {
                     Box(
@@ -554,8 +571,8 @@ private fun ColourBetAmountCard(
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit
 ) {
-    var amountIndex by remember(target) { mutableFloatStateOf(3f) }
-    var selectedPreset by remember(target) { mutableIntStateOf(presetAmounts[3]) }
+    var amountIndex by remember(target) { mutableFloatStateOf(1f) }
+    var selectedPreset by remember(target) { mutableIntStateOf(presetAmounts[1]) }
     val amount = presetAmounts[amountIndex.roundToInt().coerceIn(0, presetAmounts.lastIndex)]
 
     Dialog(onDismissRequest = { if (!placingBet) onDismiss() }) {

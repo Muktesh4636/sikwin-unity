@@ -565,23 +565,23 @@ fun QuickGamesRow(
 
     data class QuickEntry(val id: String, val label: String)
     val entries = listOf(
-        QuickEntry("ipl", "IPL"),
+        QuickEntry("cock_fight", "Cock fight"),
+        QuickEntry("colour_game", "Colour Game"),
         QuickEntry("gundu_ata", "Gundu Ata"),
         QuickEntry("coin", "Head & Tails"),
-        QuickEntry("colour_game", "Colour Game")
+        QuickEntry("ipl", "IPL")
     )
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp)
     ) {
-        entries.forEach { entry ->
+        items(entries) { entry ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .weight(1f)
+                    .width(72.dp)
                     .clickable {
                         when (entry.id) {
                             "ipl" -> onNavigate("ipl")
@@ -597,9 +597,10 @@ fun QuickGamesRow(
                         .clip(CircleShape)
                         .background(
                             when (entry.id) {
-                                "ipl" -> Brush.linearGradient(listOf(Color(0xFF1A3A1A), Color(0xFF0D5C0D)))
+                                "ipl" -> Brush.linearGradient(listOf(Color(0xFF0D47A1), Color(0xFF1A237E)))
                                 "gundu_ata" -> Brush.linearGradient(listOf(Color(0xFF0A1628), Color(0xFF1565C0)))
                                 "coin" -> Brush.linearGradient(listOf(Color(0xFF3D2B00), Color(0xFFB8860B)))
+                                "cock_fight" -> Brush.linearGradient(listOf(Color(0xFF5C1A08), Color(0xFF8B4513)))
                                 else -> Brush.linearGradient(listOf(Color(0xFF0A0A0A), Color(0xFF1A1A1A)))
                             }
                         ),
@@ -682,6 +683,9 @@ fun QuickGamesRow(
                                 ) {}
                             }
                         }
+                        "cock_fight" -> {
+                            Text("🐓", fontSize = 34.sp)
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -691,7 +695,7 @@ fun QuickGamesRow(
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
-                    maxLines = 1,
+                    maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

@@ -497,6 +497,17 @@ fun AppNavigation(
                                 }
                             }
                         }
+                        "cock_fight" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("cock_fight") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
                     }
                 },
                 onNavigate = { route ->
@@ -512,6 +523,16 @@ fun AppNavigation(
                             showAuthDialog = true
                         } else {
                             navController.navigate("colour_game") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else if (route == "cock_fight") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("cock_fight") {
                                 popUpTo("home") { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -593,6 +614,9 @@ fun AppNavigation(
                     }
                 }
             )
+        }
+        composable("cock_fight") {
+            CockFightScreen(onBack = { navController.popBackStack() })
         }
         composable("ipl") {
             IplScreen(

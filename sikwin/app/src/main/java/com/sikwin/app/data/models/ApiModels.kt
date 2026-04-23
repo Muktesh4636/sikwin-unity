@@ -281,6 +281,75 @@ data class CricketBetListWrapper(
     val results: List<CricketBetHistoryItem>? = null
 )
 
+// --- Cricket scorecard: GET /api/cricket/result/ (live match JSON from provider) ---
+
+/** GET https://gunduata.club/api/cricket/result/ */
+data class CricketResultResponse(
+    val match_id: String? = null,
+    val fetched_at: String? = null,
+    val score: CricketScorePayload? = null,
+    val action: String? = null,
+    val message: String? = null
+)
+
+data class CricketScorePayload(
+    val matchTitle: String? = null,
+    val matchCommentary: String? = null,
+    val matchStatus: Int? = null,
+    val currentInningsNumber: Int? = null,
+    val bettingSuspended: Boolean? = null,
+    val seriesName: String? = null,
+    /** Last few overs with ball-by-ball codes (e.g. "4", "1w", "6"). */
+    val recentOvers: List<CricketRecentOver>? = null,
+    val innings: List<CricketInningsScore>? = null
+)
+
+data class CricketRecentOver(
+    val overNumber: Int? = null,
+    val runs: Int? = null,
+    val isCurrentOver: Boolean? = null,
+    val balls: List<String>? = null
+)
+
+data class CricketInningsScore(
+    val teamName: String? = null,
+    val summary: String? = null,
+    val conclusion: String? = null,
+    val runs: Int? = null,
+    val wickets: Int? = null,
+    /** e.g. 20.0 or 13.1 (overs.balls) */
+    val overs: Double? = null,
+    /** T20 usually 20. */
+    val oversAvailable: Int? = null,
+    val inningsNumber: Int? = null,
+    val target: Int? = null,
+    val batsmen: List<CricketBatsmanRow>? = null,
+    val bowlers: List<CricketBowlerRow>? = null
+)
+
+data class CricketBatsmanRow(
+    val batsmanName: String? = null,
+    val runs: Int? = null,
+    val balls: Int? = null,
+    val description: String? = null,
+    val active: Boolean? = null,
+    val onStrike: Boolean? = null,
+    val didNotBat: Boolean? = null,
+    val toCome: Boolean? = null,
+    val fours: Int? = null,
+    val sixes: Int? = null
+)
+
+data class CricketBowlerRow(
+    val bowlerName: String? = null,
+    val overs: Double? = null,
+    val maidens: Int? = null,
+    val runs: Int? = null,
+    val wickets: Int? = null,
+    val isActiveBowler: Boolean? = null,
+    val isOtherBowler: Boolean? = null
+)
+
 // --- Colour game: GET /api/colour/round/, POST /api/colour/bet/, GET .../result/, GET /api/colour/bets/ ---
 
 /** GET /api/colour/round/ — active round or [status] == "no_round". */
@@ -292,7 +361,12 @@ data class ColourRoundResponse(
     val betting_open: Boolean? = null,
     val result: String? = null,
     val number: Int? = null,
-    val start_time: String? = null
+    /** ISO-8601 start of round — used to derive remaining time if [timer] is absent. */
+    val start_time: String? = null,
+    /** Optional server “now” (ISO-8601) — if added by API, improves clock sync. */
+    val server_time: String? = null,
+    /** Optional total betting window in seconds for this round. */
+    val round_duration_seconds: Int? = null
 )
 
 /** GET /api/colour/round/{round_id}/result/ */

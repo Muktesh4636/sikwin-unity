@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,12 +27,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,15 +67,21 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sikwin.app.data.models.CricketLiveEventData
 import com.sikwin.app.data.models.CricketLiveMarket
 import com.sikwin.app.data.models.CricketLiveOutcome
+import com.sikwin.app.data.models.CricketBatsmanRow
+import com.sikwin.app.data.models.CricketBowlerRow
+import com.sikwin.app.data.models.CricketInningsScore
+import com.sikwin.app.data.models.CricketScorePayload
 import com.sikwin.app.ui.theme.CricketAccentGold
 import com.sikwin.app.ui.theme.CricketChipBorder
 import com.sikwin.app.ui.theme.CricketHeaderBg
@@ -80,8 +96,14 @@ import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import com.sikwin.app.R
 import android.os.SystemClock
 import kotlinx.coroutines.delay
+import java.util.Locale
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 private const val CRICKET_POLL_MS = 2000L
+/** Live scorecard from GET /api/cricket/result/ */
+private const val CRICKET_SCORE_POLL_MS = 5000L
 /** Blur only after this many failed polls in a row (transient errors won't stop updates). */
 private const val CRICKET_POLL_FAILURES_BEFORE_BLUR = 5
 
@@ -90,6 +112,27 @@ private fun Modifier.oddsBlurIf(blur: Boolean): Modifier = when {
     !blur -> this
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> this.blur(5.dp)
     else -> this.graphicsLayer { alpha = 0.55f }
+}
+
+private enum class IplMatchTab {
+    Live,
+    Scoreboard
+}
+
+@Composable
+private fun IplMatchNameTitle(text: String) {
+    Text(
+        text = text,
+        color = TextWhite,
+        fontWeight = FontWeight.Bold,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
+        maxLines = 4,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+    )
 }
 
 private data class CricketBetPick(
@@ -110,9 +153,11 @@ fun IplScreen(
     val context = LocalContext.current
     var betPick by remember { mutableStateOf<CricketBetPick?>(null) }
     var stakeText by remember { mutableStateOf("100") }
-    // Default to Main; filter indices match CricketMarketFilter (0=All, 1=Main, …)
-    var filterIndex by remember { mutableIntStateOf(1) }
+    // Default to All; filter indices match CricketMarketFilter (0=All, 1=Main, …)
+    var filterIndex by remember { mutableIntStateOf(0) }
     var pollSession by remember { mutableIntStateOf(0) }
+    /** null = both panels collapsed; tap a tab to open, tap again to close. */
+    var iplMatchTab by remember { mutableStateOf<IplMatchTab?>(null) }
 
     fun restartCricketPolling() {
         pollSession++
@@ -138,6 +183,15 @@ fun IplScreen(
             // Next poll ~CRICKET_POLL_MS after this one started (not after 2s + request time).
             val elapsed = SystemClock.elapsedRealtime() - start
             delay((CRICKET_POLL_MS - elapsed).coerceAtLeast(0L))
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val start = SystemClock.elapsedRealtime()
+            viewModel.cricketResultFetchOnce()
+            val elapsed = SystemClock.elapsedRealtime() - start
+            delay((CRICKET_SCORE_POLL_MS - elapsed).coerceAtLeast(0L))
         }
     }
 
@@ -308,6 +362,21 @@ fun IplScreen(
                                 .fillMaxWidth()
                         ) {
                             if (live == null) {
+                                viewModel.cricketScore?.matchTitle?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
+                                    item {
+                                        IplMatchNameTitle(cleanMatchTitle(raw).uppercase(Locale.US))
+                                    }
+                                }
+                                item {
+                                    IplMatchStreamOrScoreSection(
+                                        selectedTab = iplMatchTab,
+                                        onTabSelect = { tab ->
+                                            iplMatchTab = if (iplMatchTab == tab) null else tab
+                                        },
+                                        score = viewModel.cricketScore,
+                                        scoreError = viewModel.cricketScoreError
+                                    )
+                                }
                                 item {
                                     Text(
                                         "No live event from the API right now. Open the full site below.",
@@ -328,14 +397,19 @@ fun IplScreen(
                                     )
                                 }
                                 item {
-                                    Text(
-                                        text = live.description?.trim()?.uppercase()
-                                            ?.takeIf { it.isNotEmpty() } ?: "MATCH",
-                                        color = TextWhite,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp,
-                                        lineHeight = 22.sp,
-                                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                                    IplMatchNameTitle(
+                                        live.description?.trim()?.uppercase()
+                                            ?.takeIf { it.isNotEmpty() } ?: "MATCH"
+                                    )
+                                }
+                                item {
+                                    IplMatchStreamOrScoreSection(
+                                        selectedTab = iplMatchTab,
+                                        onTabSelect = { tab ->
+                                            iplMatchTab = if (iplMatchTab == tab) null else tab
+                                        },
+                                        score = viewModel.cricketScore,
+                                        scoreError = viewModel.cricketScoreError
                                     )
                                 }
                                 item {
@@ -404,6 +478,582 @@ fun IplScreen(
                 }
             }
         }
+    }
+}
+
+private val ScoreCardNavy = Color(0xFF0D1B2A)
+private val ScoreCardHeaderBar = Color(0xFFD8E4F0)
+private val ScoreCardHeaderTitle = Color(0xFF0D2147)
+private val BallFourBg = Color(0xFF2E7D32)
+private val BallSixBg = Color(0xFFFF9800)
+private val BallNeutralBg = Color(0xFFECEFF1)
+private val BallNeutralFg = Color(0xFF263238)
+
+private fun formatOversDisplay(o: Double?): String {
+    if (o == null) return ""
+    val t = String.format(Locale.US, "%.1f", o).trimEnd('0').trimEnd('.')
+    return t.ifEmpty { "0" }
+}
+
+/** Cricket overs like 16.2 → balls played (16*6+2). */
+private fun oversToBalls(o: Double): Int {
+    val whole = floor(o).toInt().coerceAtLeast(0)
+    val frac = o - whole
+    val ballsInPartial = (frac * 10).roundToInt().coerceIn(0, 5)
+    return whole * 6 + ballsInPartial
+}
+
+private fun teamAbbrev(teamName: String): String {
+    val known = mapOf(
+        "Chennai Super Kings" to "CSK",
+        "Punjab Kings" to "PK",
+        "Mumbai Indians" to "MI",
+        "Kolkata Knight Riders" to "KKR",
+        "Royal Challengers Bengaluru" to "RCB",
+        "Sunrisers Hyderabad" to "SRH",
+        "Rajasthan Royals" to "RR",
+        "Delhi Capitals" to "DC",
+        "Lucknow Super Giants" to "LSG",
+        "Gujarat Titans" to "GT"
+    )
+    val t = teamName.trim()
+    known[t]?.let { return it }
+    val parts = t.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    if (parts.size >= 2) {
+        return parts.take(2).joinToString("") { "${it.first().uppercaseChar()}" }
+    }
+    return t.take(4).uppercase(Locale.US)
+}
+
+private fun jerseyColor(abbrev: String): Color = when (abbrev) {
+    "CSK" -> Color(0xFFFFD600)
+    "PK", "PBKS" -> Color(0xFFE53935)
+    "MI" -> Color(0xFF004BA0)
+    "KKR" -> Color(0xFF3D0B69)
+    "RCB" -> Color(0xFFE30314)
+    "SRH" -> Color(0xFFFF6F00)
+    "RR" -> Color(0xFF254AA5)
+    "DC" -> Color(0xFF2563EB)
+    "LSG" -> Color(0xFF0A7DE8)
+    "GT" -> Color(0xFF1B2A52)
+    else -> Color(0xFF546E7A)
+}
+
+/** Rough win% for the chasing side (2nd innings); used when API has no explicit model. */
+private fun estimateChasingWinPercent(first: CricketInningsScore, second: CricketInningsScore): Float? {
+    if (second.conclusion?.equals("In Progress", true) != true) return null
+    val goal = (first.runs ?: 0) + 1
+    val scored = second.runs ?: 0
+    val need = goal - scored
+    if (need <= 0) return 0.98f
+    val oversCap = second.oversAvailable ?: 20
+    val ballsTotal = oversCap * 6
+    val ballsPlayed = oversToBalls(second.overs ?: 0.0)
+    val ballsLeft = (ballsTotal - ballsPlayed).coerceAtLeast(0)
+    if (ballsLeft <= 0) return 0.5f
+    val ease = ballsLeft.toFloat() / (need * 1.25f + 0.01f)
+    return (0.08f + 0.84f * (ease / (ease + 1.1f))).coerceIn(0.05f, 0.95f)
+}
+
+private fun ballChipStyle(raw: String): Pair<Color, Color> {
+    val s = raw.trim().lowercase(Locale.US)
+    if (s == "4" || s == "4b") return BallFourBg to Color.White
+    if (s == "6") return BallSixBg to Color.White
+    return BallNeutralBg to BallNeutralFg
+}
+
+private fun pickHighlightBowler(bowlers: List<CricketBowlerRow>?): CricketBowlerRow? {
+    val b = bowlers.orEmpty()
+    b.firstOrNull { it.isActiveBowler == true }?.let { return it }
+    b.firstOrNull { it.isOtherBowler == true }?.let { return it }
+    return b.filter { (it.overs ?: 0.0) > 0.0 }.maxByOrNull { it.overs ?: 0.0 }
+}
+
+private fun cleanMatchTitle(title: String): String =
+    title.replace(Regex("\\s*\\([^)]+\\)\\s*$"), "").trim()
+
+@Composable
+private fun IplLiveScoreTabRow(
+    selected: IplMatchTab?,
+    onSelect: (IplMatchTab) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val liveSel = selected == IplMatchTab.Live
+        Surface(
+            onClick = { onSelect(IplMatchTab.Live) },
+            shape = RoundedCornerShape(10.dp),
+            color = CricketMarketBg,
+            border = BorderStroke(
+                1.dp,
+                if (liveSel) CricketOutcomeBlue else CricketChipBorder
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LiveTv,
+                contentDescription = "Live",
+                tint = if (liveSel) CricketAccentGold else CricketTextMuted,
+                modifier = Modifier
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .size(18.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(6.dp))
+        val scoreSel = selected == IplMatchTab.Scoreboard
+        Surface(
+            onClick = { onSelect(IplMatchTab.Scoreboard) },
+            shape = RoundedCornerShape(10.dp),
+            color = CricketMarketBg,
+            border = BorderStroke(
+                1.dp,
+                if (scoreSel) CricketOutcomeBlue else CricketChipBorder
+            )
+        ) {
+            Text(
+                text = "Scoreboard",
+                color = if (scoreSel) TextWhite else CricketTextMuted,
+                fontSize = 11.sp,
+                fontWeight = if (scoreSel) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+/** Black live dashboard placeholder; embed stream URL here later. */
+@Composable
+private fun CricketLiveDashboardPlaceholder() {
+    val infiniteTransition = rememberInfiniteTransition(label = "liveBlink")
+    val blinkAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 750, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blinkAlpha"
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.Black)
+    ) {
+        Text(
+            text = "LIVE",
+            color = Color(0xFFE53935).copy(alpha = blinkAlpha),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 12.dp, top = 10.dp)
+        )
+        Text(
+            text = "Coming soon",
+            color = CricketTextMuted,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun IplMatchStreamOrScoreSection(
+    selectedTab: IplMatchTab?,
+    onTabSelect: (IplMatchTab) -> Unit,
+    score: CricketScorePayload?,
+    scoreError: String?
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        IplLiveScoreTabRow(selected = selectedTab, onSelect = onTabSelect)
+        selectedTab?.let { tab ->
+            Spacer(modifier = Modifier.height(10.dp))
+            when (tab) {
+                IplMatchTab.Live -> CricketLiveDashboardPlaceholder()
+                IplMatchTab.Scoreboard -> CricketScoreCardSection(
+                    score = score,
+                    error = scoreError
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CricketScoreCardSection(
+    score: CricketScorePayload?,
+    error: String?
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(ScoreCardNavy)
+    ) {
+        when {
+            score != null -> {
+                val inningsSorted = score.innings.orEmpty().sortedBy { it.inningsNumber ?: 0 }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(ScoreCardHeaderBar)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = "Indian Premier League",
+                        color = ScoreCardHeaderTitle,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        lineHeight = 18.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Column(modifier = Modifier.padding(12.dp)) {
+                    inningsSorted.take(2).forEach { inn ->
+                        val abbrev = teamAbbrev(inn.teamName ?: "—")
+                        val batting = inn.conclusion?.equals("In Progress", ignoreCase = true) == true
+                        val jColor = jerseyColor(abbrev)
+                        val ovAvail = inn.oversAvailable ?: 20
+                        val ovStr = formatOversDisplay(inn.overs)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(jColor)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = abbrev,
+                                    color = TextWhite,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 17.sp
+                                )
+                                if (batting) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFF9800))
+                                    )
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = inn.summary?.trim() ?: "—",
+                                    color = TextWhite,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "$ovStr / $ovAvail Ovs",
+                                    color = CricketTextMuted,
+                                    fontSize = 12.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                    score.matchCommentary?.trim()?.takeIf { it.isNotEmpty() }?.let { comm ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = comm,
+                            color = CricketTextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (score.bettingSuspended == true) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Betting suspended",
+                            color = CricketOutcomeRed,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    if (inningsSorted.size >= 2) {
+                        val first = inningsSorted[0]
+                        val second = inningsSorted[1]
+                        val chasePct = estimateChasingWinPercent(first, second)
+                        if (chasePct != null) {
+                            val t1 = teamAbbrev(first.teamName ?: "")
+                            val t2 = teamAbbrev(second.teamName ?: "")
+                            val c1 = jerseyColor(t1)
+                            val c2 = jerseyColor(t2)
+                            val p1 = 1f - chasePct
+                            val p2 = chasePct
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "${first.teamName?.trim() ?: t1} ${(p1 * 100).toInt()}%",
+                                    color = CricketTextMuted,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "${second.teamName?.trim() ?: t2} ${(p2 * 100).toInt()}%",
+                                    color = CricketTextMuted,
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.End,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0xFF1B2635))
+                            ) {
+                                val w1 = max(p1, 0.04f)
+                                val w2 = max(1f - p1, 0.04f)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(w1)
+                                        .fillMaxWidth()
+                                        .fillMaxHeight()
+                                        .background(c1)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .weight(w2)
+                                        .fillMaxWidth()
+                                        .fillMaxHeight()
+                                        .background(c2)
+                                )
+                            }
+                        }
+                    }
+                    // Oldest over on the left, latest over on the right (reading time left → right).
+                    val recent = score.recentOvers.orEmpty()
+                        .sortedBy { it.overNumber ?: 0 }
+                        .takeLast(3)
+                    if (recent.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Recent overs",
+                            color = CricketTextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                recent.forEachIndexed { idx, over ->
+                                    if (idx > 0) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .width(1.dp)
+                                                .height(44.dp)
+                                                .background(Color.White.copy(alpha = 0.25f))
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Column {
+                                        val on = over.overNumber ?: 0
+                                        val suffix = when {
+                                            on % 100 in 11..13 -> "th"
+                                            on % 10 == 1 -> "st"
+                                            on % 10 == 2 -> "nd"
+                                            on % 10 == 3 -> "rd"
+                                            else -> "th"
+                                        }
+                                        Text(
+                                            text = "${on}$suffix",
+                                            color = if (over.isCurrentOver == true) TextWhite else CricketTextMuted,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (over.isCurrentOver == true) FontWeight.Bold else FontWeight.Normal,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                        // Balls in delivery order: first ball left, latest ball right.
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            over.balls.orEmpty()
+                                                .filter { it.isNotBlank() }
+                                                .forEach { raw ->
+                                                    val (bg, fg) = ballChipStyle(raw)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(26.dp)
+                                                            .clip(CircleShape)
+                                                            .background(bg),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = raw.trim(),
+                                                            color = fg,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            maxLines = 1
+                                                        )
+                                                    }
+                                                }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    val activeInnings = inningsSorted.firstOrNull {
+                        it.conclusion?.equals("In Progress", ignoreCase = true) == true
+                    }
+                    val batters = activeInnings?.batsmen.orEmpty().filter { b ->
+                        b.active == true && b.didNotBat != true && b.toCome != true
+                    }
+                    val bowler = pickHighlightBowler(activeInnings?.bowlers)
+                    if (batters.isNotEmpty() || bowler != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.15f), thickness = 1.dp)
+                        if (batters.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            StatTableHeader(
+                                col1 = "Batter",
+                                c2 = "R",
+                                c3 = "B",
+                                c4 = "4s",
+                                c5 = "6s"
+                            )
+                            batters.take(6).forEach { b ->
+                                StatTableRow5(
+                                    col1 = "${b.batsmanName?.trim() ?: "—"}${if (b.onStrike == true) "*" else ""}",
+                                    c2 = "${b.runs ?: 0}",
+                                    c3 = "${b.balls ?: 0}",
+                                    c4 = "${b.fours ?: 0}",
+                                    c5 = "${b.sixes ?: 0}"
+                                )
+                            }
+                        }
+                        if (bowler != null) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.15f), thickness = 1.dp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            StatTableHeader(
+                                col1 = "Bowler",
+                                c2 = "O",
+                                c3 = "R",
+                                c4 = "W",
+                                c5 = ""
+                            )
+                            StatTableRow5(
+                                col1 = bowler.bowlerName?.trim() ?: "—",
+                                c2 = formatOversDisplay(bowler.overs),
+                                c3 = "${bowler.runs ?: 0}",
+                                c4 = "${bowler.wickets ?: 0}",
+                                c5 = ""
+                            )
+                        }
+                    }
+                }
+            }
+            error != null -> {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = error,
+                        color = CricketTextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+            else -> {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Loading live score…",
+                        color = CricketTextMuted,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatTableHeader(
+    col1: String,
+    c2: String,
+    c3: String,
+    c4: String,
+    c5: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = col1,
+            color = CricketTextMuted,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1.4f)
+        )
+        Text(text = c2, color = CricketTextMuted, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+        Text(text = c3, color = CricketTextMuted, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+        Text(text = c4, color = CricketTextMuted, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+        Text(text = c5, color = CricketTextMuted, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+    }
+}
+
+@Composable
+private fun StatTableRow5(
+    col1: String,
+    c2: String,
+    c3: String,
+    c4: String,
+    c5: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = col1,
+            color = TextWhite,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1.4f)
+        )
+        Text(text = c2, color = TextWhite, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+        Text(text = c3, color = TextWhite, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+        Text(text = c4, color = TextWhite, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+        Text(text = c5, color = TextWhite, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
     }
 }
 

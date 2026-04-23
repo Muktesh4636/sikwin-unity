@@ -342,20 +342,83 @@ fun HeadsTailsScreen(
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
 
-            // Coin — 3D Y rotation; two layers (heads at θ, tails at θ+180°) land on API result.
+            // Live stream board — placeholder until a real stream URL is wired in.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp),
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF0D0D0D)),
                 contentAlignment = Alignment.Center
             ) {
-                CoinFlipVisual(
-                    rotationY = coinRotation.value,
-                    modifier = Modifier.size(176.dp)
+                // Subtle gradient overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xFF1A1A2E), Color(0xFF0D0D0D))
+                            )
+                        )
                 )
+                // Centre content
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text("▶", fontSize = 36.sp, color = TextWhite.copy(alpha = 0.25f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Live Stream",
+                        color = TextWhite.copy(alpha = 0.55f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        "Coming Soon",
+                        color = TextGrey.copy(alpha = 0.5f),
+                        fontSize = 11.sp
+                    )
+                }
+                // Blinking LIVE badge — top-right corner
+                val liveTransition = rememberInfiniteTransition(label = "live_blink")
+                val liveAlpha by liveTransition.animateFloat(
+                    initialValue = 0.4f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(700, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "live_alpha"
+                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFFE53935).copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .alpha(liveAlpha)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE53935))
+                    )
+                    Text(
+                        "LIVE",
+                        color = Color(0xFFE53935).copy(alpha = liveAlpha),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.sp,
+                        letterSpacing = 2.sp
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Enter amount: manual field + stepper (below coin)
             Text(
@@ -438,99 +501,6 @@ fun HeadsTailsScreen(
                     enabled = !flipping,
                     modifier = Modifier.weight(1f),
                     onClick = { selectedSide = CoinSide.TAILS }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    val pick = selectedSide ?: return@Button
-                    if (flipping) return@Button
-                    val stake = betForPlay()
-                    flipping = true
-                    flipError = null
-                    lastRoundResultSide = null
-                    scope.launch {
-                        // Spin immediately while the network runs so the UI never feels idle for 3–5s.
-                        val spinJob = launch {
-                            while (isActive) {
-                                coinRotation.animateTo(
-                                    coinRotation.value + 360f,
-                                    animationSpec = tween(
-                                        durationMillis = 320,
-                                        easing = LinearEasing
-                                    )
-                                )
-                            }
-                        }
-                        val apiResult = viewModel.postCoinFlip(pick == CoinSide.HEADS, stake)
-                        spinJob.cancelAndJoin()
-                        apiResult.fold(
-                            onSuccess = { body ->
-                                val resultSide = when (body.result?.lowercase()?.trim()) {
-                                    "heads" -> CoinSide.HEADS
-                                    else -> CoinSide.TAILS
-                                }
-                                val won = body.won == true
-                                viewModel.fetchWallet()
-                                val endRotation = computeCoinFlipEndRotation(
-                                    coinRotation.value,
-                                    resultSide,
-                                    minSpins = 2
-                                )
-                                coinRotation.animateTo(
-                                    endRotation,
-                                    animationSpec = tween(
-                                        durationMillis = 3000,
-                                        easing = FastOutSlowInEasing
-                                    )
-                                )
-                                lastRoundResultSide = resultSide
-                                lastRoundSummary = resources.getString(
-                                    if (won) R.string.heads_tails_round_summary_win else R.string.heads_tails_round_summary_lose,
-                                    coinSideLabel(pick),
-                                    coinSideLabel(resultSide),
-                                    stake
-                                )
-                                val winCol = parseRupeeInt(body.payout)
-                                myBets.add(0, BetRowUi(username, stake, winCol))
-                                if (won) {
-                                    val showAmt = winCol.takeIf { it > 0 } ?: (stake * 2)
-                                    celebrationWinRupees = showAmt
-                                    delay(1000)
-                                    showCelebration = true
-                                }
-                                flipping = false
-                            },
-                            onFailure = { e ->
-                                flipError = e.message
-                                flipping = false
-                            }
-                        )
-                    }
-                },
-                enabled = !flipping && selectedSide != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryYellow,
-                    contentColor = Color.Black,
-                    disabledContainerColor = SurfaceColor,
-                    disabledContentColor = TextGrey
-                )
-            ) {
-                Text(stringResource(R.string.heads_tails_flip), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            }
-
-            flipError?.let { err ->
-                Text(
-                    text = err,
-                    color = Color(0xFFE57373),
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 10.dp)
                 )
             }
 

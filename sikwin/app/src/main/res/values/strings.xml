@@ -329,4 +329,8 @@
     <string name="colour_bet_confirm">Confirm</string>
     <string name="colour_bet_cancel">Cancel</string>
     <string name="colour_bet_subtitle_number">[ Number %d ]</string>
+
+    <!-- Cock fight (in-app) -->
+    <string name="cock_fight_title">COCK FIGHT</string>
+    <string name="cock_fight_coming_soon">Desi arena — full game coming soon.</string>
 </resources>

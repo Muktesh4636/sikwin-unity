@@ -14,10 +14,10 @@ android {
 
     flavorDimensions += "franchise"
     productFlavors {
-        sikwin {
+        gunduata {
             dimension "franchise"
             resValue "string", "app_name", "Gundu Ata"
-            archivesBaseName = "Sikwin"
+            archivesBaseName = "GunduAta"
         }
         sai {
             dimension "franchise"
