@@ -333,4 +333,5 @@
     <!-- Cock fight (in-app) -->
     <string name="cock_fight_title">COCK FIGHT</string>
     <string name="cock_fight_coming_soon">Desi arena — full game coming soon.</string>
+    <string name="cock_fight_open_in_browser">Open in browser (WebGL)</string>
 </resources>

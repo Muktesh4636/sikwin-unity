@@ -10,4 +10,10 @@ object Constants {
     // APK / signup links for users: use BuildConfig.PUBLIC_SITE_URL (per franchise in app/build.gradle).
 
     const val IPL_WEB_URL = "https://gunduata.club/cricket/"
+
+    /**
+     * WebGL build hosted on your site. Opening this in the system browser (from the app) loads the game.
+     * Change to your own origin when you deploy, e.g. `https://yourdomain.com/game/index.html`.
+     */
+    const val WEBGL_GAME_URL = "https://gunduata.club/game/index.html"
 }
