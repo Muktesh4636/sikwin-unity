@@ -61,7 +61,7 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
     private View soundOverlayView;
     private View lightningOverlayView;
 
-    private static final String FREQUENCY_API_URL = "https://gunduata.club/api/game/frequency/";
+    private static final String FREQUENCY_API_URL = "https://gunduata.tech/api/game/frequency/";
     private static final int LIGHTNING_CHECK_DELAY_MS = 5000;
     private static final int LIGHTNING_DISPLAY_MS = 3000;
     // Disable the "spark/lightning" overlay unless explicitly needed.

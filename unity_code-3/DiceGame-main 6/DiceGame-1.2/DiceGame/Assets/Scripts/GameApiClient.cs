@@ -19,7 +19,7 @@ public class GameApiClient : MonoBehaviour
     [SerializeField] private string baseUrl = "http://159.198.46.36:8232";
 
     [Tooltip("Server time API URL")]
-    [SerializeField] private string timeApiUrl = "https://gunduata.club/api/time/";
+    [SerializeField] private string timeApiUrl = "https://gunduata.tech/api/time/";
 
     // Auth tokens (kept in memory; persist externally if desired)
     private string accessToken = null;
@@ -94,7 +94,7 @@ public class GameApiClient : MonoBehaviour
         [JsonProperty("PAYOUT_RATIOS")]           public Dictionary<string, float> PayoutRatios { get; set; }
     }
 
-    /// <summary>Response model for https://gunduata.club/api/time/</summary>
+    /// <summary>Response model for https://gunduata.tech/api/time/</summary>
     [Serializable]
     public class ServerTimeResponse
     {

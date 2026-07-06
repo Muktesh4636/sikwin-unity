@@ -18,22 +18,22 @@ website/
 └── dist/                # Build output (generated; deploy this to server)
 ```
 
-## Access on the internet at gunduata.club
+## Access on the internet at gunduata.tech
 
-You’ve set a DNS record so **gunduata.club** points to your server. To serve the site there:
+You’ve set a DNS record so **gunduata.tech** points to your server. To serve the site there:
 
-1. **On the server** (the IP that gunduata.club points to), configure Nginx to serve the website and proxy `/api/` to your backend. Use the example in `docs/nginx-gunduata.conf`: set `root` to the folder where the built site will live (e.g. `/var/www/gunduata.club`) and `location / { try_files $uri $uri/ /index.html; }` for the SPA.
+1. **On the server** (the IP that gunduata.tech points to), configure Nginx to serve the website and proxy `/api/` to your backend. Use the example in `docs/nginx-gunduata.conf`: set `root` to the folder where the built site will live (e.g. `/var/www/gunduata.tech`) and `location / { try_files $uri $uri/ /index.html; }` for the SPA.
 2. **Deploy the built site** to that folder:
    ```bash
    cd website
    ./deploy-to-server.sh
    ```
-   This builds the site and uploads `dist/` to the server. Defaults use the LB at `187.77.186.84` and path `/var/www/gunduata.club`; override with `DEPLOY_HOST`, `REMOTE_PATH` if your server is different.
+   This builds the site and uploads `dist/` to the server. Defaults use the LB at `72.62.226.41` and path `/var/www/gunduata.tech`; override with `DEPLOY_HOST`, `REMOTE_PATH` if your server is different.
 3. **Reload Nginx** on the server after the first deploy: `nginx -t && systemctl reload nginx` (or `sudo systemctl reload nginx`).
 
-After that, anyone on the internet can open **http://gunduata.club** (or **https://gunduata.club** if you enable SSL) and get the same site. The app already uses `https://gunduata.club/api/` as the API base, so API calls work when the site is loaded from gunduata.club.
+After that, anyone on the internet can open **http://gunduata.tech** (or **https://gunduata.tech** if you enable SSL) and get the same site. The app already uses `https://gunduata.tech/api/` as the API base, so API calls work when the site is loaded from gunduata.tech.
 
-**If gunduata.club still shows "Roll with Royalty" or another site:** Nginx on the Load Balancer is serving a different folder. Deploy the build (step 2 above), then on the LB set Nginx `root` for gunduata.club to `/var/www/gunduata.club` and reload Nginx. Step-by-step: **[docs/DEPLOY-GUNDUATA-CLUB.md](../docs/DEPLOY-GUNDUATA-CLUB.md)**.
+**If gunduata.tech still shows "Roll with Royalty" or another site:** Nginx on the Load Balancer is serving a different folder. Deploy the build (step 2 above), then on the LB set Nginx `root` for gunduata.tech to `/var/www/gunduata.tech` and reload Nginx. Step-by-step: **[docs/DEPLOY-GUNDUATA-CLUB.md](../docs/DEPLOY-GUNDUATA-CLUB.md)**.
 
 ## Setup
 
@@ -52,31 +52,31 @@ npm run dev -- --host
 
 By default it uses:
 
-- `https://gunduata.club/api/`
+- `https://gunduata.tech/api/`
 
 To override, create a `.env` file:
 
 ```bash
-VITE_API_BASE_URL=https://gunduata.club/api/
+VITE_API_BASE_URL=https://gunduata.tech/api/
 ```
 
-## Redirect IP to gunduata.club
+## Redirect IP to gunduata.tech
 
-If you have a DNS record pointing **gunduata.club** to your server (or machine), you can redirect visitors from the IP to the same page on the domain so the URL bar shows **gunduata.club**.
+If you have a DNS record pointing **gunduata.tech** to your server (or machine), you can redirect visitors from the IP to the same page on the domain so the URL bar shows **gunduata.tech**.
 
 Create a `.env` file (or add to it):
 
-- **Local dev** (e.g. you run Vite on port 5174 and gunduata.club resolves to your machine):
+- **Local dev** (e.g. you run Vite on port 5174 and gunduata.tech resolves to your machine):
   ```bash
-  VITE_CANONICAL_SITE_URL=http://gunduata.club:5174
+  VITE_CANONICAL_SITE_URL=http://gunduata.tech:5174
   ```
-  Then opening `http://192.168.29.147:5174/` will redirect to `http://gunduata.club:5174/` (same page).
+  Then opening `http://192.168.29.147:5174/` will redirect to `http://gunduata.tech:5174/` (same page).
 
-- **Production** (site served at gunduata.club on port 80/443):
+- **Production** (site served at gunduata.tech on port 80/443):
   ```bash
-  VITE_CANONICAL_SITE_URL=https://gunduata.club
+  VITE_CANONICAL_SITE_URL=https://gunduata.tech
   ```
-  Then opening the site via IP will redirect to `https://gunduata.club/` (same path).
+  Then opening the site via IP will redirect to `https://gunduata.tech/` (same path).
 
 Restart the dev server after changing `.env`.
 
@@ -95,7 +95,7 @@ To create a **separate website for the Kiran franchise** (same codebase, differe
    cd website
    npm run build:kiran
    ```
-   Output is in `dist/` (same as main build). Deploy this `dist/` to Kiran’s domain (e.g. `kiran.gunduata.club` or a separate domain).
+   Output is in `dist/` (same as main build). Deploy this `dist/` to Kiran’s domain (e.g. `kiran.gunduata.tech` or a separate domain).
 
 3. **Run Kiran site locally**
    ```bash

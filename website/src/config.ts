@@ -1,7 +1,7 @@
 import { GAME_ASSET_VERSION } from './utils/gameAssetVersion';
 
 export const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_BASE_URL?.toString() || 'https://gunduata.club/api/';
+  (import.meta as any).env?.VITE_API_BASE_URL?.toString() || 'https://gunduata.tech/api/';
 
 /** If set, visiting via IP or other host redirects here (e.g. https://gunduata.club). Same path preserved. */
 export const CANONICAL_SITE_URL =
@@ -27,7 +27,7 @@ export const ALLOWED_HOSTS: string[] =
   (import.meta as any).env?.VITE_ALLOWED_HOSTS?.toString()
     ?.split(',')
     ?.map((h: string) => h.trim())
-    ?.filter(Boolean) || ['gunduata.club', 'www.gunduata.club', 'gunduata1.gunduata.club'];
+    ?.filter(Boolean) || ['gunduata.tech', 'www.gunduata.tech', 'gunduata1.gunduata.tech'];
 
 /** App/franchise name (e.g. "Gundu Ata", "Kiran"). Set via VITE_APP_NAME for franchise builds. */
 export const APP_NAME =

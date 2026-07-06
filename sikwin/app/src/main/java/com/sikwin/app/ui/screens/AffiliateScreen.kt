@@ -226,7 +226,7 @@ fun AffiliateScreen(
                             Button(
                                 enabled = referralCode.isNotEmpty(),
                                 onClick = {
-                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.club/signup?ref=$referralCode"
+                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.tech/signup?ref=$referralCode"
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)
@@ -254,7 +254,7 @@ fun AffiliateScreen(
                             Button(
                                 enabled = referralCode.isNotEmpty(),
                                 onClick = {
-                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.club/signup?ref=$referralCode"
+                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.tech/signup?ref=$referralCode"
                                     val genericIntent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)
