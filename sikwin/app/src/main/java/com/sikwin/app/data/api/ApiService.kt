@@ -51,6 +51,9 @@ interface ApiService {
     @GET("auth/deposits/mine/")
     suspend fun getMyDeposits(): Response<List<DepositRequest>>
 
+    @POST("auth/deposits/initiate/")
+    suspend fun initiateDeposit(@Body data: Map<String, String>): Response<PaybitraDepositResponse>
+
     @Multipart
     @POST("auth/deposits/upload-proof/")
     suspend fun uploadDepositProof(

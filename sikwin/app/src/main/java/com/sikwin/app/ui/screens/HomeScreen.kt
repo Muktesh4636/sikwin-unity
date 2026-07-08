@@ -181,56 +181,66 @@ fun HomeScreen(
                         onGameClick = { gameId ->
                             if (gameId == "more") {
                                 // scroll to hot games — just a no-op for now
-                            } else if (!viewModel.loginSuccess && gameId == "gundu_ata") {
-                                showLoginPopup = true
                             } else {
-                                onGameClick(gameId)
+                                launchHomeGame(
+                                    gameId = gameId,
+                                    loginSuccess = viewModel.loginSuccess,
+                                    onGameClick = onGameClick,
+                                    onNavigate = onNavigate,
+                                    onRequireLogin = { showLoginPopup = true }
+                                )
                             }
-                        },
-                        onNavigate = onNavigate
+                        }
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Hot Games
                     SectionHeader(title = stringResource(R.string.hot_games))
                     HotGamesGrid(
                         viewModel = viewModel,
-                        onGameClick = { gameId ->
-                            if (!viewModel.loginSuccess) {
-                                showLoginPopup = true
-                            } else {
-                                onGameClick(gameId)
-                            }
-                        },
+                        onGameClick = onGameClick,
                         onNavigate = onNavigate,
                         onRequireLogin = { showLoginPopup = true }
                     )
                 } else {
                     // Search Results
                     SectionHeader(title = stringResource(R.string.search_results))
-                    val games = listOf(
-                        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0))
-                    ).filter { it.name.contains(searchQuery, ignoreCase = true) }
+                    val games = homeScreenGames().filter {
+                        it.name.contains(searchQuery, ignoreCase = true) ||
+                            it.id.contains(searchQuery, ignoreCase = true)
+                    }
                     
                     if (games.isNotEmpty()) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.Start
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            games.forEach { game ->
-                                GameCard(
-                                    game = game,
-                                    modifier = Modifier.fillMaxWidth(0.5f),
-                                    onClick = {
-                                        if (!viewModel.loginSuccess) {
-                                            showLoginPopup = true
-                                        } else {
-                                            onGameClick(game.id)
-                                        }
+                            games.chunked(2).forEach { rowGames ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowGames.forEach { game ->
+                                        GameCard(
+                                            game = game,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = {
+                                                launchHomeGame(
+                                                    gameId = game.id,
+                                                    loginSuccess = viewModel.loginSuccess,
+                                                    onGameClick = onGameClick,
+                                                    onNavigate = onNavigate,
+                                                    onRequireLogin = { showLoginPopup = true }
+                                                )
+                                            }
+                                        )
                                     }
-                                )
+                                    if (rowGames.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
                             }
                         }
                     } else {
@@ -484,7 +494,7 @@ fun PromotionalBanners(
                 1 -> BannerData("REFER & EARN", "Earn up to ₹1 Lakh!", "INVITE", listOf(Color(0xFF455A64), Color(0xFF263238)), { handleBannerClickRequireLogin("affiliate") })
                 2 -> BannerData("MEGA SPIN", "Deposit ₹2000 or more to spin the wheel!", "SPIN NOW", listOf(Color(0xFF4A148C), Color(0xFF880E4F)), { handleBannerClickRequireLogin("lucky_draw") })
                 3 -> BannerData("USDT SPECIAL ₮", "Get 5% EXTRA CASHBACK on all USDT deposits!", "DEPOSIT NOW", listOf(Color(0xFF00897B), Color(0xFF004D40)), { handleBannerClick("deposit?method=USDT") })
-                4 -> BannerData("IPL CRICKET", "Live odds & markets — bet on matches anytime!", "BET NOW", listOf(Color(0xFF0D47A1), Color(0xFF1A237E)), { handleBannerClick("ipl") })
+                4 -> BannerData(stringResource(R.string.banner_cricket_title), stringResource(R.string.banner_cricket_subtitle), "BET NOW", listOf(Color(0xFF0D47A1), Color(0xFF1A237E)), { handleBannerClick("ipl") })
                 else -> BannerData("FRANCHISE", "Get Gundu Ata franchise at 50% off — Get in touch today!", "LEARN MORE", listOf(Color(0xFF795548), Color(0xFF5D4037)), { handleBannerClick("white_label_account") })
             }
 
@@ -552,43 +562,62 @@ fun SectionHeader(title: String) {
 
 // ─── Quick-launch game icons row ─────────────────────────────────────────────
 
+private fun homeScreenGames(): List<GameItem> = listOf(
+    GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)),
+    GameItem("COLOUR GAME", "colour_game", Color(0xFF1A1A2E)),
+    GameItem("HEAD & TAILS", "coin", Color(0xFFB8860B)),
+    GameItem("CRICKET", "ipl", Color(0xFF0D47A1))
+)
+
+private fun launchHomeGame(
+    gameId: String,
+    loginSuccess: Boolean,
+    onGameClick: (String) -> Unit,
+    onNavigate: (String) -> Unit,
+    onRequireLogin: () -> Unit
+) {
+    when (gameId) {
+        "ipl", "coin" -> onNavigate(gameId)
+        "gundu_ata" -> {
+            if (!loginSuccess) onRequireLogin()
+            else onGameClick(gameId)
+        }
+        else -> onGameClick(gameId)
+    }
+}
+
 private data class QuickGame(val id: String, val label: String, val iconRes: Int?, val gradient: List<Color>)
 
 @Composable
 fun QuickGamesRow(
-    onGameClick: (String) -> Unit,
-    onNavigate: (String) -> Unit
+    onGameClick: (String) -> Unit
 ) {
     val context = LocalContext.current
     val iplIconRes = context.resources.getIdentifier("ic_ipl_nav", "drawable", context.packageName).takeIf { it != 0 }
     val gunduIconRes = context.resources.getIdentifier("ic_gundu_ata_nav", "drawable", context.packageName).takeIf { it != 0 }
 
+    val cricketLabel = stringResource(R.string.game_cricket)
     data class QuickEntry(val id: String, val label: String)
     val entries = listOf(
-        QuickEntry("cock_fight", "Cock fight"),
         QuickEntry("colour_game", "Colour Game"),
         QuickEntry("gundu_ata", "Gundu Ata"),
         QuickEntry("coin", "Head & Tails"),
-        QuickEntry("ipl", "IPL")
+        QuickEntry("ipl", cricketLabel)
     )
 
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        items(entries) { entry ->
+        entries.forEach { entry ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .width(72.dp)
-                    .clickable {
-                        when (entry.id) {
-                            "ipl" -> onNavigate("ipl")
-                            "coin" -> onNavigate("coin")
-                            else -> onGameClick(entry.id)
-                        }
-                    }
+                    .weight(1f)
+                    .clickable { onGameClick(entry.id) }
                     .padding(vertical = 4.dp)
             ) {
                 Box(
@@ -600,7 +629,6 @@ fun QuickGamesRow(
                                 "ipl" -> Brush.linearGradient(listOf(Color(0xFF0D47A1), Color(0xFF1A237E)))
                                 "gundu_ata" -> Brush.linearGradient(listOf(Color(0xFF0A1628), Color(0xFF1565C0)))
                                 "coin" -> Brush.linearGradient(listOf(Color(0xFF3D2B00), Color(0xFFB8860B)))
-                                "cock_fight" -> Brush.linearGradient(listOf(Color(0xFF5C1A08), Color(0xFF8B4513)))
                                 else -> Brush.linearGradient(listOf(Color(0xFF0A0A0A), Color(0xFF1A1A1A)))
                             }
                         ),
@@ -682,9 +710,6 @@ fun QuickGamesRow(
                                     contentAlignment = Alignment.Center
                                 ) {}
                             }
-                        }
-                        "cock_fight" -> {
-                            Text("🐓", fontSize = 34.sp)
                         }
                     }
                 }
@@ -822,7 +847,7 @@ fun HotGamesGrid(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // Game Card centered
+        // Hot Games — Gundu Ata banner only
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
@@ -848,7 +873,7 @@ fun HotGamesGrid(
         var supportMenuExpanded by remember { mutableStateOf(false) }
         var supportMenuClosing by remember { mutableStateOf(false) }  // Keeps popup in tree during exit animation
         val scaleAlpha = remember { Animatable(0f) }
-        // Support contacts from https://gunduata.club/api/support/contacts/?package=<applicationId>
+        // Support contacts from https://gunduata.tech/api/support/contacts/?package=<applicationId>
         var supportWhatsApp by remember { mutableStateOf<String?>(null) }
         var supportTelegram by remember { mutableStateOf<String?>(null) }
         val supportPackageName = LocalContext.current.packageName
@@ -1193,14 +1218,90 @@ fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit) {
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                stringResource(R.string.colour_game_title),
-                                color = PrimaryYellow,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(8.dp)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Box(Modifier.size(18.dp).clip(CircleShape).background(Color(0xFF16A34A)))
+                                    Box(Modifier.size(18.dp).clip(CircleShape).background(Color(0xFF7C3AED)))
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Box(Modifier.size(18.dp).clip(CircleShape).background(Color(0xFFDC2626)))
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    stringResource(R.string.colour_game_title),
+                                    color = PrimaryYellow,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                    "coin" -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(Color(0xFF3D2B00), Color(0xFFB8860B))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.heads_coin),
+                                contentDescription = null,
+                                modifier = Modifier.size(72.dp),
+                                contentScale = ContentScale.Fit
                             )
+                        }
+                    }
+                    "ipl" -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(Color(0xFF0D47A1), Color(0xFF1A237E))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Image(
+                                    painter = painterResource(R.drawable.ic_ipl_nav),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    colorFilter = ColorFilter.tint(Color(0xFFFFCA28))
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(stringResource(R.string.game_cricket), color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+                        }
+                    }
+                    "cock_fight" -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(Color(0xFF5C1A08), Color(0xFF8B4513))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("🐓", fontSize = 44.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    stringResource(R.string.cock_fight_title),
+                                    color = PrimaryYellow,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                            }
                         }
                     }
                     else -> {
@@ -1310,14 +1411,9 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
         val allNavItems = listOf(
             BottomNavItem("Home", "home", Icons.Default.Home),
             BottomNavItem("GUNDU ATA", "gundu_ata", Icons.Default.Casino),
-            BottomNavItem("IPL", "ipl", Icons.Default.SportsCricket),
             BottomNavItem("Me", "me", Icons.Default.AccountCircle)
         )
-        val items = if (currentRoute == "ipl") {
-            allNavItems.filter { it.route != "gundu_ata" }
-        } else {
-            allNavItems
-        }
+        val items = allNavItems
 
         items.forEach { item ->
             NavigationBarItem(
@@ -1335,14 +1431,6 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                                         viewModel.syncAuthToUnity()
                                         onNavigate(item.route)
                                     }
-                                }
-                            }
-                            "ipl" -> onNavigate(item.route)
-                            "coin" -> {
-                                if (!viewModel.loginSuccess) {
-                                    showLoginPopup = true
-                                } else {
-                                    onNavigate(item.route)
                                 }
                             }
                             "me" -> {
@@ -1371,34 +1459,6 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                         } else {
                             Icon(item.icon, contentDescription = null)
                         }
-                    } else if (item.route == "ipl") {
-                        val context = LocalContext.current
-                        val iplIconId = context.resources.getIdentifier("ic_ipl_nav", "drawable", context.packageName)
-                        val iplSelected = currentRoute == item.route
-                        if (iplIconId != 0) {
-                            Image(
-                                painter = painterResource(id = iplIconId),
-                                contentDescription = null,
-                                modifier = Modifier.size(if (iplSelected) 26.dp else 24.dp),
-                                contentScale = ContentScale.Fit,
-                                colorFilter = if (iplSelected) ColorFilter.tint(PrimaryYellow) else ColorFilter.tint(TextGrey)
-                            )
-                        } else {
-                            Icon(
-                                item.icon,
-                                contentDescription = null,
-                                tint = if (iplSelected) PrimaryYellow else TextGrey
-                            )
-                        }
-                    } else if (item.route == "coin") {
-                        val sel = currentRoute == item.route
-                        Image(
-                            painter = painterResource(R.drawable.ic_heads_tails_nav),
-                            contentDescription = stringResource(R.string.heads_tails_nav),
-                            modifier = Modifier.size(if (sel) 26.dp else 24.dp),
-                            contentScale = ContentScale.Fit,
-                            colorFilter = if (sel) ColorFilter.tint(PrimaryYellow) else ColorFilter.tint(TextGrey)
-                        )
                     } else {
                         Icon(item.icon, contentDescription = null)
                     }

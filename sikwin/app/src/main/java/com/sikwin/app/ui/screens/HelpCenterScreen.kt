@@ -47,7 +47,7 @@ fun HelpCenterScreen(
     val scrollState = rememberScrollState()
     val prefs = remember { context.applicationContext.getSharedPreferences("gunduata_prefs", Context.MODE_PRIVATE) }
 
-    // Fetched from https://gunduata.club/api/support/contacts/
+    // Fetched from https://gunduata.tech/api/support/contacts/
     var whatsappNumber by remember { mutableStateOf(prefs.getString("support_whatsapp_number", null)) }
     var telegramHandle by remember { mutableStateOf(prefs.getString("support_telegram", null)) }
     var isLoading by remember { mutableStateOf(whatsappNumber == null && telegramHandle == null) }

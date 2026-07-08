@@ -279,7 +279,7 @@
     <string name="refer_more_this_step">%d more referrals in this step to unlock</string>
     <string name="referral_all_milestones_unlocked">All milestone rewards unlocked.</string>
 
-    <!-- Heads & Tails (coin) — match gunduata.club/coin/ -->
+    <!-- Heads & Tails (coin) — match gunduata.tech/coin/ -->
     <string name="heads_tails_title">Heads &amp; Tails</string>
     <string name="heads_tails_last_round">Last round</string>
     <string name="heads_tails_heads">Heads</string>
@@ -334,4 +334,9 @@
     <string name="cock_fight_title">COCK FIGHT</string>
     <string name="cock_fight_coming_soon">Desi arena — full game coming soon.</string>
     <string name="cock_fight_open_in_browser">Open in browser (WebGL)</string>
+
+    <!-- Cricket (in-app; route id remains ipl) -->
+    <string name="game_cricket">Cricket</string>
+    <string name="banner_cricket_title">CRICKET</string>
+    <string name="banner_cricket_subtitle">Live odds &amp; markets — bet on matches anytime!</string>
 </resources>

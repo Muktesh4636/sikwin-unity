@@ -99,6 +99,20 @@ data class PaymentMethod(
     val is_active: Boolean
 )
 
+data class PaybitraDepositResponse(
+    val amount: String,
+    val currency: String = "INR",
+    val upi_id: String,
+    val acc_holder_name: String? = null,
+    val code: String? = null,
+    val upi_uri: String,
+    val paybitra_order_id: String,
+    val payin_id: String? = null,
+    val expires_at: String? = null,
+    val pay_in_url: String? = null,
+    val message: String? = null
+)
+
 data class ReferralData(
     val referral_code: String,
     val total_referrals: Int,
@@ -172,13 +186,13 @@ data class RecentRoundResult(
     val timestamp: String?
 )
 
-/** Response from https://gunduata.club/api/support/contacts/ */
+/** Response from https://gunduata.tech/api/support/contacts/ */
 data class SupportContacts(
     val whatsapp_number: String? = null,
     val telegram: String? = null
 )
 
-/** POST https://gunduata.club/api/coin/ — body: `toss` (heads|tails), `bet_amount` (number). */
+/** POST https://gunduata.tech/api/coin/ — body: `toss` (heads|tails), `bet_amount` (number). */
 data class CoinFlipResponse(
     val toss: String? = null,
     val result: String? = null,
@@ -192,7 +206,7 @@ data class CoinFlipResponse(
 
 // --- Cricket / IPL: GET /api/cricket/live/, POST /api/cricket/bet/ ---
 
-/** GET https://gunduata.club/api/cricket/live/ */
+/** GET https://gunduata.tech/api/cricket/live/ */
 data class CricketLiveResponse(
     val data: CricketLiveEventData? = null,
     val fetched_at: String? = null,
@@ -283,7 +297,7 @@ data class CricketBetListWrapper(
 
 // --- Cricket scorecard: GET /api/cricket/result/ (live match JSON from provider) ---
 
-/** GET https://gunduata.club/api/cricket/result/ */
+/** GET https://gunduata.tech/api/cricket/result/ */
 data class CricketResultResponse(
     val match_id: String? = null,
     val fetched_at: String? = null,

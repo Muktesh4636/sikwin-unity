@@ -123,14 +123,10 @@ private fun randomLiveDisplayName(): String {
     return if (Random.nextFloat() < 0.42f) "$cap ${Random.nextInt(1, 100)}" else cap
 }
 
-/** Win column in ₹50..₹15,000 when the row shows a win; bet is plausible vs win. */
+/** Live feed rows — winners only (win > 0); losers are not shown in the table. */
 private fun generateLiveBetRows(count: Int): List<BetRowUi> = List(count) {
-    val won = Random.nextFloat() < 0.52f
-    val win = if (won) Random.nextInt(50, 15_001) else 0
-    val bet = when {
-        won && win > 0 -> (win / 2).coerceIn(25, 12_000)
-        else -> Random.nextInt(40, 8001)
-    }
+    val win = Random.nextInt(50, 15_001)
+    val bet = (win / 2).coerceIn(25, 12_000)
     BetRowUi(randomLiveDisplayName(), bet, win)
 }
 
@@ -186,7 +182,7 @@ private fun CoinFlipVisual(rotationY: Float, modifier: Modifier = Modifier) {
 }
 
 /**
- * Heads & Tails — layout aligned with https://gunduata.club/coin/ (dark theme, bet stepper,
+ * Heads & Tails — layout aligned with https://gunduata.tech/coin/ (dark theme, bet stepper,
  * Heads ♚ / Tails ♛, Flip, Live Bets tabs, winner dialog).
  * Balance from GET /api/auth/wallet/; POST /api/coin/ — win/lose is decided on the server.
  */
@@ -545,7 +541,7 @@ fun HeadsTailsScreen(
             BetsTableHeader()
             HorizontalDivider(color = BorderColor, thickness = 1.dp)
 
-            val rows = if (liveTab == 0) livePoolRows else myBets
+            val rows = (if (liveTab == 0) livePoolRows else myBets).filter { it.win > 0 }
             if (rows.isEmpty()) {
                 Text(
                     stringResource(R.string.heads_tails_no_wins_yet),

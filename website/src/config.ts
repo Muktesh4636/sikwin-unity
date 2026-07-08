@@ -3,7 +3,7 @@ import { GAME_ASSET_VERSION } from './utils/gameAssetVersion';
 export const API_BASE_URL =
   (import.meta as any).env?.VITE_API_BASE_URL?.toString() || 'https://gunduata.tech/api/';
 
-/** If set, visiting via IP or other host redirects here (e.g. https://gunduata.club). Same path preserved. */
+/** If set, visiting via IP or other host redirects here (e.g. https://gunduata.tech). Same path preserved. */
 export const CANONICAL_SITE_URL =
   (import.meta as any).env?.VITE_CANONICAL_SITE_URL?.toString()?.trim() || '';
 
@@ -22,7 +22,7 @@ export function getSiteOriginForLinks(): string {
   return '';
 }
 
-/** Hosts that are valid for this site (no redirect). Subdomains like gunduata1.gunduata.club are allowed. */
+/** Hosts that are valid for this site (no redirect). Subdomains like gunduata1.gunduata.tech are allowed. */
 export const ALLOWED_HOSTS: string[] =
   (import.meta as any).env?.VITE_ALLOWED_HOSTS?.toString()
     ?.split(',')

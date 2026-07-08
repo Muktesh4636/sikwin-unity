@@ -126,9 +126,16 @@ fun LeaderboardScreen(viewModel: GunduAtaViewModel, onBack: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "1st: ${viewModel.leaderboardPrizes["1st"]} | 2nd: ${viewModel.leaderboardPrizes["2nd"]} | 3rd: ${viewModel.leaderboardPrizes["3rd"]}",
+                        "1st: ${viewModel.leaderboardPrizes["1st"] ?: "—"} | 2nd: ${viewModel.leaderboardPrizes["2nd"] ?: "—"} | 3rd: ${viewModel.leaderboardPrizes["3rd"] ?: "—"}",
                         color = TextWhite,
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "4th: ${viewModel.leaderboardPrizes["4th"] ?: "—"} | 5th: ${viewModel.leaderboardPrizes["5th"] ?: "—"} | 6th: ${viewModel.leaderboardPrizes["6th"] ?: "—"} | 7th: ${viewModel.leaderboardPrizes["7th"] ?: "—"}",
+                        color = TextWhite,
+                        fontSize = 14.sp,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold
                     )
@@ -176,6 +183,10 @@ fun LeaderboardScreen(viewModel: GunduAtaViewModel, onBack: () -> Unit) {
                             1 -> viewModel.leaderboardPrizes["1st"]
                             2 -> viewModel.leaderboardPrizes["2nd"]
                             3 -> viewModel.leaderboardPrizes["3rd"]
+                            4 -> viewModel.leaderboardPrizes["4th"]
+                            5 -> viewModel.leaderboardPrizes["5th"]
+                            6 -> viewModel.leaderboardPrizes["6th"]
+                            7 -> viewModel.leaderboardPrizes["7th"]
                             else -> null
                         }
                         

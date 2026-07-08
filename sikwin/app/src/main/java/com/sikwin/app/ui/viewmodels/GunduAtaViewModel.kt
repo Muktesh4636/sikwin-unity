@@ -220,6 +220,8 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     var depositRequests by mutableStateOf<List<DepositRequest>>(emptyList())
     var withdrawRequests by mutableStateOf<List<WithdrawRequest>>(emptyList())
     var paymentMethods by mutableStateOf<List<PaymentMethod>>(emptyList())
+    var paybitraDeposit by mutableStateOf<PaybitraDepositResponse?>(null)
+    var paybitraLoading by mutableStateOf(false)
     var bettingHistory by mutableStateOf<List<Bet>>(emptyList())
     /** Cricket/IPL bets only — from [getCricketBettingHistory], not dice [Betting] history. */
     var cricketBettingHistory by mutableStateOf<List<CricketBetHistoryItem>>(emptyList())
@@ -1171,6 +1173,38 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         }
     }
 
+    fun initiateDeposit(amount: String, method: String = "UPI", onError: ((String) -> Unit)? = null) {
+        viewModelScope.launch {
+            paybitraLoading = true
+            errorMessage = null
+            paybitraDeposit = null
+            try {
+                val response = RetrofitClient.apiService.initiateDeposit(
+                    mapOf("amount" to amount, "method" to method)
+                )
+                if (response.isSuccessful) {
+                    paybitraDeposit = response.body()
+                } else {
+                    logoutIfUnauthorized(response.code())
+                    val msg = parseError(response.errorBody()?.string())
+                        .ifEmpty { "Could not start deposit. Please try again." }
+                    errorMessage = msg
+                    onError?.invoke(msg)
+                }
+            } catch (e: Exception) {
+                val msg = handleException(e)
+                errorMessage = msg
+                onError?.invoke(msg)
+            } finally {
+                paybitraLoading = false
+            }
+        }
+    }
+
+    fun clearPaybitraDeposit() {
+        paybitraDeposit = null
+    }
+
     fun fetchBankDetails() {
         // Set loading immediately to avoid a brief empty-state flicker
         // on first open of Withdraw screen.
@@ -1328,8 +1362,14 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
             isLoading = true
             errorMessage = null
             try {
-                val response = RetrofitClient.apiService.submitUtr(mapOf("amount" to amount, "utr" to utr))
+                val payload = mutableMapOf("amount" to amount, "utr" to utr)
+                paybitraDeposit?.let { session ->
+                    payload["paybitra_order_id"] = session.paybitra_order_id
+                    session.code?.let { payload["paybitra_code"] = it }
+                }
+                val response = RetrofitClient.apiService.submitUtr(payload)
                 if (response.isSuccessful) {
+                    clearPaybitraDeposit()
                     onSuccess()
                 } else {
                     val errorBody = response.errorBody()?.string()
@@ -1646,6 +1686,7 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         wallet = null
         transactions = emptyList()
         depositRequests = emptyList()
+        paybitraDeposit = null
         withdrawRequests = emptyList()
         errorMessage = null
         loginSuccess = false
@@ -1758,7 +1799,12 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     var userRank by mutableIntStateOf(0)
     var userRotationMoney by mutableStateOf(0.0)
     var leaderboardPlayers by mutableStateOf<List<Map<String, Any>>>(emptyList())
-    var leaderboardPrizes by mutableStateOf<Map<String, String>>(mapOf("1st" to "₹1,000", "2nd" to "₹500", "3rd" to "₹100"))
+    var leaderboardPrizes by mutableStateOf<Map<String, String>>(
+        mapOf(
+            "1st" to "₹3,000", "2nd" to "₹1,500", "3rd" to "₹1,000",
+            "4th" to "₹750", "5th" to "₹500", "6th" to "₹300", "7th" to "₹100"
+        )
+    )
 
     fun fetchLeaderboard() {
         viewModelScope.launch {
@@ -1774,9 +1820,13 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                     userRank = (userStats?.get("rank") as? Double)?.toInt() ?: (userStats?.get("rank") as? Int) ?: 0
                     userRotationMoney = (userStats?.get("turnover") as? Double) ?: (userStats?.get("turnover") as? Int)?.toDouble() ?: 0.0
 
-                    val prizes = data?.get("prizes") as? Map<String, String>
-                    if (prizes != null) {
-                        leaderboardPrizes = prizes
+                    val prizesRaw = data?.get("prizes")
+                    if (prizesRaw is Map<*, *>) {
+                        val merged = leaderboardPrizes.toMutableMap()
+                        for ((k, v) in prizesRaw) {
+                            if (k is String && v != null) merged[k] = v.toString()
+                        }
+                        leaderboardPrizes = merged
                     }
                 }
             } catch (e: Exception) {

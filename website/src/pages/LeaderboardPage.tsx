@@ -20,7 +20,11 @@ export function LeaderboardPage() {
   const [items, setItems] = useState<LeaderItem[]>([]);
   const [userRank, setUserRank] = useState<number>(0);
   const [userTurnover, setUserTurnover] = useState<number>(0);
-  const [prizes, setPrizes] = useState<Record<string, string>>({ '1st': '₹1,000', '2nd': '₹500', '3rd': '₹100' });
+  const defaultPrizes: Record<string, string> = {
+    '1st': '₹3,000', '2nd': '₹1,500', '3rd': '₹1,000',
+    '4th': '₹750', '5th': '₹500', '6th': '₹300', '7th': '₹100',
+  };
+  const [prizes, setPrizes] = useState<Record<string, string>>(defaultPrizes);
 
   const load = async () => {
     try {
@@ -30,7 +34,11 @@ export function LeaderboardPage() {
       const leaderboard = (data.leaderboard as any[]) ?? [];
       const userStats = (data.user_stats as any) ?? {};
       const apiPrizes = (data.prizes as any) ?? null;
-      if (apiPrizes && typeof apiPrizes === 'object') setPrizes(apiPrizes);
+      const mergedPrizes =
+        apiPrizes && typeof apiPrizes === 'object'
+          ? { ...defaultPrizes, ...apiPrizes }
+          : defaultPrizes;
+      setPrizes(mergedPrizes);
 
       setUserRank(Number(userStats.rank ?? 0) || 0);
       setUserTurnover(Number(userStats.turnover ?? 0) || 0);
@@ -42,7 +50,14 @@ export function LeaderboardPage() {
         const turnover = Number(row?.turnover ?? 0) || 0;
         const prize =
           row?.prize ??
-          (rank === 1 ? (apiPrizes?.['1st'] ?? prizes['1st']) : rank === 2 ? (apiPrizes?.['2nd'] ?? prizes['2nd']) : rank === 3 ? (apiPrizes?.['3rd'] ?? prizes['3rd']) : null);
+          (rank === 1 ? mergedPrizes['1st']
+            : rank === 2 ? mergedPrizes['2nd']
+            : rank === 3 ? mergedPrizes['3rd']
+            : rank === 4 ? mergedPrizes['4th']
+            : rank === 5 ? mergedPrizes['5th']
+            : rank === 6 ? mergedPrizes['6th']
+            : rank === 7 ? mergedPrizes['7th']
+            : null);
         return { rank, username, turnover, prize };
       });
 
@@ -57,7 +72,16 @@ export function LeaderboardPage() {
   }, []);
 
   const showUserCard = userTurnover > 50;
-  const prizeLine = useMemo(() => `1st: ${prizes['1st']} | 2nd: ${prizes['2nd']} | 3rd: ${prizes['3rd']}`, [prizes]);
+  const prizeLine1 = useMemo(
+    () =>
+      `1st: ${prizes['1st'] ?? '—'} | 2nd: ${prizes['2nd'] ?? '—'} | 3rd: ${prizes['3rd'] ?? '—'}`,
+    [prizes],
+  );
+  const prizeLine2 = useMemo(
+    () =>
+      `4th: ${prizes['4th'] ?? '—'} | 5th: ${prizes['5th'] ?? '—'} | 6th: ${prizes['6th'] ?? '—'} | 7th: ${prizes['7th'] ?? '—'}`,
+    [prizes],
+  );
 
   return (
     <div className="mobile-frame min-h-dvh pb-10" style={{ backgroundColor: BG }}>
@@ -103,7 +127,8 @@ export function LeaderboardPage() {
           style={{ backgroundColor: SURFACE }}
         >
           <div className="text-sm font-black tracking-widest text-[#FFCC00]">DAILY CHAMPIONS</div>
-          <div className="mt-2 text-base font-bold text-white">{prizeLine}</div>
+          <div className="mt-2 text-sm font-bold text-white">{prizeLine1}</div>
+          <div className="mt-1 text-sm font-bold text-white">{prizeLine2}</div>
           <div className="mt-1 text-xs text-[#BDBDBD]">Daily turnover based prizes!</div>
           <div className="mt-0.5 text-xs text-[#BDBDBD]">Results will be announced daily 11:00 PM night</div>
         </div>

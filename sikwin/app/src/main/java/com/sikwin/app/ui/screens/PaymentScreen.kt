@@ -46,6 +46,11 @@ import androidx.compose.ui.unit.sp
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +68,15 @@ fun PaymentScreen(
     val usdtBonusPercent = 0.05
     
     val isUsdt = paymentMethod.contains("USDT", ignoreCase = true)
+    val isBank = paymentMethod.contains("BANK", ignoreCase = true)
+    val isUpiDeposit = !isUsdt && !isBank
+    val paybitraSession = viewModel.paybitraDeposit
+    val activeUpiId = paybitraSession?.upi_id
+        ?: viewModel.paymentMethods.firstOrNull { !it.upi_id.isNullOrBlank() }?.upi_id
+    val activeUpiUri = paybitraSession?.upi_uri
+    val qrBitmap = remember(activeUpiUri) {
+        activeUpiUri?.let { generateQrBitmap(it) }
+    }
     
     val usdtAmount = if (isUsdt) {
         try {
@@ -108,23 +122,30 @@ fun PaymentScreen(
         String.format("%02d:%02d", minutes, seconds)
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.fetchPaymentMethods()
+    LaunchedEffect(amount, paymentMethod) {
         viewModel.clearError()
+        if (isUpiDeposit) {
+            viewModel.fetchPaymentMethods()
+            viewModel.initiateDeposit(amount, paymentMethod) { message ->
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        } else {
+            viewModel.clearPaybitraDeposit()
+            viewModel.fetchPaymentMethods()
+        }
     }
 
     fun openUpiApp(packageName: String?, specificUpiId: String?) {
-        val upiId = specificUpiId ?: viewModel.paymentMethods.firstOrNull { !it.upi_id.isNullOrBlank() }?.upi_id 
+        val upiId = specificUpiId ?: activeUpiId
         
         if (upiId.isNullOrBlank()) {
             Toast.makeText(context, "No UPI ID available for payment", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Create UPI payment URI
-        val payeeName = "GunduAta"
-        val transactionNote = "Wallet Topup"
-        val upiUri = "upi://pay?pa=$upiId&pn=$payeeName&am=$amount&cu=INR&tn=$transactionNote"
+        val payeeName = paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+        val transactionNote = paybitraSession?.code?.takeIf { it.isNotBlank() } ?: "Wallet Topup"
+        val upiUri = activeUpiUri ?: "upi://pay?pa=$upiId&pn=$payeeName&am=$amount&cu=INR&tn=$transactionNote"
         
         // Debug logging
         android.util.Log.d("PaymentScreen", "Opening UPI app - Package: $packageName, UPI URI: $upiUri")
@@ -156,6 +177,39 @@ fun PaymentScreen(
                 context.startActivity(Intent.createChooser(intent, "Pay with"))
             } catch (e: Exception) {
                 Toast.makeText(context, "No UPI app found. Please install a UPI app.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun saveBitmapToGallery(bitmap: Bitmap) {
+        scope.launch {
+            try {
+                val filename = "GunduAta_QR_${System.currentTimeMillis()}.jpg"
+                var fos: OutputStream? = null
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val contentValues = android.content.ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                    }
+                    val imageUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                    fos = imageUri?.let { context.contentResolver.openOutputStream(it) }
+                } else {
+                    val imagesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                    val image = java.io.File(imagesDir, filename)
+                    fos = java.io.FileOutputStream(image)
+                }
+
+                fos?.use {
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "QR Code saved to gallery", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error saving image: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -289,6 +343,16 @@ fun PaymentScreen(
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
+            if (isUpiDeposit && viewModel.paybitraLoading) {
+                Spacer(modifier = Modifier.height(24.dp))
+                CircularProgressIndicator(color = Color(0xFF3F51B5))
+                Text(
+                    "Fetching payment details...",
+                    color = Color.Gray,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            } else {
             Text(
                 "Use Mobile Scan QR To Pay",
                 color = Color.Black,
@@ -382,42 +446,57 @@ fun PaymentScreen(
                             Text(stringResource(R.string.bank_details_unavailable), color = Color.Red)
                         }
                     } else {
-                        // UPI QR
-                        val qrMethod = viewModel.paymentMethods.firstOrNull { 
-                            (it.method_type == "QR" || it.name.contains("QR", ignoreCase = true) || it.method_type == "UPI") && it.qr_image != null
+                        // UPI QR from PayBitra or fallback static methods
+                        if (!activeUpiId.isNullOrBlank()) {
+                            BankDetailRow("UPI ID", activeUpiId, context)
+                            paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() }?.let { name ->
+                                BankDetailRow("Account Name", name, context)
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
-                        
-                        if (qrMethod?.qr_image != null) {
-                            AsyncImage(
-                                model = qrMethod.qr_image,
+
+                        if (qrBitmap != null) {
+                            Image(
+                                bitmap = qrBitmap.asImageBitmap(),
                                 contentDescription = "Payment QR Code",
-                                modifier = Modifier.size(250.dp),
-                                contentScale = ContentScale.Fit
+                                modifier = Modifier.size(250.dp)
                             )
                         } else {
-                            // Try to find ANY method with a QR code if specific QR/UPI type not found
-                            val anyQrMethod = viewModel.paymentMethods.firstOrNull { it.qr_image != null }
-                            if (anyQrMethod?.qr_image != null) {
+                            val qrMethod = viewModel.paymentMethods.firstOrNull { 
+                                (it.method_type == "QR" || it.name.contains("QR", ignoreCase = true) || it.method_type == "UPI") && it.qr_image != null
+                            }
+                            
+                            if (qrMethod?.qr_image != null) {
                                 AsyncImage(
-                                    model = anyQrMethod.qr_image,
+                                    model = qrMethod.qr_image,
                                     contentDescription = "Payment QR Code",
                                     modifier = Modifier.size(250.dp),
                                     contentScale = ContentScale.Fit
                                 )
                             } else {
-                                Icon(
-                                    Icons.Default.QrCode2,
-                                    contentDescription = "QR Code",
-                                    modifier = Modifier.size(150.dp),
-                                    tint = Color.Black
-                                )
+                                val anyQrMethod = viewModel.paymentMethods.firstOrNull { it.qr_image != null }
+                                if (anyQrMethod?.qr_image != null) {
+                                    AsyncImage(
+                                        model = anyQrMethod.qr_image,
+                                        contentDescription = "Payment QR Code",
+                                        modifier = Modifier.size(250.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.QrCode2,
+                                        contentDescription = "QR Code",
+                                        modifier = Modifier.size(150.dp),
+                                        tint = Color.Black
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if (!paymentMethod.contains("BANK", ignoreCase = true)) {
+            if (!isBank && !viewModel.paybitraLoading) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 val currentQrUrl = if (isUsdt) {
@@ -433,12 +512,15 @@ fun PaymentScreen(
 
                 Button(
                     onClick = { 
-                        currentQrUrl?.let { saveImageToGallery(it) }
+                        when {
+                            qrBitmap != null -> saveBitmapToGallery(qrBitmap)
+                            currentQrUrl != null -> saveImageToGallery(currentQrUrl)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3F51B5)),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.width(120.dp),
-                    enabled = currentQrUrl != null
+                    enabled = qrBitmap != null || currentQrUrl != null
                 ) {
                     Text(stringResource(R.string.save), color = Color.White)
                 }
@@ -504,11 +586,14 @@ fun PaymentScreen(
                                     selectedMethod = method.name
                                     // Identify package based on name (with improved matching)
                                     val packageName = getPaymentPackage(method.name)
-                                    // Use specific UPI ID if available
-                                    if (!method.upi_id.isNullOrBlank()) {
-                                        // Debug: Log the method name and detected package
-                                        android.util.Log.d("PaymentScreen", "Method: ${method.name}, Package: $packageName, UPI ID: ${method.upi_id}")
-                                        openUpiApp(packageName, method.upi_id)
+                                    val methodUpiId = if (isUpiDeposit && !activeUpiId.isNullOrBlank()) {
+                                        activeUpiId
+                                    } else {
+                                        method.upi_id
+                                    }
+                                    if (!methodUpiId.isNullOrBlank()) {
+                                        android.util.Log.d("PaymentScreen", "Method: ${method.name}, Package: $packageName, UPI ID: $methodUpiId")
+                                        openUpiApp(packageName, methodUpiId)
                                     } else {
                                         // Fallback for non-UPI or if UPI ID missing
                                         // If it's a Bank method, maybe show a toast or dialog with details
@@ -635,6 +720,7 @@ fun PaymentScreen(
 
             // Bottom padding so "Submit Payment Proof" and upload section are never cut off by nav/gesture bar
             Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 }
@@ -729,6 +815,22 @@ private fun getAppName(packageName: String?): String {
         "com.google.android.apps.nbu.paisa.user" -> "Google Pay"
         "net.one97.paytm" -> "Paytm"
         else -> "payment app"
+    }
+}
+
+private fun generateQrBitmap(content: String, size: Int = 512): Bitmap? {
+    return try {
+        val hints = mapOf(EncodeHintType.MARGIN to 1)
+        val matrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bitmap.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            }
+        }
+        bitmap
+    } catch (_: Exception) {
+        null
     }
 }
 

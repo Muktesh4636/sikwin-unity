@@ -8,7 +8,11 @@
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APK_SRC="${APK_SRC:-${REPO_ROOT}/sikwin/app/build/outputs/apk/debug/Sikwin-debug.apk}"
+APK_SRC="${APK_SRC:-${REPO_ROOT}/sikwin/app/build/outputs/apk/gunduata/debug/GunduAta-gunduata-debug.apk}"
+# Fallback: Gradle may emit a different archivesBaseName; pick newest gunduata debug APK.
+if [ ! -f "$APK_SRC" ]; then
+  APK_SRC="$(ls -t "${REPO_ROOT}"/sikwin/app/build/outputs/apk/gunduata/debug/*.apk 2>/dev/null | head -1)"
+fi
 APK_DST="${SCRIPT_DIR}/public/GunduAta.apk"
 
 if [ ! -f "$APK_SRC" ]; then
