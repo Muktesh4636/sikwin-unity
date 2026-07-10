@@ -21,7 +21,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import com.unity3d.player.UnityTokenHolder
 import android.content.SharedPreferences
-import android.os.SystemClock
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.format.DateTimeParseException
@@ -283,10 +282,14 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     /** Colour game — GET /api/colour/round/ */
     var colourRound by mutableStateOf<ColourRoundResponse?>(null)
     /**
-     * Seconds remaining for the colour round UI — ticks down every second locally and is
-     * re-synced from the server on each [refreshColourRound].
+     * Seconds remaining — decrements locally once per second after [initializeColourLocalTimerForRound].
+     * Not re-synced from the API on every poll; only seeded when a new [round_id] starts.
      */
     var colourDisplayTimerSeconds by mutableIntStateOf(0)
+    /** Initial countdown length for the current local round (progress bar). */
+    var colourRoundInitialSeconds by mutableIntStateOf(60)
+    /** Result for the current round — fetched when the local timer hits zero. */
+    var colourDisplayedResult by mutableStateOf<ColourRoundResultResponse?>(null)
     /** GET /api/colour/bets/ — sorted newest first in [fetchColourBetsHistory]. */
     var colourBetsHistory by mutableStateOf<List<ColourBetHistoryItem>>(emptyList())
     /** GET /api/colour/results/ — global recent results for Colour Game table. */
@@ -298,17 +301,13 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     private var colourPublicResultsPollJob: Job? = null
     /** Avoid duplicate “timer hit zero” handling for the same [ColourRoundResponse.round_id]. */
     private var colourTimerZeroHandledRoundId: String? = null
-    /** Max [ColourRoundResponse.timer] seen for the current round — used to tell 60s vs ~30s countdown. */
-    private var colourPeakTimerForCurrentRound: Int = 0
-    /** Server [ColourRoundResponse.timer] value at last sync; paired with [colourTimerAnchorElapsedRealtime]. */
-    private var colourTimerAnchorSeconds: Int = 0
-    /** [SystemClock.elapsedRealtime] when we last synced [colourTimerAnchorSeconds] from the server. */
-    private var colourTimerAnchorElapsedRealtime: Long = 0L
+    /** Round id for which [colourDisplayTimerSeconds] is counting down locally. */
+    private var colourLocalRoundId: String? = null
 
     companion object {
-        /** Sync round/timer while Colour Game is open (betting_open / timer alignment). */
+        /** Poll for new rounds and server betting_open (close bets) — not for every-second timer. */
         private const val COLOUR_ROUND_POLL_INTERVAL_MS = 4_000L
-        /** Public results refresh while Colour Game is open (faster than round poll). */
+        /** Public results refresh while Colour Game is open. */
         private const val COLOUR_PUBLIC_RESULTS_POLL_MS = 4_000L
     }
 
@@ -343,21 +342,13 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         colourPublicResultsPollJob = null
         colourLocalTickJob?.cancel()
         colourLocalTickJob = null
-        colourTimerAnchorSeconds = 0
-        colourTimerAnchorElapsedRealtime = 0L
+        colourLocalRoundId = null
     }
 
-    /** Call when Colour Game screen resumes (tab switch / back stack) — pulls latest round, timer, betting_open. */
+    /** Call when Colour Game screen resumes — updates betting_open / round id; does not reset local timer. */
     fun refreshColourRoundNow() {
         viewModelScope.launch { refreshColourRound() }
     }
-
-    /**
-     * When the server has reported a timer above ~40s for this round, treat the round as a ~60s
-     * cycle and lock betting for the last 30s ([timerSec] 30…0). Otherwise assume a short (~30s)
-     * betting countdown and follow [ColourRoundResponse.betting_open] with [timerSec] > 0.
-     */
-    fun colourRoundUsesSixtySecondCountdown(): Boolean = colourPeakTimerForCurrentRound > 40
 
     private fun startColourLocalTimer() {
         if (colourLocalTickJob?.isActive == true) return
@@ -366,13 +357,11 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                 delay(1000)
                 val round = colourRound
                 if (round?.status?.equals("no_round", ignoreCase = true) == true) continue
-                val anchorRt = colourTimerAnchorElapsedRealtime
-                if (anchorRt <= 0L) continue
-                val elapsedSec = ((SystemClock.elapsedRealtime() - anchorRt) / 1000L).toInt().coerceAtLeast(0)
-                val newVal = maxOf(0, colourTimerAnchorSeconds - elapsedSec)
+                if (colourLocalRoundId.isNullOrBlank()) continue
+                if (colourDisplayTimerSeconds <= 0) continue
                 val prev = colourDisplayTimerSeconds
-                colourDisplayTimerSeconds = newVal
-                if (newVal == 0 && prev > 0) {
+                colourDisplayTimerSeconds = prev - 1
+                if (colourDisplayTimerSeconds == 0) {
                     onColourDisplayTimerReachedZero()
                 }
             }
@@ -380,23 +369,27 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     }
 
     private fun onColourDisplayTimerReachedZero() {
-        val rid = colourRound?.round_id ?: return
+        val rid = colourRound?.round_id ?: colourLocalRoundId ?: return
         if (colourTimerZeroHandledRoundId == rid) return
         colourTimerZeroHandledRoundId = rid
         colourResultPollJob?.cancel()
         colourResultPollJob = viewModelScope.launch {
-            refreshColourRound()
-            repeat(36) {
-                delay(2000)
+            repeat(36) { attempt ->
+                if (attempt > 0) delay(2000)
                 val res = fetchColourRoundResult(rid)
                 val body = res.getOrNull()
-                refreshColourRound()
-                if (loginSuccess) fetchColourBetsHistory()
-                val done = body?.status?.equals("COMPLETED", ignoreCase = true) == true ||
-                    !body?.result.isNullOrBlank()
-                if (done) {
-                    fetchColourPublicResults()
-                    return@launch
+                if (body != null) {
+                    colourDisplayedResult = body
+                    if (!body.result.isNullOrBlank() || body.number != null) {
+                        colourRound = colourRound?.copy(
+                            result = body.result ?: colourRound?.result,
+                            number = body.number ?: colourRound?.number,
+                            betting_open = false
+                        )
+                        fetchColourPublicResults()
+                        if (loginSuccess) fetchColourBetsHistory()
+                        return@launch
+                    }
                 }
             }
         }
@@ -949,7 +942,7 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         }
     }
 
-    /** GET /api/colour/round/ — no auth. Syncs round id, timer, betting_open; anchors local countdown to server time. */
+    /** GET /api/colour/round/ — no auth. Updates betting_open; seeds local timer only on new round_id. */
     suspend fun refreshColourRound() {
         try {
             val response = withContext(Dispatchers.IO) {
@@ -957,33 +950,38 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
             }
             if (response.isSuccessful) {
                 val body = response.body()
-                val prevId = colourRound?.round_id
                 colourRound = body
-                val newId = body?.round_id
-                if (newId != null && newId != prevId) {
-                    colourTimerZeroHandledRoundId = null
-                    colourPeakTimerForCurrentRound = 0
-                    colourTimerAnchorSeconds = 0
-                    colourTimerAnchorElapsedRealtime = 0L
-                }
                 if (body?.status?.equals("no_round", ignoreCase = true) == true) {
                     colourDisplayTimerSeconds = 0
-                    colourPeakTimerForCurrentRound = 0
-                    colourTimerAnchorSeconds = 0
-                    colourTimerAnchorElapsedRealtime = 0L
+                    colourRoundInitialSeconds = 60
+                    colourLocalRoundId = null
+                    colourDisplayedResult = null
                     return
                 }
-                val t = computeColourRoundRemainingSeconds(body)
-                colourPeakTimerForCurrentRound = maxOf(colourPeakTimerForCurrentRound, t)
-                colourTimerAnchorSeconds = t
-                colourTimerAnchorElapsedRealtime = SystemClock.elapsedRealtime()
-                colourDisplayTimerSeconds = t
-                if (t == 0) {
-                    onColourDisplayTimerReachedZero()
+                val newId = body?.round_id
+                if (newId.isNullOrBlank()) return
+
+                if (newId != colourLocalRoundId) {
+                    initializeColourLocalTimerForRound(body)
                 }
             }
         } catch (_: Exception) {
             // Keep last known round; avoid spamming errors while polling.
+        }
+    }
+
+    /** Seed local countdown once when the server starts a new round. */
+    private fun initializeColourLocalTimerForRound(body: ColourRoundResponse) {
+        val newId = body.round_id ?: return
+        colourLocalRoundId = newId
+        colourTimerZeroHandledRoundId = null
+        colourDisplayedResult = null
+        val remaining = computeColourRoundRemainingSeconds(body)
+        colourDisplayTimerSeconds = remaining
+        colourRoundInitialSeconds = body.round_duration_seconds?.takeIf { it > 0 }
+            ?: remaining.coerceAtLeast(1)
+        if (remaining == 0) {
+            onColourDisplayTimerReachedZero()
         }
     }
 
@@ -996,8 +994,7 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         body.timer?.let { return it.coerceAtLeast(0) }
         val startMs = parseColourIsoMillis(body.start_time) ?: return 0
         val nowWall = parseColourIsoMillis(body.server_time) ?: System.currentTimeMillis()
-        val roundLenSec = body.round_duration_seconds?.takeIf { it > 0 }
-            ?: maxOf(colourPeakTimerForCurrentRound, 60)
+        val roundLenSec = body.round_duration_seconds?.takeIf { it > 0 } ?: 60
         val elapsedSec = ((nowWall - startMs) / 1000L).toInt().coerceAtLeast(0)
         return maxOf(0, roundLenSec - elapsedSec)
     }

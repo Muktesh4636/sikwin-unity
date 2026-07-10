@@ -17,6 +17,12 @@ def initiate_deposit(request):
     if amount < 100:
         return Response({'error': 'Minimum deposit amount is ₹100'}, status=status.HTTP_400_BAD_REQUEST)
 
+    if amount < 500:
+        return Response(
+            {'error': 'Use standard payment methods for deposits below ₹500.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     upi_methods = {'UPI', 'QR', 'GPAY', 'PAYTM', 'PHONEPE'}
     if method not in upi_methods and 'UPI' not in method:
         return Response(

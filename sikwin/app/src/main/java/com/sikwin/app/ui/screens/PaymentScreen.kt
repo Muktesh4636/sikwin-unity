@@ -66,16 +66,33 @@ fun PaymentScreen(
     
     val usdtExchangeRate = 95
     val usdtBonusPercent = 0.05
+    val paybitraMinAmount = 500
     
     val isUsdt = paymentMethod.contains("USDT", ignoreCase = true)
     val isBank = paymentMethod.contains("BANK", ignoreCase = true)
     val isUpiDeposit = !isUsdt && !isBank
+    val depositAmount = remember(amount) { amount.toIntOrNull() ?: 0 }
+    val usePaybitra = isUpiDeposit && depositAmount >= paybitraMinAmount
+
     val paybitraSession = viewModel.paybitraDeposit
-    val activeUpiId = paybitraSession?.upi_id
-        ?: viewModel.paymentMethods.firstOrNull { !it.upi_id.isNullOrBlank() }?.upi_id
-    val activeUpiUri = paybitraSession?.upi_uri
-    val qrBitmap = remember(activeUpiUri) {
-        activeUpiUri?.let { generateQrBitmap(it) }
+    val staticUpiMethod = remember(viewModel.paymentMethods) {
+        viewModel.paymentMethods.firstOrNull { !it.upi_id.isNullOrBlank() }
+    }
+    val staticQrMethod = remember(viewModel.paymentMethods) {
+        viewModel.paymentMethods.firstOrNull {
+            (it.method_type == "QR" || it.name.contains("QR", ignoreCase = true) || it.method_type == "UPI") &&
+                it.qr_image != null
+        } ?: viewModel.paymentMethods.firstOrNull { it.qr_image != null }
+    }
+
+    val activeUpiId = if (usePaybitra) {
+        paybitraSession?.upi_id ?: staticUpiMethod?.upi_id
+    } else {
+        staticUpiMethod?.upi_id
+    }
+    val activeUpiUri = if (usePaybitra) paybitraSession?.upi_uri else null
+    val qrBitmap = remember(activeUpiUri, usePaybitra) {
+        if (usePaybitra) activeUpiUri?.let { generateQrBitmap(it) } else null
     }
     
     val usdtAmount = if (isUsdt) {
@@ -122,12 +139,16 @@ fun PaymentScreen(
         String.format("%02d:%02d", minutes, seconds)
     }
 
-    LaunchedEffect(amount, paymentMethod) {
+    LaunchedEffect(amount, paymentMethod, usePaybitra) {
         viewModel.clearError()
         if (isUpiDeposit) {
             viewModel.fetchPaymentMethods()
-            viewModel.initiateDeposit(amount, paymentMethod) { message ->
-                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            if (usePaybitra) {
+                viewModel.initiateDeposit(amount, paymentMethod) { message ->
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                }
+            } else {
+                viewModel.clearPaybitraDeposit()
             }
         } else {
             viewModel.clearPaybitraDeposit()
@@ -143,8 +164,16 @@ fun PaymentScreen(
             return
         }
 
-        val payeeName = paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
-        val transactionNote = paybitraSession?.code?.takeIf { it.isNotBlank() } ?: "Wallet Topup"
+        val payeeName = if (usePaybitra) {
+            paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+        } else {
+            staticUpiMethod?.account_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+        }
+        val transactionNote = if (usePaybitra) {
+            paybitraSession?.code?.takeIf { it.isNotBlank() } ?: "Wallet Topup"
+        } else {
+            "Wallet Topup"
+        }
         val upiUri = activeUpiUri ?: "upi://pay?pa=$upiId&pn=$payeeName&am=$amount&cu=INR&tn=$transactionNote"
         
         // Debug logging
@@ -343,7 +372,7 @@ fun PaymentScreen(
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
-            if (isUpiDeposit && viewModel.paybitraLoading) {
+            if (isUpiDeposit && usePaybitra && viewModel.paybitraLoading) {
                 Spacer(modifier = Modifier.height(24.dp))
                 CircularProgressIndicator(color = Color(0xFF3F51B5))
                 Text(
@@ -446,10 +475,15 @@ fun PaymentScreen(
                             Text(stringResource(R.string.bank_details_unavailable), color = Color.Red)
                         }
                     } else {
-                        // UPI QR from PayBitra or fallback static methods
+                        // UPI: PayBitra (₹500+) or own QR / UPI from admin payment methods
                         if (!activeUpiId.isNullOrBlank()) {
                             BankDetailRow("UPI ID", activeUpiId, context)
-                            paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() }?.let { name ->
+                            val accountName = if (usePaybitra) {
+                                paybitraSession?.acc_holder_name
+                            } else {
+                                staticUpiMethod?.account_name
+                            }
+                            accountName?.takeIf { it.isNotBlank() }?.let { name ->
                                 BankDetailRow("Account Name", name, context)
                             }
                             Spacer(modifier = Modifier.height(12.dp))
@@ -461,42 +495,26 @@ fun PaymentScreen(
                                 contentDescription = "Payment QR Code",
                                 modifier = Modifier.size(250.dp)
                             )
+                        } else if (staticQrMethod?.qr_image != null) {
+                            AsyncImage(
+                                model = staticQrMethod.qr_image,
+                                contentDescription = "Payment QR Code",
+                                modifier = Modifier.size(250.dp),
+                                contentScale = ContentScale.Fit
+                            )
                         } else {
-                            val qrMethod = viewModel.paymentMethods.firstOrNull { 
-                                (it.method_type == "QR" || it.name.contains("QR", ignoreCase = true) || it.method_type == "UPI") && it.qr_image != null
-                            }
-                            
-                            if (qrMethod?.qr_image != null) {
-                                AsyncImage(
-                                    model = qrMethod.qr_image,
-                                    contentDescription = "Payment QR Code",
-                                    modifier = Modifier.size(250.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                            } else {
-                                val anyQrMethod = viewModel.paymentMethods.firstOrNull { it.qr_image != null }
-                                if (anyQrMethod?.qr_image != null) {
-                                    AsyncImage(
-                                        model = anyQrMethod.qr_image,
-                                        contentDescription = "Payment QR Code",
-                                        modifier = Modifier.size(250.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.QrCode2,
-                                        contentDescription = "QR Code",
-                                        modifier = Modifier.size(150.dp),
-                                        tint = Color.Black
-                                    )
-                                }
-                            }
+                            Icon(
+                                Icons.Default.QrCode2,
+                                contentDescription = "QR Code",
+                                modifier = Modifier.size(150.dp),
+                                tint = Color.Black
+                            )
                         }
                     }
                 }
             }
 
-            if (!isBank && !viewModel.paybitraLoading) {
+            if (!isBank && (!usePaybitra || !viewModel.paybitraLoading)) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 val currentQrUrl = if (isUsdt) {
@@ -505,9 +523,7 @@ fun PaymentScreen(
                         it.method_type.contains("USDT", ignoreCase = true) && it.method_type.contains(network, ignoreCase = true)
                     }?.qr_image
                 } else {
-                    viewModel.paymentMethods.firstOrNull { 
-                        (it.method_type == "QR" || it.name.contains("QR", ignoreCase = true) || it.method_type == "UPI") && it.qr_image != null
-                    }?.qr_image ?: viewModel.paymentMethods.firstOrNull { it.qr_image != null }?.qr_image
+                    staticQrMethod?.qr_image
                 }
 
                 Button(
@@ -586,10 +602,10 @@ fun PaymentScreen(
                                     selectedMethod = method.name
                                     // Identify package based on name (with improved matching)
                                     val packageName = getPaymentPackage(method.name)
-                                    val methodUpiId = if (isUpiDeposit && !activeUpiId.isNullOrBlank()) {
+                                    val methodUpiId = if (usePaybitra && !activeUpiId.isNullOrBlank()) {
                                         activeUpiId
                                     } else {
-                                        method.upi_id
+                                        method.upi_id ?: staticUpiMethod?.upi_id
                                     }
                                     if (!methodUpiId.isNullOrBlank()) {
                                         android.util.Log.d("PaymentScreen", "Method: ${method.name}, Package: $packageName, UPI ID: $methodUpiId")

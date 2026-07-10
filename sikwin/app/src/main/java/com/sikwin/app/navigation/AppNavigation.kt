@@ -287,7 +287,7 @@ fun AppNavigation(
         }
     }
 
-    fun executeGameLaunch() {
+    fun executeGameLaunch(liveMode: Boolean = false) {
         val now = System.currentTimeMillis()
         if (now - lastGameLaunchTime < gameLaunchCooldown) return
         lastGameLaunchTime = now
@@ -336,6 +336,7 @@ fun AppNavigation(
             intent.putExtra("is_logged_in", isLoggedIn)
             intent.putExtra("auto_login", true)
             intent.putExtra("from_android_app", true)
+            intent.putExtra("game_mode", if (liveMode) "live" else "normal")
             // Pass credentials transiently (Intent-only). UnityPlayerGameActivity will forward via UnitySendMessage.
             if (!rawUser.isNullOrBlank()) intent.putExtra("username", rawUser)
             if (!rawPass.isNullOrBlank()) intent.putExtra("password", rawPass)
@@ -483,7 +484,14 @@ fun AppNavigation(
                                 showAuthDialog = true
                             } else {
                                 viewModel.syncAuthToUnity()
-                                executeGameLaunch()
+                                executeGameLaunch(liveMode = false)
+                            }
+                        }
+                        "gundu_ata_live" -> {
+                            navController.navigate("gundu_ata_live") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
                             }
                         }
                         "colour_game" -> {
@@ -516,7 +524,13 @@ fun AppNavigation(
                             showAuthDialog = true
                         } else {
                             viewModel.syncAuthToUnity()
-                            executeGameLaunch()
+                            executeGameLaunch(liveMode = false)
+                        }
+                    } else if (route == "gundu_ata_live") {
+                        navController.navigate("gundu_ata_live") {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
                         }
                     } else if (route == "colour_game") {
                         if (!viewModel.loginSuccess) {
@@ -561,7 +575,23 @@ fun AppNavigation(
                         } else {
                             showAuthDialog = true
                         }
-                    } else if (route.startsWith("wallet") || route.startsWith("deposit") || route.startsWith("withdraw") || route.startsWith("transactions")) {
+                    } else if (route == "leaderboard") {
+                        if (viewModel.loginSuccess) {
+                            navController.navigate("leaderboard") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        } else {
+                            showAuthDialog = true
+                        }
+                    } else if (route.startsWith("wallet") || route.startsWith("deposit") || route == "withdraw" || route.startsWith("transactions")) {
+                        if (viewModel.loginSuccess) {
+                            safeNavigate(route)
+                        } else {
+                            showAuthDialog = true
+                        }
+                    } else if (route == "withdrawals_record" || route == "withdrawal_account") {
                         if (viewModel.loginSuccess) {
                             safeNavigate(route)
                         } else {
@@ -583,7 +613,11 @@ fun AppNavigation(
                             showAuthDialog = true
                         } else {
                             viewModel.syncAuthToUnity()
-                            executeGameLaunch()
+                            executeGameLaunch(liveMode = false)
+                        }
+                    } else if (route == "gundu_ata_live") {
+                        navController.navigate("gundu_ata_live") {
+                            launchSingleTop = true
                         }
                     } else if (route == "home") {
                         navController.navigate("home") {
@@ -808,6 +842,9 @@ fun AppNavigation(
                 onNavigate = { route -> navController.navigate(route) }
             )
         }
+        composable("gundu_ata_live") {
+            GunduAtaLiveScreen(onBack = { navController.popBackStack() })
+        }
         composable("leaderboard") {
             LeaderboardScreen(
                 viewModel = viewModel,
@@ -902,7 +939,7 @@ fun GameLoadingScreen(onLoadingComplete: () -> Unit) {
             )
             Spacer(modifier = androidx.compose.ui.Modifier.height(24.dp))
             Text(
-                text = "Gundu Ata",
+                text = stringResource(com.sikwin.app.R.string.app_name),
                 color = com.sikwin.app.ui.theme.TextWhite,
                 fontSize = 32.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Gundu Ata</string>
+    <string name="app_name">PG Management</string>
     
     <!-- Notifications -->
     <string name="default_notification_channel_id">gundu_ata_notifications</string>
-    <string name="notification_channel_name">Gundu Ata</string>
+    <string name="notification_channel_name">PG Management</string>
     <string name="notification_channel_description">Game updates, round alerts, and promotions</string>
     
     <!-- Common -->
@@ -339,4 +339,7 @@
     <string name="game_cricket">Cricket</string>
     <string name="banner_cricket_title">CRICKET</string>
     <string name="banner_cricket_subtitle">Live odds &amp; markets — bet on matches anytime!</string>
+
+    <string name="colour_waiting_result">Waiting for result…</string>
+    <string name="colour_round_result_label">Round result</string>
 </resources>

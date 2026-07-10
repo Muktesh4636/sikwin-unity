@@ -67,6 +67,7 @@ import androidx.compose.ui.window.Dialog
 import com.sikwin.app.R
 import com.sikwin.app.data.models.ColourBetHistoryItem
 import com.sikwin.app.data.models.ColourPublicResultItem
+import com.sikwin.app.data.models.ColourRoundResultResponse
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -118,13 +119,12 @@ fun ColourGameScreen(
 
     val round = viewModel.colourRound
     val timerSec = viewModel.colourDisplayTimerSeconds.coerceAtLeast(0)
-    val sixtySecondStyleRound = viewModel.colourRoundUsesSixtySecondCountdown()
-    /** Lock betting for the last 30s when the round uses a ~60s timer; else follow server + timer > 0. */
+    val roundResult = viewModel.colourDisplayedResult
+    /** Bets close when the server sets betting_open = false (polled every few seconds). */
     val canBet = viewModel.loginSuccess &&
         round != null &&
         round.betting_open == true &&
-        !round.status.equals("no_round", ignoreCase = true) &&
-        (if (sixtySecondStyleRound) timerSec > 30 else timerSec > 0)
+        !round.status.equals("no_round", ignoreCase = true)
 
     DisposableEffect(Unit) {
         viewModel.startColourGameSession()
@@ -181,8 +181,8 @@ fun ColourGameScreen(
     }
 
     val balance = viewModel.wallet?.balance ?: "0.00"
-    /** Full round is treated as 60s; bar fills as time runs down. */
-    val progress = (timerSec.coerceAtMost(60) / 60f).coerceIn(0f, 1f)
+    val initialTimerSec = viewModel.colourRoundInitialSeconds.coerceAtLeast(1)
+    val progress = (timerSec.coerceAtMost(initialTimerSec) / initialTimerSec.toFloat()).coerceIn(0f, 1f)
     val timerText = remember(timerSec) {
         val m = timerSec / 60
         val s = timerSec % 60
@@ -390,7 +390,17 @@ fun ColourGameScreen(
                 progress = progress,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(40.dp))
+
+            if (timerSec == 0 && round?.status?.equals("no_round", ignoreCase = true) != true) {
+                Spacer(modifier = Modifier.height(16.dp))
+                ColourRoundResultBanner(
+                    result = roundResult,
+                    fallbackResult = round?.result,
+                    fallbackNumber = round?.number
+                )
+            }
+
+            Spacer(modifier = Modifier.height(if (timerSec == 0) 24.dp else 40.dp))
 
             val joinGreenText = stringResource(R.string.colour_join_green)
             val joinVioletText = stringResource(R.string.colour_join_violet)
@@ -436,7 +446,11 @@ fun ColourGameScreen(
                     row.forEach { n ->
                         NumberCell(
                             n = n,
-                            openLabel = if (canBet) "OPEN" else "—",
+                            openLabel = when {
+                                canBet -> "OPEN"
+                                round?.betting_open == false -> "CLOSED"
+                                else -> "—"
+                            },
                             modifier = Modifier.weight(1f).padding(4.dp),
                             enabled = canBet && !placingBet
                         ) {
@@ -544,6 +558,86 @@ fun ColourGameScreen(
 }
 
 /** Track is full width; gold segment always grows from the **left** (start), not from the center. */
+@Composable
+private fun ColourRoundResultBanner(
+    result: ColourRoundResultResponse?,
+    fallbackResult: String?,
+    fallbackNumber: Int?
+) {
+    val resultText = result?.result?.takeIf { it.isNotBlank() } ?: fallbackResult
+    val resultNumber = result?.number ?: fallbackNumber
+    val hasResult = !resultText.isNullOrBlank() || resultNumber != null
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(TableBg)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            stringResource(R.string.colour_round_result_label),
+            color = GoldTitle,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        if (!hasResult) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                color = GoldTitle,
+                strokeWidth = 2.dp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.colour_waiting_result),
+                color = Color(0xFF9CA3AF),
+                fontSize = 14.sp
+            )
+        } else {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                dotsFromColourResult(resultText).forEach { d ->
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (d) {
+                                    DotColour.GREEN -> GreenBright
+                                    DotColour.RED -> RedBright
+                                    DotColour.VIOLET -> VioletBright
+                                }
+                            )
+                    )
+                }
+            }
+            if (resultNumber != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = resultNumber.toString(),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 32.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            if (!resultText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = resultText.replace('_', ' ').uppercase(),
+                    color = Color(0xFF9CA3AF),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ColourRoundProgressBar(progress: Float, modifier: Modifier = Modifier) {
     val p = progress.coerceIn(0f, 1f)

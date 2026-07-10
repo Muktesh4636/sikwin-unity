@@ -3,6 +3,7 @@ package com.sikwin.app.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -56,6 +58,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.window.Dialog
 import com.sikwin.app.data.api.RetrofitClient
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +75,15 @@ fun HomeScreen(
     var showGuestSpinWheel by remember { mutableStateOf(false) }
     var guestWheelCloseCount by remember { mutableIntStateOf(0) }
     var showLoginPopup by remember { mutableStateOf(false) }
+    var showGunduAtaChoiceDialog by remember { mutableStateOf(false) }
+
+    if (showGunduAtaChoiceDialog) {
+        GunduAtaChoiceDialog(
+            onDismiss = { showGunduAtaChoiceDialog = false },
+            onPlayLive = { onNavigate("gundu_ata_live") },
+            onPlayNormal = { onGameClick("gundu_ata") }
+        )
+    }
     
     if (showLoginPopup) {
         AlertDialog(
@@ -190,6 +202,13 @@ fun HomeScreen(
                                     onRequireLogin = { showLoginPopup = true }
                                 )
                             }
+                        },
+                        onGunduAtaChoice = {
+                            if (viewModel.loginSuccess) {
+                                showGunduAtaChoiceDialog = true
+                            } else {
+                                showLoginPopup = true
+                            }
                         }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -227,13 +246,21 @@ fun HomeScreen(
                                             game = game,
                                             modifier = Modifier.weight(1f),
                                             onClick = {
-                                                launchHomeGame(
-                                                    gameId = game.id,
-                                                    loginSuccess = viewModel.loginSuccess,
-                                                    onGameClick = onGameClick,
-                                                    onNavigate = onNavigate,
-                                                    onRequireLogin = { showLoginPopup = true }
-                                                )
+                                                if (game.id == "gundu_ata") {
+                                                    if (viewModel.loginSuccess) {
+                                                        showGunduAtaChoiceDialog = true
+                                                    } else {
+                                                        showLoginPopup = true
+                                                    }
+                                                } else {
+                                                    launchHomeGame(
+                                                        gameId = game.id,
+                                                        loginSuccess = viewModel.loginSuccess,
+                                                        onGameClick = onGameClick,
+                                                        onNavigate = onNavigate,
+                                                        onRequireLogin = { showLoginPopup = true }
+                                                    )
+                                                }
                                             }
                                         )
                                     }
@@ -405,38 +432,72 @@ fun HomeTopBar(
 @Composable
 fun SearchBar(onSearch: (String) -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
-    
-    OutlinedTextField(
-        value = searchQuery,
-        onValueChange = { 
-            searchQuery = it
-            onSearch(it)
-        },
+
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp),
-        placeholder = { Text(stringResource(R.string.search_games), color = TextGrey) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextWhite) },
-        trailingIcon = {
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)
+            .height(40.dp),
+        color = SurfaceColor,
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = null,
+                tint = TextWhite,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = searchQuery,
+                onValueChange = {
+                    searchQuery = it
+                    onSearch(it)
+                },
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = TextWhite,
+                    fontSize = 13.sp
+                ),
+                cursorBrush = SolidColor(PrimaryYellow),
+                modifier = Modifier.weight(1f),
+                decorationBox = { innerTextField ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                stringResource(R.string.search_games),
+                                color = TextGrey,
+                                fontSize = 13.sp
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            )
             if (searchQuery.isNotEmpty()) {
-                IconButton(onClick = { 
-                    searchQuery = ""
-                    onSearch("")
-                }) {
-                    Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextGrey)
+                IconButton(
+                    onClick = {
+                        searchQuery = ""
+                        onSearch("")
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Clear",
+                        tint = TextGrey,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
-        },
-        colors = TextFieldDefaults.outlinedTextFieldColors(
-            containerColor = SurfaceColor,
-            unfocusedBorderColor = Color.Transparent,
-            focusedBorderColor = PrimaryYellow,
-            focusedTextColor = TextWhite,
-            unfocusedTextColor = TextWhite
-        ),
-        shape = RoundedCornerShape(12.dp),
-        singleLine = true
-    )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -590,7 +651,8 @@ private data class QuickGame(val id: String, val label: String, val iconRes: Int
 
 @Composable
 fun QuickGamesRow(
-    onGameClick: (String) -> Unit
+    onGameClick: (String) -> Unit,
+    onGunduAtaChoice: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val iplIconRes = context.resources.getIdentifier("ic_ipl_nav", "drawable", context.packageName).takeIf { it != 0 }
@@ -617,7 +679,13 @@ fun QuickGamesRow(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onGameClick(entry.id) }
+                    .clickable {
+                        if (entry.id == "gundu_ata" && onGunduAtaChoice != null) {
+                            onGunduAtaChoice()
+                        } else {
+                            onGameClick(entry.id)
+                        }
+                    }
                     .padding(vertical = 4.dp)
             ) {
                 Box(
@@ -842,9 +910,19 @@ fun HotGamesGrid(
         }
     }
     
+    var showGunduAtaDialog by remember { mutableStateOf(false) }
+    if (showGunduAtaDialog) {
+        GunduAtaChoiceDialog(
+            onDismiss = { showGunduAtaDialog = false },
+            onPlayLive = { onNavigate("gundu_ata_live") },
+            onPlayNormal = { onGameClick("gundu_ata") }
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 220.dp)
             .padding(horizontal = 16.dp)
     ) {
         // Hot Games — Gundu Ata banner only
@@ -861,6 +939,8 @@ fun HotGamesGrid(
                     onClick = {
                         if (!viewModel.loginSuccess) {
                             onRequireLogin()
+                        } else if (game.id == "gundu_ata") {
+                            showGunduAtaDialog = true
                         } else {
                             onGameClick(game.id)
                         }
@@ -1038,6 +1118,19 @@ fun HotGamesGrid(
                 // Treasury Box Icon and Continuous Winnings Animation
                 val treasuryBoxId = context.resources.getIdentifier("ic_treasury_box", "drawable", context.packageName)
                 if (treasuryBoxId != 0) {
+                    var lastTreasuryClickTime by remember { mutableStateOf(0L) }
+                    val onTreasuryClick = {
+                        val now = System.currentTimeMillis()
+                        if (now - lastTreasuryClickTime > 800L) {
+                            lastTreasuryClickTime = now
+                            if (viewModel.loginSuccess) {
+                                onNavigate("leaderboard")
+                            } else {
+                                onRequireLogin()
+                            }
+                        }
+                    }
+
                     // Real-box shake animation logic
                     val infiniteTransition = rememberInfiniteTransition(label = "shake")
                     
@@ -1080,46 +1173,27 @@ fun HotGamesGrid(
                         label = "shakeScale"
                     )
 
+                    // Single stable tap target — shake is visual-only so clicks don't miss the box
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .offset(y = 10.dp, x = 45.dp),
+                            .offset(y = 10.dp)
+                            .width(88.dp)
+                            .heightIn(min = 220.dp)
+                            .zIndex(10f)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = onTreasuryClick
+                            ),
                         contentAlignment = Alignment.BottomCenter
                     ) {
-                        // Treasury Box Image (SHAKING) - Layered behind names initially
-                        Box(
-                            modifier = Modifier
-                                .zIndex(1f) // Ensure box is below names that have come out
-                                .graphicsLayer(
-                                    rotationZ = shakeRotation,
-                                    scaleX = shakeScale,
-                                    scaleY = shakeScale,
-                                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
-                                )
-                        ) {
-                            Image(
-                                painter = painterResource(id = treasuryBoxId),
-                                contentDescription = "Treasury Box",
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clickable {
-                                        if (viewModel.loginSuccess) {
-                                            onNavigate("leaderboard")
-                                        } else {
-                                            onRequireLogin()
-                                        }
-                                    },
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-
                         // Continuous Winnings Particles container (STABLE - No shake)
-                        // Positioned so names start inside/behind the box
                         Box(
                             modifier = Modifier
-                                .width(150.dp)
+                                .fillMaxWidth()
                                 .height(200.dp)
-                                .zIndex(2f), // Names appear on top of the box
+                                .align(Alignment.BottomCenter),
                             contentAlignment = Alignment.BottomCenter
                         ) {
                             activeWinnings.forEach { particle ->
@@ -1130,6 +1204,25 @@ fun HotGamesGrid(
                                     )
                                 }
                             }
+                        }
+
+                        // Treasury Box Image (SHAKING) — visual only; parent handles taps
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .graphicsLayer(
+                                    rotationZ = shakeRotation,
+                                    scaleX = shakeScale,
+                                    scaleY = shakeScale,
+                                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                                )
+                        ) {
+                            Image(
+                                painter = painterResource(id = treasuryBoxId),
+                                contentDescription = "Treasury Box",
+                                modifier = Modifier.size(72.dp),
+                                contentScale = ContentScale.Fit
+                            )
                         }
                     }
                 }
@@ -1180,6 +1273,152 @@ fun WinningTextParticle(text: String, onAnimationFinished: () -> Unit) {
                 scaleY = scale
             )
     )
+}
+
+@Composable
+fun GunduAtaChoiceDialog(
+    onDismiss: () -> Unit,
+    onPlayLive: () -> Unit,
+    onPlayNormal: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = SurfaceColor,
+            tonalElevation = 8.dp
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Choose Game Mode",
+                    color = TextWhite,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp
+                )
+                Spacer(Modifier.height(16.dp))
+
+                // Live option
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onPlayLive(); onDismiss() },
+                    color = Color(0xFF1A0A0A),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFFEF5350).copy(alpha = 0.8f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEF5350).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🔴", fontSize = 22.sp)
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "Gundu Ata",
+                                    color = TextWhite,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Surface(
+                                    color = Color(0xFFEF5350),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        "LIVE",
+                                        color = Color.White,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                "Join scheduled live rounds",
+                                color = TextGrey,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Icon(
+                            Icons.Default.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = Color(0xFFEF5350)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Normal / anytime option
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onPlayNormal(); onDismiss() },
+                    color = Color(0xFF0A1A0A),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.5.dp, PrimaryYellow.copy(alpha = 0.6f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(PrimaryYellow.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Casino,
+                                contentDescription = null,
+                                tint = PrimaryYellow,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Gundu Ata",
+                                color = TextWhite,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                "Play anytime at your own pace",
+                                color = TextGrey,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Icon(
+                            Icons.Default.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = PrimaryYellow
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Cancel", color = TextGrey)
+                }
+            }
+        }
+    }
 }
 
 data class GameItem(val name: String, val id: String, val color: Color)
@@ -1374,8 +1613,17 @@ fun VideoPlayer(videoResId: Int, modifier: Modifier = Modifier) {
 @Composable
 fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onNavigate: (String) -> Unit) {
     var showLoginPopup by remember { mutableStateOf(false) }
+    var showGunduAtaDialog by remember { mutableStateOf(false) }
     var lastGameLaunchTime by remember { mutableStateOf(0L) }
     val gameLaunchCooldown = 1500L // Prevent double-tap crash
+
+    if (showGunduAtaDialog) {
+        GunduAtaChoiceDialog(
+            onDismiss = { showGunduAtaDialog = false },
+            onPlayLive = { onNavigate("gundu_ata_live") },
+            onPlayNormal = { onNavigate("gundu_ata") }
+        )
+    }
 
     if (showLoginPopup) {
         AlertDialog(
@@ -1425,12 +1673,7 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
                                 if (!viewModel.loginSuccess) {
                                     showLoginPopup = true
                                 } else {
-                                    val now = System.currentTimeMillis()
-                                    if (now - lastGameLaunchTime >= gameLaunchCooldown) {
-                                        lastGameLaunchTime = now
-                                        viewModel.syncAuthToUnity()
-                                        onNavigate(item.route)
-                                    }
+                                    showGunduAtaDialog = true
                                 }
                             }
                             "me" -> {
