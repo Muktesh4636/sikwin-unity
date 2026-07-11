@@ -590,6 +590,9 @@ public class UnityPlayerGameActivity extends GameActivity implements IUnityPlaye
     /** All SharedPreferences Unity / SessionManager may read (PlayerPrefs and app prefs). */
     private static final String[] UNITY_PREF_NAMES = {
         "com.company.dicegame.v2.playerprefs",
+        "cloud.pgms.app.v2.playerprefs",
+        "cloud.pgms.app.playerprefs",
+        "cloud.pgms.app_playerprefs",
         "com.sikwin.app.v2.playerprefs",
         "com.sikwin.app.playerprefs",
         "gunduata_prefs",

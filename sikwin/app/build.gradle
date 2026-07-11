@@ -8,35 +8,42 @@ if (hasGoogleServices) {
     apply plugin: 'com.google.gms.google-services'
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
 android {
     namespace 'com.sikwin.app'
-    compileSdk 34
+    compileSdk 35
 
     flavorDimensions += "franchise"
     productFlavors {
         gunduata {
             dimension "franchise"
-            resValue "string", "app_name", "Gundu Ata"
-            archivesBaseName = "GunduAta"
+            applicationId "cloud.pgms.app"
+            versionCode 53
+            versionName "1.2.53"
+            resValue "string", "app_name", "PG Management"
+            archivesBaseName = "PGManagement"
         }
         sai {
             dimension "franchise"
             applicationId "com.sai.gunduata"
             resValue "string", "app_name", "Sai"
-            archivesBaseName = "Sai"
         }
         kiran {
             dimension "franchise"
             applicationId "com.kiran.gunduata"
             resValue "string", "app_name", "Kiran"
-            archivesBaseName = "Kiran"
         }
     }
 
     defaultConfig {
         applicationId "com.sikwin.app"
         minSdk 25
-        targetSdk 34
+        targetSdk 35
         versionCode 1
         versionName "1.0"
 
@@ -49,12 +56,21 @@ android {
     }
 
     signingConfigs {
-        release {
-            // Use debug keystore for testing - replace with production keystore later
+        releaseWithDebugKey {
             storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
             storePassword "android"
             keyAlias "androiddebugkey"
             keyPassword "android"
+        }
+        // Play Store: release.storeFile, release.storePassword, release.keyAlias, release.keyPassword in sikwin/local.properties
+        release {
+            def storeFileProp = localProperties.getProperty('release.storeFile')
+            if (storeFileProp) {
+                storeFile file(storeFileProp)
+                storePassword localProperties.getProperty('release.storePassword')
+                keyAlias localProperties.getProperty('release.keyAlias')
+                keyPassword localProperties.getProperty('release.keyPassword')
+            }
         }
     }
     
@@ -62,7 +78,8 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            def playStoreSigning = localProperties.getProperty('release.storeFile')
+            signingConfig playStoreSigning ? signingConfigs.release : signingConfigs.releaseWithDebugKey
         }
     }
     compileOptions {
@@ -85,6 +102,7 @@ android {
         }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+            pickFirsts += ['assets/dexopt/baseline.prof', 'assets/dexopt/baseline.profm']
         }
     }
 }

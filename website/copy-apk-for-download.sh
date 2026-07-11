@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Copy the latest Kotlin+Unity APK into website/public as GunduAta.apk (download name matches branding).
-# Default source: sikwin debug build (build first: assembleDebug, often from /tmp if path has ':').
-# Override standalone Gundu Ata only: APK_SRC="/path/to/Gundu Ata.apk" ./copy-apk-for-download.sh
+# Copy the latest Kotlin+Unity APK into website/public as PG-Management.apk (download name matches branding).
+# Default source: sikwin gunduata debug build (build first: assembleGunduataDebug, often from /tmp if path has ':').
+# Override: APK_SRC="/path/to/PGManagement-gunduata-release.apk" ./copy-apk-for-download.sh
 #
 #   ./copy-apk-for-download.sh
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APK_SRC="${APK_SRC:-${REPO_ROOT}/sikwin/app/build/outputs/apk/gunduata/debug/GunduAta-gunduata-debug.apk}"
+APK_SRC="${APK_SRC:-${REPO_ROOT}/sikwin/app/build/outputs/apk/gunduata/debug/PGManagement-gunduata-debug.apk}"
+if [ ! -f "$APK_SRC" ] && [ -f /tmp/sikwin-builds/app/outputs/apk/gunduata/debug/PGManagement-gunduata-debug.apk ]; then
+  APK_SRC=/tmp/sikwin-builds/app/outputs/apk/gunduata/debug/PGManagement-gunduata-debug.apk
+fi
 # Fallback: Gradle may emit a different archivesBaseName; pick newest gunduata debug APK.
 if [ ! -f "$APK_SRC" ]; then
   APK_SRC="$(ls -t "${REPO_ROOT}"/sikwin/app/build/outputs/apk/gunduata/debug/*.apk 2>/dev/null | head -1)"
