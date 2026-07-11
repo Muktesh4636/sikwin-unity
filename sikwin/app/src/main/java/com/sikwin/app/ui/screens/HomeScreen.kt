@@ -938,7 +938,7 @@ fun HotGamesGrid(
                     modifier = Modifier
                         .fillMaxWidth(0.52f)
                         .padding(horizontal = 4.dp),
-                    cardAspectRatio = 0.85f,
+                    cardAspectRatio = 0.75f,
                     onClick = {
                         if (!viewModel.loginSuccess) {
                             onRequireLogin()
