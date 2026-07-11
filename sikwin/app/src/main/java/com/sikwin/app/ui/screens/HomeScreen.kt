@@ -181,7 +181,6 @@ fun HomeScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                Spacer(modifier = Modifier.height(12.dp))
                 // Search Bar
                 SearchBar(onSearch = { searchQuery = it })
                 
@@ -328,6 +327,7 @@ fun HomeTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(BlackBackground)
+            .statusBarsPadding()
             .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
