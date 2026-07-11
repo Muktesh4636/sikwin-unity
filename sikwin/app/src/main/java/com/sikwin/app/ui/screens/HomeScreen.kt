@@ -925,6 +925,7 @@ fun HotGamesGrid(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
+            .padding(bottom = 18.dp)
             .clipToBounds()
     ) {
         // Hot Games — Gundu Ata banner only
@@ -1180,7 +1181,7 @@ fun HotGamesGrid(
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .width(80.dp)
+                            .width(88.dp)
                             .fillMaxHeight()
                             .zIndex(10f)
                             .clickable(
@@ -1213,6 +1214,7 @@ fun HotGamesGrid(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
+                                .offset(y = 12.dp)
                                 .graphicsLayer(
                                     rotationZ = shakeRotation,
                                     scaleX = shakeScale,
@@ -1223,7 +1225,7 @@ fun HotGamesGrid(
                             Image(
                                 painter = painterResource(id = treasuryBoxId),
                                 contentDescription = "Treasury Box",
-                                modifier = Modifier.size(56.dp),
+                                modifier = Modifier.size(68.dp),
                                 contentScale = ContentScale.Fit
                             )
                         }
