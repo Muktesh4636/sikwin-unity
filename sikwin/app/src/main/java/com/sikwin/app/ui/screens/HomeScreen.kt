@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -168,7 +169,8 @@ fun HomeScreen(
             ) 
         },
         bottomBar = { HomeBottomNavigation(currentRoute = "home", viewModel = viewModel, onNavigate = onNavigate) },
-        containerColor = BlackBackground
+        containerColor = BlackBackground,
+        contentWindowInsets = WindowInsets(0)
     ) { padding ->
         Box(
             modifier = Modifier
@@ -326,6 +328,7 @@ fun HomeTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(BlackBackground)
+            .statusBarsPadding()
             .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -922,8 +925,8 @@ fun HotGamesGrid(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 220.dp)
             .padding(horizontal = 16.dp)
+            .clipToBounds()
     ) {
         // Hot Games — Gundu Ata banner only
         Row(
@@ -934,8 +937,9 @@ fun HotGamesGrid(
                 GameCard(
                     game = game,
                     modifier = Modifier
-                        .fillMaxWidth(0.5f)
+                        .fillMaxWidth(0.72f)
                         .padding(horizontal = 4.dp),
+                    cardAspectRatio = 1.45f,
                     onClick = {
                         if (!viewModel.loginSuccess) {
                             onRequireLogin()
@@ -1177,9 +1181,8 @@ fun HotGamesGrid(
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .offset(y = 10.dp)
-                            .width(88.dp)
-                            .heightIn(min = 220.dp)
+                            .width(80.dp)
+                            .fillMaxHeight()
                             .zIndex(10f)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
@@ -1192,8 +1195,9 @@ fun HotGamesGrid(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp)
-                                .align(Alignment.BottomCenter),
+                                .fillMaxHeight()
+                                .align(Alignment.BottomCenter)
+                                .clipToBounds(),
                             contentAlignment = Alignment.BottomCenter
                         ) {
                             activeWinnings.forEach { particle ->
@@ -1220,7 +1224,7 @@ fun HotGamesGrid(
                             Image(
                                 painter = painterResource(id = treasuryBoxId),
                                 contentDescription = "Treasury Box",
-                                modifier = Modifier.size(72.dp),
+                                modifier = Modifier.size(56.dp),
                                 contentScale = ContentScale.Fit
                             )
                         }
@@ -1245,8 +1249,8 @@ fun WinningTextParticle(text: String, onAnimationFinished: () -> Unit) {
     }
     
     // Calculate offset and alpha based on progress
-    // Start from y=0 (inside box) and move up to -150dp
-    val yOffset = - (animProgress.value * 150).dp 
+    // Start from y=0 (inside box) and move up to -100dp
+    val yOffset = - (animProgress.value * 100).dp 
     
     // Fade in quickly at start, then stay visible, then fade out at end
     val alpha = when {
@@ -1424,7 +1428,7 @@ fun GunduAtaChoiceDialog(
 data class GameItem(val name: String, val id: String, val color: Color)
 
 @Composable
-fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit) {
+fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit, cardAspectRatio: Float = 0.7f) {
     Box(
         modifier = modifier.clickable { onClick() },
         contentAlignment = Alignment.BottomCenter
@@ -1434,7 +1438,7 @@ fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .aspectRatio(0.7f)
+                    .aspectRatio(cardAspectRatio)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(game.color),
