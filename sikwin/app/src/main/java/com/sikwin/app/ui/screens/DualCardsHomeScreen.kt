@@ -194,7 +194,7 @@ fun DualCardsHomeScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Gundu Ata card — same looping video as classic Hot Games
+                // Gundu Ata card — video only (same as classic Hot Games)
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -208,36 +208,9 @@ fun DualCardsHomeScreen(
                         videoResId = R.raw.gundu_ata_video,
                         modifier = Modifier.fillMaxSize()
                     )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.35f))
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "GUNDU ATA",
-                            color = GoldMid,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Black.copy(alpha = 0.55f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                        GoldPlayButton(text = "PLAY", fullWidth = true) {
-                            requireLoginOr { showGunduAtaChoiceDialog = true }
-                        }
-                    }
                 }
 
-                // Andar Bahar card — same Gundu Ata live video as classic theme
+                // Andar Bahar card — same video only
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -251,34 +224,6 @@ fun DualCardsHomeScreen(
                         videoResId = R.raw.gundu_ata_video,
                         modifier = Modifier.fillMaxSize()
                     )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.35f))
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "ANDAR BAHAR",
-                            color = GoldMid,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Black.copy(alpha = 0.55f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                        GoldPlayButton(text = "PLAY", fullWidth = true) {
-                            requireLoginOr { onNavigate("colour_game") }
-                        }
-                    }
                 }
             }
 
