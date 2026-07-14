@@ -167,7 +167,11 @@ fun DualCardsHomeScreen(
                     .padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                DualCategoryCircle("HOT", Icons.Default.LocalFireDepartment) {
+                DualCategoryCircle(
+                    label = "GUNDU ATA",
+                    icon = null,
+                    imageRes = R.drawable.gundu_ata_logo_gold
+                ) {
                     requireLoginOr { showGunduAtaChoiceDialog = true }
                 }
                 DualCategoryCircle("CRICKET", Icons.Default.SportsCricket) {
@@ -293,11 +297,16 @@ private fun DualCardsTopBar(
 }
 
 @Composable
-private fun DualCategoryCircle(label: String, icon: ImageVector, onClick: () -> Unit) {
+private fun DualCategoryCircle(
+    label: String,
+    icon: ImageVector? = null,
+    imageRes: Int? = null,
+    onClick: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(64.dp)
+            .width(68.dp)
             .clickable(onClick = onClick)
     ) {
         Box(
@@ -308,10 +317,25 @@ private fun DualCategoryCircle(label: String, icon: ImageVector, onClick: () -> 
                 .border(1.5.dp, GoldMid, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = label, tint = GoldMid, modifier = Modifier.size(26.dp))
+            if (imageRes != null) {
+                Image(
+                    painter = painterResource(id = imageRes),
+                    contentDescription = label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(40.dp)
+                )
+            } else if (icon != null) {
+                Icon(icon, contentDescription = label, tint = GoldMid, modifier = Modifier.size(26.dp))
+            }
         }
         Spacer(modifier = Modifier.height(6.dp))
-        Text(label, color = GoldMid, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(
+            label,
+            color = GoldMid,
+            fontSize = if (label.length > 6) 8.sp else 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
     }
 }
 

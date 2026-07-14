@@ -164,22 +164,44 @@ fun HeroHomeScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                HeroCategoryChip("HOT", Icons.Default.LocalFireDepartment, selectedCategory == "hot") {
-                    selectedCategory = "hot"
+                HeroCategoryChip(
+                    label = "GUNDU ATA",
+                    icon = null,
+                    imageRes = R.drawable.gundu_ata_logo_gold,
+                    selected = selectedCategory == "gundu"
+                ) {
+                    selectedCategory = "gundu"
+                    requireLoginOr { showGunduAtaChoiceDialog = true }
                 }
-                HeroCategoryChip("CRICKET", Icons.Default.SportsCricket, selectedCategory == "cricket") {
+                HeroCategoryChip(
+                    label = "CRICKET",
+                    icon = Icons.Default.SportsCricket,
+                    selected = selectedCategory == "cricket"
+                ) {
                     selectedCategory = "cricket"
                     requireLoginOr { onNavigate("ipl") }
                 }
-                HeroCategoryChip("COLOUR", Icons.Default.Palette, selectedCategory == "colour") {
+                HeroCategoryChip(
+                    label = "COLOUR",
+                    icon = Icons.Default.Palette,
+                    selected = selectedCategory == "colour"
+                ) {
                     selectedCategory = "colour"
                     requireLoginOr { onNavigate("colour_game") }
                 }
-                HeroCategoryChip("LIVE", Icons.Default.Videocam, selectedCategory == "live") {
+                HeroCategoryChip(
+                    label = "LIVE",
+                    icon = Icons.Default.Videocam,
+                    selected = selectedCategory == "live"
+                ) {
                     selectedCategory = "live"
                     requireLoginOr { showGunduAtaChoiceDialog = true }
                 }
-                HeroCategoryChip("H&T", Icons.Default.MonetizationOn, selectedCategory == "coin") {
+                HeroCategoryChip(
+                    label = "H&T",
+                    icon = Icons.Default.MonetizationOn,
+                    selected = selectedCategory == "coin"
+                ) {
                     selectedCategory = "coin"
                     requireLoginOr { onNavigate("coin") }
                 }
@@ -322,7 +344,8 @@ private fun HeroTopBar(
 @Composable
 private fun HeroCategoryChip(
     label: String,
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    imageRes: Int? = null,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -344,18 +367,27 @@ private fun HeroCategoryChip(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = if (selected) Color.Black else PrimaryYellow,
-                modifier = Modifier.size(26.dp)
-            )
+            if (imageRes != null) {
+                Image(
+                    painter = painterResource(id = imageRes),
+                    contentDescription = label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(40.dp)
+                )
+            } else if (icon != null) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    tint = if (selected) Color.Black else PrimaryYellow,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             label,
             color = if (selected) PrimaryYellow else TextGrey,
-            fontSize = 10.sp,
+            fontSize = if (label.length > 6) 8.sp else 10.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1
         )
