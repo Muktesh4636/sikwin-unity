@@ -21,10 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -251,26 +250,15 @@ private fun DualCardsTopBar(
             Icon(Icons.Default.Menu, contentDescription = "Menu", tint = GoldMid, modifier = Modifier.size(26.dp))
         }
 
-        Column(
-            modifier = Modifier.weight(1f),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                "GA",
-                color = GoldMid,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Serif,
-                lineHeight = 22.sp
-            )
-            Text(
-                "GUNDU ATA",
-                color = GoldMid,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp
-            )
-        }
+        Image(
+            painter = painterResource(id = R.drawable.gundu_ata_logo_gold),
+            contentDescription = "Gundu Ata",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp)
+                .padding(horizontal = 8.dp)
+        )
 
         if (isLoggedIn) {
             Row(

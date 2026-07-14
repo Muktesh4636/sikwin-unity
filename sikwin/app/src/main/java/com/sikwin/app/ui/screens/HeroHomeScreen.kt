@@ -283,20 +283,13 @@ private fun HeroTopBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painter = painterResource(id = R.drawable.app_logo),
-            contentDescription = null,
+            painter = painterResource(id = R.drawable.gundu_ata_logo_gold),
+            contentDescription = "Gundu Ata",
+            contentScale = ContentScale.Fit,
             modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(8.dp))
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            "GUNDU ATA",
-            color = PrimaryYellow,
-            fontWeight = FontWeight.Black,
-            fontSize = 18.sp,
-            fontFamily = FontFamily.Serif,
-            modifier = Modifier.weight(1f)
+                .weight(1f)
+                .height(48.dp)
+                .padding(end = 8.dp)
         )
         if (isLoggedIn) {
             Surface(color = SurfaceColor, shape = RoundedCornerShape(20.dp)) {
