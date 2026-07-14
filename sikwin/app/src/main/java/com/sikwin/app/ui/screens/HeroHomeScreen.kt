@@ -310,20 +310,20 @@ private fun HeroTopBar(
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .weight(1f)
-                .height(48.dp)
+                .height(58.dp)
                 .padding(end = 8.dp)
         )
         if (isLoggedIn) {
-            Surface(color = SurfaceColor, shape = RoundedCornerShape(20.dp)) {
+            Surface(color = SurfaceColor, shape = RoundedCornerShape(24.dp)) {
                 Row(
-                    modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = 12.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("₹ $balance", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("₹ $balance", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(30.dp)
                             .clip(CircleShape)
                             .background(PrimaryYellow)
                             .clickable(onClick = onDeposit),

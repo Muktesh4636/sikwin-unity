@@ -260,32 +260,32 @@ private fun DualCardsTopBar(
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .weight(1f)
-                .height(48.dp)
+                .height(58.dp)
                 .padding(horizontal = 8.dp)
         )
 
         if (isLoggedIn) {
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(24.dp))
                     .background(Color(0xFF1A1A1A))
-                    .border(1.dp, GoldDeep.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
-                    .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
+                    .border(1.dp, GoldDeep.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                    .padding(start = 12.dp, end = 5.dp, top = 5.dp, bottom = 5.dp)
                     .clickable(onClick = onDeposit),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = GoldMid, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = GoldMid, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("₹$balance", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("₹$balance", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(modifier = Modifier.width(6.dp))
                 Box(
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(30.dp)
                         .clip(CircleShape)
                         .background(GoldBrush),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Black, modifier = Modifier.size(18.dp))
                 }
             }
         } else {
