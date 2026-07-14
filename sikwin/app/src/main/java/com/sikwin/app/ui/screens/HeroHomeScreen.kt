@@ -179,9 +179,9 @@ fun HeroHomeScreen(
                     selectedCategory = "live"
                     requireLoginOr { showGunduAtaChoiceDialog = true }
                 }
-                HeroCategoryChip("MORE", Icons.Default.Apps, selectedCategory == "more") {
-                    selectedCategory = "more"
-                    onNavigate("me")
+                HeroCategoryChip("H&T", Icons.Default.MonetizationOn, selectedCategory == "coin") {
+                    selectedCategory = "coin"
+                    requireLoginOr { onNavigate("coin") }
                 }
             }
 

@@ -180,8 +180,8 @@ fun DualCardsHomeScreen(
                 DualCategoryCircle("LIVE", Icons.Default.Videocam) {
                     requireLoginOr { onNavigate("gundu_ata_live") }
                 }
-                DualCategoryCircle("MORE", Icons.Default.MoreHoriz) {
-                    onNavigate("me")
+                DualCategoryCircle("H&T", Icons.Default.MonetizationOn) {
+                    requireLoginOr { onNavigate("coin") }
                 }
             }
 
