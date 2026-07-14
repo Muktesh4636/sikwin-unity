@@ -165,7 +165,7 @@ fun HeroHomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 HeroCategoryChip(
-                    label = "GUNDU ATA",
+                    label = "GA",
                     icon = null,
                     imageRes = R.drawable.gundu_ata_logo_gold,
                     selected = selectedCategory == "gundu"

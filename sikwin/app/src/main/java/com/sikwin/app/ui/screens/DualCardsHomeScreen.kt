@@ -168,7 +168,7 @@ fun DualCardsHomeScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 DualCategoryCircle(
-                    label = "GUNDU ATA",
+                    label = "GA",
                     icon = null,
                     imageRes = R.drawable.gundu_ata_logo_gold
                 ) {
