@@ -93,6 +93,20 @@ fun ThemeScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             ThemeOptionCard(
+                title = stringResource(R.string.theme_dual_cards_title),
+                subtitle = stringResource(R.string.theme_dual_cards_subtitle),
+                selected = selected == ThemePreferences.THEME_DUAL_CARDS,
+                onClick = { applyTheme(ThemePreferences.THEME_DUAL_CARDS) }
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.theme_dual_cards_preview),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            ThemeOptionCard(
                 title = stringResource(R.string.theme_hero_title),
                 subtitle = stringResource(R.string.theme_hero_subtitle),
                 selected = selected == ThemePreferences.THEME_HERO,

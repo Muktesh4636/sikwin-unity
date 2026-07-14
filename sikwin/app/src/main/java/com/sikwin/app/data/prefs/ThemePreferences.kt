@@ -13,8 +13,11 @@ class ThemePreferences(context: Context) {
         /** Current / classic home layout */
         const val THEME_CLASSIC = "classic"
 
-        /** New hero casino lobby layout */
+        /** Hero casino lobby layout */
         const val THEME_HERO = "hero"
+
+        /** Exact Dual Cards mock (Variant 7) — banners unchanged */
+        const val THEME_DUAL_CARDS = "dual_cards"
     }
 
     fun setAppTheme(themeId: String) {
@@ -26,4 +29,6 @@ class ThemePreferences(context: Context) {
     }
 
     fun isHeroTheme(): Boolean = getAppTheme() == THEME_HERO
+
+    fun isDualCardsTheme(): Boolean = getAppTheme() == THEME_DUAL_CARDS
 }

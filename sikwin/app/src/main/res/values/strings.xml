@@ -33,6 +33,8 @@
     <string name="languages">Languages</string>
     <string name="themes">Themes</string>
     <string name="choose_theme">Choose your app home theme</string>
+    <string name="theme_dual_cards_title">Dual Cards Theme</string>
+    <string name="theme_dual_cards_subtitle">Exact design with LIVE banner &amp; two game cards</string>
     <string name="theme_hero_title">New Theme — Hero Lobby</string>
     <string name="theme_hero_subtitle">Live casino banner, categories &amp; VIP bottom bar</string>
     <string name="theme_classic_title">Old Theme — Classic</string>

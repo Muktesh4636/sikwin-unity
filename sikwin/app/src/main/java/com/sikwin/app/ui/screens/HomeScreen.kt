@@ -73,16 +73,26 @@ fun HomeScreen(
     onNavigate: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val isHeroTheme = remember {
-        com.sikwin.app.data.prefs.ThemePreferences(context).isHeroTheme()
+    val appTheme = remember {
+        com.sikwin.app.data.prefs.ThemePreferences(context).getAppTheme()
     }
-    if (isHeroTheme) {
-        HeroHomeScreen(
-            viewModel = viewModel,
-            onGameClick = onGameClick,
-            onNavigate = onNavigate
-        )
-        return
+    when (appTheme) {
+        com.sikwin.app.data.prefs.ThemePreferences.THEME_HERO -> {
+            HeroHomeScreen(
+                viewModel = viewModel,
+                onGameClick = onGameClick,
+                onNavigate = onNavigate
+            )
+            return
+        }
+        com.sikwin.app.data.prefs.ThemePreferences.THEME_DUAL_CARDS -> {
+            DualCardsHomeScreen(
+                viewModel = viewModel,
+                onGameClick = onGameClick,
+                onNavigate = onNavigate
+            )
+            return
+        }
     }
 
     var searchQuery by remember { mutableStateOf("") }
