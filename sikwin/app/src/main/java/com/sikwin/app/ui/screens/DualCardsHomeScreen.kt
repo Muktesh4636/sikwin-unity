@@ -193,7 +193,7 @@ fun DualCardsHomeScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Gundu Ata card — video only (same as classic Hot Games)
+                // First video → Gundu Ata Live
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -201,7 +201,7 @@ fun DualCardsHomeScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .background(CardDark)
                         .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-                        .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
+                        .clickable { requireLoginOr { onNavigate("gundu_ata_live") } }
                 ) {
                     VideoPlayer(
                         videoResId = R.raw.gundu_ata_video,
@@ -209,7 +209,7 @@ fun DualCardsHomeScreen(
                     )
                 }
 
-                // Andar Bahar card — same video only
+                // Second video → Unity virtual Gundu Ata
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -217,7 +217,7 @@ fun DualCardsHomeScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF0B3D2E))
                         .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-                        .clickable { requireLoginOr { onNavigate("colour_game") } }
+                        .clickable { requireLoginOr { onGameClick("gundu_ata") } }
                 ) {
                     VideoPlayer(
                         videoResId = R.raw.gundu_ata_video,
