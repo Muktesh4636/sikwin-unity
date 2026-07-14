@@ -1,6 +1,10 @@
 package com.sikwin.app.ui.screens
 
 import android.app.Activity
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,7 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -29,7 +35,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.sikwin.app.R
+import com.sikwin.app.data.prefs.BannerPreferences
 import com.sikwin.app.data.prefs.ThemePreferences
 import com.sikwin.app.ui.theme.*
 
@@ -38,7 +47,23 @@ fun ThemeScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val activity = context as? Activity
     val themePrefs = remember { ThemePreferences(context) }
+    val bannerPrefs = remember { BannerPreferences(context) }
     var selected by remember { mutableStateOf(themePrefs.getAppTheme()) }
+    var bannerRevision by remember { mutableIntStateOf(0) }
+    val hasCustomBanner = remember(bannerRevision) { bannerPrefs.hasCustomLiveCasinoBanner() }
+
+    val pickBanner = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val ok = bannerPrefs.saveLiveCasinoBanner(uri)
+        if (ok) {
+            bannerRevision++
+            Toast.makeText(context, context.getString(R.string.banner_saved), Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, context.getString(R.string.banner_save_failed), Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun applyTheme(themeId: String) {
         if (selected == themeId) return
@@ -78,13 +103,6 @@ fun ThemeScreen(onBack: () -> Unit) {
             )
         }
 
-        Text(
-            stringResource(R.string.choose_theme),
-            color = TextGrey,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -92,6 +110,116 @@ fun ThemeScreen(onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Live Casino banner editor
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SurfaceColor)
+                    .border(1.dp, BorderColor, RoundedCornerShape(16.dp))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    stringResource(R.string.live_casino_banner_title),
+                    color = TextWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+                Text(
+                    stringResource(R.string.live_casino_banner_subtitle),
+                    color = TextGrey,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0A0A0A))
+                ) {
+                    key(bannerRevision) {
+                        if (hasCustomBanner) {
+                            val file = bannerPrefs.getLiveCasinoBannerFile()
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(file).build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.theme_dual_cards_preview),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                alignment = Alignment.TopCenter,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("LIVE CASINO", color = PrimaryYellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(PrimaryYellow)
+                            .clickable { pickBanner.launch("image/*") }
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            if (hasCustomBanner) stringResource(R.string.change_banner)
+                            else stringResource(R.string.add_banner),
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                    if (hasCustomBanner) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF2A2A2A))
+                                .clickable {
+                                    bannerPrefs.clearLiveCasinoBanner()
+                                    bannerRevision++
+                                    Toast.makeText(context, context.getString(R.string.banner_reset), Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.RestartAlt, contentDescription = null, tint = TextGrey, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.reset_banner), color = TextGrey, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+
+            Text(
+                stringResource(R.string.choose_theme),
+                color = TextGrey,
+                fontSize = 14.sp
+            )
+
             ThemeOptionCard(
                 title = stringResource(R.string.theme_dual_cards_title),
                 subtitle = stringResource(R.string.theme_dual_cards_subtitle),
@@ -126,7 +254,6 @@ fun ThemeScreen(onBack: () -> Unit) {
                 selected = selected == ThemePreferences.THEME_CLASSIC,
                 onClick = { applyTheme(ThemePreferences.THEME_CLASSIC) }
             ) {
-                // Mini preview of classic dark + yellow home
                 Column(
                     modifier = Modifier
                         .fillMaxSize()

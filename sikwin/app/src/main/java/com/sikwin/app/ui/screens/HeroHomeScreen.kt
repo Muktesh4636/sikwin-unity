@@ -144,9 +144,8 @@ fun HeroHomeScreen(
                         requireLoginOr { showGunduAtaChoiceDialog = true }
                     }
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.gundu_ata_bg),
-                    contentDescription = null,
+                LiveCasinoBannerImage(
+                    defaultResId = R.drawable.gundu_ata_bg,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )

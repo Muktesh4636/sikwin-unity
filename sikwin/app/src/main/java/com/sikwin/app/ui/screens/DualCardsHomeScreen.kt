@@ -151,9 +151,8 @@ fun DualCardsHomeScreen(
                     .clip(RoundedCornerShape(18.dp))
                     .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.theme_dual_cards_preview),
-                    contentDescription = null,
+                LiveCasinoBannerImage(
+                    defaultResId = R.drawable.theme_dual_cards_preview,
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.TopCenter,
                     modifier = Modifier.fillMaxSize()

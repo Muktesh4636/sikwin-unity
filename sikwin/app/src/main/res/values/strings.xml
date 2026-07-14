@@ -39,6 +39,14 @@
     <string name="theme_hero_subtitle">Live casino banner, categories &amp; VIP bottom bar</string>
     <string name="theme_classic_title">Old Theme — Classic</string>
     <string name="theme_classic_subtitle">Current home layout with Hot Games card</string>
+    <string name="live_casino_banner_title">Live Casino Banner</string>
+    <string name="live_casino_banner_subtitle">Photo shown at the top LIVE CASINO place (Dual Cards &amp; Hero themes)</string>
+    <string name="add_banner">Add Banner</string>
+    <string name="change_banner">Change Banner</string>
+    <string name="reset_banner">Reset</string>
+    <string name="banner_saved">Banner saved</string>
+    <string name="banner_save_failed">Could not save banner</string>
+    <string name="banner_reset">Banner reset to default</string>
     <string name="help_center">Help center</string>
     <string name="refer_a_friend">Refer a Friend</string>
     <string name="white_label_account">Get Franchise with us</string>
