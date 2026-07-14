@@ -386,7 +386,7 @@ private fun HeroBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(78.dp)
                 .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -395,14 +395,14 @@ private fun HeroBottomBar(
             HeroNavItem("PROMO", Icons.Default.CardGiftcard, false, onPromo)
             Box(
                 modifier = Modifier
-                    .offset(y = (-10).dp)
-                    .size(56.dp)
+                    .offset(y = (-12).dp)
+                    .size(62.dp)
                     .clip(CircleShape)
                     .background(PrimaryYellow)
                     .clickable(onClick = onVip),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.WorkspacePremium, contentDescription = "VIP", tint = Color.Black, modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.WorkspacePremium, contentDescription = "VIP", tint = Color.Black, modifier = Modifier.size(32.dp))
             }
             HeroNavItem("WALLET", Icons.Default.AccountBalanceWallet, false, onWallet)
             HeroNavItem("PROFILE", Icons.Default.Person, false, onProfile)
@@ -416,9 +416,10 @@ private fun HeroNavItem(label: String, icon: ImageVector, selected: Boolean, onC
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
     ) {
-        Icon(icon, contentDescription = label, tint = if (selected) PrimaryYellow else TextGrey, modifier = Modifier.size(22.dp))
-        Text(label, color = if (selected) PrimaryYellow else TextGrey, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Icon(icon, contentDescription = label, tint = if (selected) PrimaryYellow else TextGrey, modifier = Modifier.size(28.dp))
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(label, color = if (selected) PrimaryYellow else TextGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }

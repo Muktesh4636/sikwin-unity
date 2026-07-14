@@ -444,7 +444,7 @@ private fun DualCardsBottomBar(
             .fillMaxWidth()
             .background(Color(0xFF0A0A0A))
             .navigationBarsPadding()
-            .height(64.dp)
+            .height(78.dp)
             .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
@@ -463,18 +463,19 @@ private fun DualNavItem(label: String, icon: ImageVector, selected: Boolean, onC
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
         Icon(
             icon,
             contentDescription = label,
             tint = if (selected) GoldMid else GoldDeep.copy(alpha = 0.7f),
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(28.dp)
         )
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
             label,
             color = if (selected) GoldMid else GoldDeep.copy(alpha = 0.7f),
-            fontSize = 9.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
     }
