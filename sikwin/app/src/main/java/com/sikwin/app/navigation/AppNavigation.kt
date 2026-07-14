@@ -891,6 +891,11 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() }
             )
         }
+        composable("themes") {
+            ThemeScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
         composable("game_guidelines") {
             GameGuidelinesScreen(
                 onBack = { navController.popBackStack() }

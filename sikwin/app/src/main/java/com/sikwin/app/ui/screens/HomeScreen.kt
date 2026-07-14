@@ -72,6 +72,19 @@ fun HomeScreen(
     onGameClick: (String) -> Unit,
     onNavigate: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val isHeroTheme = remember {
+        com.sikwin.app.data.prefs.ThemePreferences(context).isHeroTheme()
+    }
+    if (isHeroTheme) {
+        HeroHomeScreen(
+            viewModel = viewModel,
+            onGameClick = onGameClick,
+            onNavigate = onNavigate
+        )
+        return
+    }
+
     var searchQuery by remember { mutableStateOf("") }
     var showGuestSpinWheel by remember { mutableStateOf(false) }
     var guestWheelCloseCount by remember { mutableIntStateOf(0) }

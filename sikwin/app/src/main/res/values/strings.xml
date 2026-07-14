@@ -31,6 +31,12 @@
     <string name="personal_data">Personal data</string>
     <string name="security">Security</string>
     <string name="languages">Languages</string>
+    <string name="themes">Themes</string>
+    <string name="choose_theme">Choose your app home theme</string>
+    <string name="theme_hero_title">New Theme — Hero Lobby</string>
+    <string name="theme_hero_subtitle">Live casino banner, categories &amp; VIP bottom bar</string>
+    <string name="theme_classic_title">Old Theme — Classic</string>
+    <string name="theme_classic_subtitle">Current home layout with Hot Games card</string>
     <string name="help_center">Help center</string>
     <string name="refer_a_friend">Refer a Friend</string>
     <string name="white_label_account">Get Franchise with us</string>

@@ -256,6 +256,8 @@ fun ProfileScreen(
                 Divider(color = BorderColor, thickness = 0.5.dp)
                 ProfileMenuItem(stringResource(R.string.languages), Icons.Default.Translate) { onNavigate("languages") }
                 Divider(color = BorderColor, thickness = 0.5.dp)
+                ProfileMenuItem(stringResource(R.string.themes), Icons.Default.Palette) { onNavigate("themes") }
+                Divider(color = BorderColor, thickness = 0.5.dp)
                 ProfileMenuItem(stringResource(R.string.help_center), Icons.Default.TipsAndUpdates) { onNavigate("help_center") }
                 Divider(color = BorderColor, thickness = 0.5.dp)
                 ProfileMenuItem(stringResource(R.string.refer_a_friend), Icons.Default.PersonAdd) { onNavigate("affiliate") }
