@@ -133,63 +133,22 @@ fun HeroHomeScreen(
                 onLogin = { onNavigate("login") }
             )
 
-            // LIVE CASINO hero banner
+            // LIVE CASINO hero banner (artwork includes title + PLAY NOW)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(200.dp)
+                    .height(180.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .clickable {
                         requireLoginOr { showGunduAtaChoiceDialog = true }
                     }
             ) {
                 LiveCasinoBannerImage(
-                    defaultResId = R.drawable.gundu_ata_bg,
+                    defaultResId = R.drawable.live_casino_banner,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
-                            )
-                        )
-                )
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        "LIVE CASINO",
-                        color = PrimaryYellow,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Serif
-                    )
-                    Text(
-                        "REAL DEALERS. REAL THRILLS.",
-                        color = TextWhite.copy(alpha = 0.85f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        color = PrimaryYellow,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            "PLAY NOW  ›",
-                            color = Color.Black,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                        )
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

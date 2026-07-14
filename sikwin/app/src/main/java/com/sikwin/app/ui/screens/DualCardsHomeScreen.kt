@@ -142,57 +142,21 @@ fun DualCardsHomeScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // LIVE CASINO hero banner
+            // LIVE CASINO hero banner (artwork includes title + PLAY NOW)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(210.dp)
+                    .height(180.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
             ) {
                 LiveCasinoBannerImage(
-                    defaultResId = R.drawable.theme_dual_cards_preview,
+                    defaultResId = R.drawable.live_casino_banner,
                     contentScale = ContentScale.Crop,
-                    alignment = Alignment.TopCenter,
+                    alignment = Alignment.Center,
                     modifier = Modifier.fillMaxSize()
                 )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.15f),
-                                    Color.Black.copy(alpha = 0.75f)
-                                )
-                            )
-                        )
-                )
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        "LIVE CASINO",
-                        color = GoldMid,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.SansSerif
-                    )
-                    Text(
-                        "REAL DEALERS. REAL THRILLS. REAL WINNINGS.",
-                        color = TextWhite.copy(alpha = 0.9f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.5.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    GoldPlayButton(text = "PLAY NOW") {
-                        requireLoginOr { showGunduAtaChoiceDialog = true }
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(18.dp))

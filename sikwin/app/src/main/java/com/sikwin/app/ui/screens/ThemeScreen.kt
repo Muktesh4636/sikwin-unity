@@ -150,23 +150,12 @@ fun ThemeScreen(onBack: () -> Unit) {
                             )
                         } else {
                             Image(
-                                painter = painterResource(id = R.drawable.theme_dual_cards_preview),
+                                painter = painterResource(id = R.drawable.live_casino_banner),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                alignment = Alignment.TopCenter,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(10.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text("LIVE CASINO", color = PrimaryYellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
