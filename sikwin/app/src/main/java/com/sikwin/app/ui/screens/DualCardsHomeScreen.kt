@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -195,7 +194,7 @@ fun DualCardsHomeScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Gundu Ata card
+                // Gundu Ata card — same looping video as classic Hot Games
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -205,18 +204,14 @@ fun DualCardsHomeScreen(
                         .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
                         .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.money_decoration),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF1A1200))
+                    VideoPlayer(
+                        videoResId = R.raw.gundu_ata_video,
+                        modifier = Modifier.fillMaxSize()
                     )
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.45f))
+                            .background(Color.Black.copy(alpha = 0.35f))
                     )
                     Column(
                         modifier = Modifier
@@ -225,37 +220,24 @@ fun DualCardsHomeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                "GA",
-                                color = GoldMid,
-                                fontSize = 36.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Serif
-                            )
-                            Text(
-                                "GUNDU ATA",
-                                color = GoldMid,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                "PLAY & WIN BIG",
-                                color = TextWhite,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                        Text(
+                            "GUNDU ATA",
+                            color = GoldMid,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                         GoldPlayButton(text = "PLAY", fullWidth = true) {
                             requireLoginOr { showGunduAtaChoiceDialog = true }
                         }
                     }
                 }
 
-                // Andar Bahar style card → Colour Game
+                // Andar Bahar card — same Gundu Ata live video as classic theme
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -265,6 +247,15 @@ fun DualCardsHomeScreen(
                         .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
                         .clickable { requireLoginOr { onNavigate("colour_game") } }
                 ) {
+                    VideoPlayer(
+                        videoResId = R.raw.gundu_ata_video,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.35f))
+                    )
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -272,23 +263,18 @@ fun DualCardsHomeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                "ANDAR\nBAHAR",
-                                color = GoldMid,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Black,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 26.sp,
-                                fontFamily = FontFamily.SansSerif
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
-                                PlayingCardFace("A♠", Color.Black)
-                                PlayingCardFace("K♥", Color(0xFFB71C1C))
-                            }
-                        }
+                        Text(
+                            "ANDAR BAHAR",
+                            color = GoldMid,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                         GoldPlayButton(text = "PLAY", fullWidth = true) {
                             requireLoginOr { onNavigate("colour_game") }
                         }
@@ -414,20 +400,6 @@ private fun GoldPlayButton(text: String, fullWidth: Boolean = false, onClick: ()
             fontSize = 13.sp,
             modifier = Modifier.padding(horizontal = if (fullWidth) 0.dp else 18.dp)
         )
-    }
-}
-
-@Composable
-private fun PlayingCardFace(label: String, accent: Color) {
-    Box(
-        modifier = Modifier
-            .size(width = 42.dp, height = 58.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color.White)
-            .border(1.dp, Color.Black.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = accent, fontWeight = FontWeight.Black, fontSize = 14.sp)
     }
 }
 
