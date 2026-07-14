@@ -198,7 +198,7 @@ fun DualCardsHomeScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(220.dp)
+                        .height(260.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(CardDark)
                         .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
@@ -214,7 +214,7 @@ fun DualCardsHomeScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(220.dp)
+                        .height(260.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF0B3D2E))
                         .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
