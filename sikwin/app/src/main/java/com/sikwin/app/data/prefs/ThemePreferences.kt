@@ -25,7 +25,7 @@ class ThemePreferences(context: Context) {
     }
 
     fun getAppTheme(): String {
-        return prefs.getString(KEY_APP_THEME, THEME_CLASSIC) ?: THEME_CLASSIC
+        return prefs.getString(KEY_APP_THEME, THEME_DUAL_CARDS) ?: THEME_DUAL_CARDS
     }
 
     fun isHeroTheme(): Boolean = getAppTheme() == THEME_HERO
