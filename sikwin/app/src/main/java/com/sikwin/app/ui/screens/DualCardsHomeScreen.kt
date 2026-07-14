@@ -2,46 +2,48 @@ package com.sikwin.app.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.sikwin.app.R
-import com.sikwin.app.ui.theme.BlackBackground
-import com.sikwin.app.ui.theme.PrimaryYellow
-import com.sikwin.app.ui.theme.SurfaceColor
-import com.sikwin.app.ui.theme.TextGrey
+import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 
+private val GoldLight = Color(0xFFFFE082)
+private val GoldMid = Color(0xFFFFD54F)
+private val GoldDeep = Color(0xFFC9A227)
+private val GoldBrush = Brush.verticalGradient(listOf(GoldLight, GoldMid, GoldDeep))
+private val ScreenBlack = Color(0xFF000000)
+private val CardDark = Color(0xFF0D0D0D)
+
 /**
- * Exact Dual Cards theme — shows the design mock image unchanged (banners included)
- * with invisible tap zones for navigation.
+ * Dual Cards home theme — coded Compose UI matching PHOTO dual-cards design.
+ * Selectable from Profile → Themes.
  */
 @Composable
 fun DualCardsHomeScreen(
@@ -82,7 +84,7 @@ fun DualCardsHomeScreen(
                 }
             },
             containerColor = SurfaceColor,
-            titleContentColor = Color.White,
+            titleContentColor = TextWhite,
             textContentColor = TextGrey
         )
     }
@@ -112,111 +114,404 @@ fun DualCardsHomeScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-    ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val w = maxWidth
-            val h = maxHeight
-
-            // Exact mock — banners and artwork unchanged
-            Image(
-                painter = painterResource(id = R.drawable.theme_dual_cards_preview),
-                contentDescription = "Dual Cards theme",
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier.fillMaxSize()
+    Scaffold(
+        containerColor = ScreenBlack,
+        bottomBar = {
+            DualCardsBottomBar(
+                onHome = { },
+                onPromo = { onNavigate("affiliate") },
+                onVip = { onNavigate("leaderboard") },
+                onWallet = { requireLoginOr { onNavigate("wallet") } },
+                onProfile = { onNavigate("me") }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+        ) {
+            DualCardsTopBar(
+                balance = viewModel.wallet?.balance ?: "0.00",
+                isLoggedIn = viewModel.loginSuccess,
+                onMenu = { onNavigate("me") },
+                onDeposit = { requireLoginOr { onNavigate("deposit") } },
+                onLogin = { onNavigate("login") }
             )
 
-            // Menu
-            Hotspot(
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // LIVE CASINO hero banner
+            Box(
                 modifier = Modifier
-                    .size(w * 0.14f, h * 0.07f)
-                    .offset(x = w * 0.02f, y = h * 0.01f),
-                onClick = { onNavigate("me") }
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(210.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.theme_dual_cards_preview),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.15f),
+                                    Color.Black.copy(alpha = 0.75f)
+                                )
+                            )
+                        )
+                )
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        "LIVE CASINO",
+                        color = GoldMid,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.SansSerif
+                    )
+                    Text(
+                        "REAL DEALERS. REAL THRILLS. REAL WINNINGS.",
+                        color = TextWhite.copy(alpha = 0.9f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    GoldPlayButton(text = "PLAY NOW") {
+                        requireLoginOr { showGunduAtaChoiceDialog = true }
+                    }
+                }
+            }
 
-            // Wallet / deposit
-            Hotspot(
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Circular category icons
+            Row(
                 modifier = Modifier
-                    .size(w * 0.40f, h * 0.07f)
-                    .offset(x = w * 0.58f, y = h * 0.01f),
-                onClick = { requireLoginOr { onNavigate("deposit") } }
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                DualCategoryCircle("HOT", Icons.Default.LocalFireDepartment) {
+                    requireLoginOr { showGunduAtaChoiceDialog = true }
+                }
+                DualCategoryCircle("CRICKET", Icons.Default.SportsCricket) {
+                    requireLoginOr { onNavigate("ipl") }
+                }
+                DualCategoryCircle("SLOTS", Icons.Default.Casino) {
+                    requireLoginOr { onNavigate("colour_game") }
+                }
+                DualCategoryCircle("LIVE", Icons.Default.Videocam) {
+                    requireLoginOr { onNavigate("gundu_ata_live") }
+                }
+                DualCategoryCircle("MORE", Icons.Default.MoreHoriz) {
+                    onNavigate("me")
+                }
+            }
 
-            // Hero LIVE CASINO banner + PLAY NOW
-            Hotspot(
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Dual game cards
+            Row(
                 modifier = Modifier
-                    .size(w * 0.94f, h * 0.30f)
-                    .offset(x = w * 0.03f, y = h * 0.085f),
-                onClick = { requireLoginOr { showGunduAtaChoiceDialog = true } }
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Gundu Ata card
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(220.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(CardDark)
+                        .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                        .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.money_decoration),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF1A1200))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.45f))
+                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "GA",
+                                color = GoldMid,
+                                fontSize = 36.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Serif
+                            )
+                            Text(
+                                "GUNDU ATA",
+                                color = GoldMid,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "PLAY & WIN BIG",
+                                color = TextWhite,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        GoldPlayButton(text = "PLAY", fullWidth = true) {
+                            requireLoginOr { showGunduAtaChoiceDialog = true }
+                        }
+                    }
+                }
 
-            // Categories row (HOT, CRICKET, SLOTS, LIVE, MORE)
-            val catY = h * 0.42f
-            val catSize = w * 0.16f
-            val catGap = w * 0.035f
-            val catStart = w * 0.04f
-            Hotspot(
-                modifier = Modifier.size(catSize).offset(x = catStart, y = catY),
-                onClick = { requireLoginOr { showGunduAtaChoiceDialog = true } }
-            )
-            Hotspot(
-                modifier = Modifier.size(catSize).offset(x = catStart + (catSize + catGap), y = catY),
-                onClick = { requireLoginOr { onNavigate("ipl") } }
-            )
-            Hotspot(
-                modifier = Modifier.size(catSize).offset(x = catStart + (catSize + catGap) * 2, y = catY),
-                onClick = { requireLoginOr { onNavigate("colour_game") } }
-            )
-            Hotspot(
-                modifier = Modifier.size(catSize).offset(x = catStart + (catSize + catGap) * 3, y = catY),
-                onClick = { requireLoginOr { onNavigate("gundu_ata_live") } }
-            )
-            Hotspot(
-                modifier = Modifier.size(catSize).offset(x = catStart + (catSize + catGap) * 4, y = catY),
-                onClick = { onNavigate("me") }
-            )
+                // Andar Bahar style card → Colour Game
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(220.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF0B3D2E))
+                        .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                        .clickable { requireLoginOr { onNavigate("colour_game") } }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "ANDAR\nBAHAR",
+                                color = GoldMid,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Black,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 26.sp,
+                                fontFamily = FontFamily.SansSerif
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
+                                PlayingCardFace("A♠", Color.Black)
+                                PlayingCardFace("K♥", Color(0xFFB71C1C))
+                            }
+                        }
+                        GoldPlayButton(text = "PLAY", fullWidth = true) {
+                            requireLoginOr { onNavigate("colour_game") }
+                        }
+                    }
+                }
+            }
 
-            // Left dual card — Gundu Ata
-            Hotspot(
-                modifier = Modifier
-                    .size(w * 0.44f, h * 0.28f)
-                    .offset(x = w * 0.04f, y = h * 0.55f),
-                onClick = { requireLoginOr { showGunduAtaChoiceDialog = true } }
-            )
-
-            // Right dual card — Andar Bahar artwork → colour game
-            Hotspot(
-                modifier = Modifier
-                    .size(w * 0.44f, h * 0.28f)
-                    .offset(x = w * 0.52f, y = h * 0.55f),
-                onClick = { requireLoginOr { onNavigate("colour_game") } }
-            )
-
-            // Bottom nav
-            val navY = h * 0.90f
-            val navH = h * 0.10f
-            val navW = w / 5
-            Hotspot(modifier = Modifier.size(navW, navH).offset(x = 0.dp, y = navY), onClick = { })
-            Hotspot(modifier = Modifier.size(navW, navH).offset(x = navW, y = navY), onClick = { onNavigate("affiliate") })
-            Hotspot(modifier = Modifier.size(navW, navH).offset(x = navW * 2, y = navY), onClick = { onNavigate("leaderboard") })
-            Hotspot(modifier = Modifier.size(navW, navH).offset(x = navW * 3, y = navY), onClick = { requireLoginOr { onNavigate("wallet") } })
-            Hotspot(modifier = Modifier.size(navW, navH).offset(x = navW * 4, y = navY), onClick = { onNavigate("me") })
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
 
 @Composable
-private fun Hotspot(modifier: Modifier, onClick: () -> Unit) {
+private fun DualCardsTopBar(
+    balance: String,
+    isLoggedIn: Boolean,
+    onMenu: () -> Unit,
+    onDeposit: () -> Unit,
+    onLogin: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = GoldMid, modifier = Modifier.size(26.dp))
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                "GA",
+                color = GoldMid,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Serif,
+                lineHeight = 22.sp
+            )
+            Text(
+                "GUNDU ATA",
+                color = GoldMid,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp
+            )
+        }
+
+        if (isLoggedIn) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Color(0xFF1A1A1A))
+                    .border(1.dp, GoldDeep.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
+                    .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
+                    .clickable(onClick = onDeposit),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = GoldMid, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("₹$balance", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(GoldBrush),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Black, modifier = Modifier.size(16.dp))
+                }
+            }
+        } else {
+            TextButton(onClick = onLogin) {
+                Text(stringResource(R.string.login), color = GoldMid, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DualCategoryCircle(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(64.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF121212))
+                .border(1.5.dp, GoldMid, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = label, tint = GoldMid, modifier = Modifier.size(26.dp))
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(label, color = GoldMid, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun GoldPlayButton(text: String, fullWidth: Boolean = false, onClick: () -> Unit) {
     Box(
-        modifier = modifier.clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            onClick = onClick
+        modifier = Modifier
+            .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier.wrapContentWidth())
+            .height(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(GoldBrush)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            color = Color.Black,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = if (fullWidth) 0.dp else 18.dp)
         )
-    )
+    }
+}
+
+@Composable
+private fun PlayingCardFace(label: String, accent: Color) {
+    Box(
+        modifier = Modifier
+            .size(width = 42.dp, height = 58.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.White)
+            .border(1.dp, Color.Black.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = accent, fontWeight = FontWeight.Black, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun DualCardsBottomBar(
+    onHome: () -> Unit,
+    onPromo: () -> Unit,
+    onVip: () -> Unit,
+    onWallet: () -> Unit,
+    onProfile: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0A0A0A))
+            .navigationBarsPadding()
+            .height(64.dp)
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DualNavItem("HOME", Icons.Default.Home, true, onHome)
+        DualNavItem("PROMO", Icons.Default.CardGiftcard, false, onPromo)
+        DualNavItem("VIP", Icons.Default.WorkspacePremium, false, onVip)
+        DualNavItem("WALLET", Icons.Default.AccountBalanceWallet, false, onWallet)
+        DualNavItem("PROFILE", Icons.Default.Person, false, onProfile)
+    }
+}
+
+@Composable
+private fun DualNavItem(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = if (selected) GoldMid else GoldDeep.copy(alpha = 0.7f),
+            modifier = Modifier.size(22.dp)
+        )
+        Text(
+            label,
+            color = if (selected) GoldMid else GoldDeep.copy(alpha = 0.7f),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
 }
