@@ -53,6 +53,7 @@ fun DualCardsHomeScreen(
 ) {
     var showLoginPopup by remember { mutableStateOf(false) }
     var showGunduAtaChoiceDialog by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     if (showGunduAtaChoiceDialog) {
         GunduAtaChoiceDialog(
@@ -140,14 +141,14 @@ fun DualCardsHomeScreen(
                 onLogin = { onNavigate("login") }
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            SearchBar(onSearch = { searchQuery = it })
 
             // LIVE CASINO hero banner (artwork includes title + PLAY NOW)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(180.dp)
+                    .height(220.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
             ) {

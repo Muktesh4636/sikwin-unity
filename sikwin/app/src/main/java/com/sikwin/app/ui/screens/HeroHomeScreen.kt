@@ -47,6 +47,7 @@ fun HeroHomeScreen(
     var showLoginPopup by remember { mutableStateOf(false) }
     var showGunduAtaChoiceDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf("hot") }
+    var searchQuery by remember { mutableStateOf("") }
 
     if (showGunduAtaChoiceDialog) {
         GunduAtaChoiceDialog(
@@ -133,12 +134,14 @@ fun HeroHomeScreen(
                 onLogin = { onNavigate("login") }
             )
 
+            SearchBar(onSearch = { searchQuery = it })
+
             // LIVE CASINO hero banner (artwork includes title + PLAY NOW)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(180.dp)
+                    .height(220.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .clickable {
                         requireLoginOr { showGunduAtaChoiceDialog = true }
