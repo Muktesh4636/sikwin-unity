@@ -228,44 +228,96 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     var cricketBetsError by mutableStateOf<String?>(null)
     var referralData by mutableStateOf<ReferralData?>(null)
 
-    /** Cricket / IPL tab — GET /api/cricket/live/ */
+    /** GET /api/cricket/matches/ */
+    var cricketMatches by mutableStateOf<List<CricketMatchSummary>>(emptyList())
+    var cricketMatchesLoading by mutableStateOf(false)
+    var cricketMatchesError by mutableStateOf<String?>(null)
+    var cricketMatchesSyncedAt by mutableStateOf<String?>(null)
+
+    /** Selected match id — null shows the list. */
+    var cricketSelectedMatchId by mutableStateOf<Long?>(null)
+
+    /** Mapped live event for the selected match (detail + changes). */
     var cricketLive by mutableStateOf<CricketLiveEventData?>(null)
-    /** Bumps on each successful odds payload so list keys refresh even when [CricketLiveEventData] equals previous. */
+    /** Bumps on each successful odds payload so list keys refresh. */
     var cricketLiveEpoch by mutableStateOf(0L)
     var cricketFetchedAt by mutableStateOf<String?>(null)
     var cricketLoading by mutableStateOf(false)
     var cricketError by mutableStateOf<String?>(null)
     var cricketBetPlacing by mutableStateOf(false)
-    /** True only after several consecutive failed polls (legacy blur; odds are cleared on failure so no stale odds). */
+    /** True only after several consecutive failed polls. */
     var cricketPollStopped by mutableStateOf(false)
 
-    /** GET /api/cricket/result/ — live scorecard (polled from IPL screen, e.g. every 5s). */
+    /** Score ticker — GET /api/cricket/scores/, keyed by match id in [cricketScoreById]. */
+    var cricketScoreById by mutableStateOf<Map<Long, CricketMatchSummary>>(emptyMap())
     var cricketScore by mutableStateOf<CricketScorePayload?>(null)
     var cricketScoreFetchedAt by mutableStateOf<String?>(null)
     var cricketScoreError by mutableStateOf<String?>(null)
 
-    /**
-     * Fetches live score JSON. On success updates [cricketScore]. On failure keeps previous [cricketScore] if any
-     * and sets [cricketScoreError]; clears error on success.
-     */
-    suspend fun cricketResultFetchOnce(): Boolean {
-        val matchId = cricketLive?.id?.takeIf { it > 0L }
+    /** Bookmark for GET /api/cricket/changes/?bn=N */
+    var cricketChangesBn by mutableStateOf(0L)
+    var cricketChangesError by mutableStateOf<String?>(null)
+
+    /** Fetch match list. */
+    suspend fun cricketFetchMatchesOnce(): Boolean {
+        val showSpinner = cricketMatches.isEmpty() && cricketMatchesError == null
+        if (showSpinner) cricketMatchesLoading = true
         return try {
             val resp = withContext(Dispatchers.IO) {
-                RetrofitClient.apiService.getCricketResult(matchId = matchId)
+                RetrofitClient.apiService.getCricketMatches()
             }
             if (resp.isSuccessful) {
                 val body = resp.body()
-                val s = body?.score
-                cricketScoreFetchedAt = body?.fetched_at
-                if (s != null) {
-                    cricketScore = s
-                    cricketScoreError = null
-                    true
-                } else {
-                    if (cricketScore == null) cricketScoreError = "No score data"
-                    false
+                val list = body?.matches.orEmpty()
+                cricketMatches = list
+                cricketMatchesSyncedAt = body?.last_sync
+                cricketMatchesError = if (list.isEmpty()) "No live matches right now." else null
+                true
+            } else {
+                logoutIfUnauthorized(resp.code())
+                val err = resp.errorBody()?.string()
+                if (cricketMatches.isEmpty()) cricketMatchesError = parseError(err)
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketMatches", "Failed", e)
+            if (cricketMatches.isEmpty()) {
+                cricketMatchesError = handleException(e)
+            }
+            false
+        } finally {
+            if (showSpinner) cricketMatchesLoading = false
+        }
+    }
+
+    /** Fetch scores ticker and refresh scorecard for the selected match. */
+    suspend fun cricketFetchScoresOnce(): Boolean {
+        return try {
+            val resp = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getCricketScores()
+            }
+            if (resp.isSuccessful) {
+                val body = resp.body()
+                val list = body?.matches.orEmpty()
+                cricketScoreById = list.associateBy { it.id }
+                cricketScoreFetchedAt = body?.last_sync
+                cricketScoreError = null
+                applySelectedMatchScore()
+                // Soft-refresh list row scores when we already have matches
+                if (cricketMatches.isNotEmpty() && list.isNotEmpty()) {
+                    val scoreMap = list.associateBy { it.id }
+                    cricketMatches = cricketMatches.map { m ->
+                        val s = scoreMap[m.id] ?: return@map m
+                        m.copy(
+                            scores = s.scores ?: m.scores,
+                            period = s.period ?: m.period,
+                            clock = s.clock ?: m.clock,
+                            live = s.live ?: m.live,
+                            live_market_count = s.live_market_count ?: m.live_market_count
+                        )
+                    }
                 }
+                true
             } else {
                 logoutIfUnauthorized(resp.code())
                 val err = resp.errorBody()?.string()
@@ -273,9 +325,197 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                 false
             }
         } catch (e: Exception) {
-            android.util.Log.e("CricketResult", "Failed", e)
+            android.util.Log.e("CricketScores", "Failed", e)
             if (cricketScore == null) cricketScoreError = handleException(e)
             false
+        }
+    }
+
+    private fun applySelectedMatchScore() {
+        val id = cricketSelectedMatchId ?: return
+        val row = cricketScoreById[id]
+            ?: cricketMatches.firstOrNull { it.id == id }
+        cricketScore = row?.toScorePayload()
+    }
+
+    fun selectCricketMatch(matchId: Long) {
+        if (cricketSelectedMatchId == matchId) return
+        cricketSelectedMatchId = matchId
+        cricketLive = null
+        cricketLiveEpoch = 0L
+        cricketError = null
+        cricketPollStopped = false
+        cricketChangesBn = 0L
+        cricketChangesError = null
+        applySelectedMatchScore()
+        viewModelScope.launch {
+            cricketFetchMatchDetailOnce(matchId)
+        }
+    }
+
+    fun clearCricketMatchSelection() {
+        cricketSelectedMatchId = null
+        cricketLive = null
+        cricketFetchedAt = null
+        cricketLiveEpoch = 0L
+        cricketError = null
+        cricketPollStopped = false
+        cricketScore = null
+        cricketChangesBn = 0L
+        cricketChangesError = null
+    }
+
+    /**
+     * GET /api/cricket/matches/{id}/ — full odds.
+     * Returns true when markets are loaded.
+     */
+    suspend fun cricketFetchMatchDetailOnce(matchId: Long = cricketSelectedMatchId ?: 0L): Boolean {
+        if (matchId <= 0L) return false
+        val showSpinner = cricketLive == null && cricketError == null
+        if (showSpinner) cricketLoading = true
+        return try {
+            val resp = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getCricketMatch(matchId)
+            }
+            if (resp.isSuccessful) {
+                val body = resp.body()
+                val detail = body?.match
+                cricketFetchedAt = body?.last_sync
+                if (detail != null) {
+                    cricketLive = detail.toLiveEvent()
+                    cricketLiveEpoch++
+                    cricketError = null
+                    // Prefer detail live/scores immediately; scores poll will refresh further.
+                    cricketScore = detail.toScorePayload()
+                    cricketScoreFetchedAt = body?.last_sync ?: cricketScoreFetchedAt
+                    cricketScoreError = null
+                    true
+                } else {
+                    clearCricketLive("No match data")
+                    false
+                }
+            } else {
+                logoutIfUnauthorized(resp.code())
+                val err = resp.errorBody()?.string()
+                val msg = parseError(err)
+                android.util.Log.w("CricketMatch", "HTTP ${resp.code()} $err")
+                clearCricketLive(msg)
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketMatch", "Failed", e)
+            clearCricketLive(e.message ?: "Could not load cricket odds.")
+            false
+        } finally {
+            if (showSpinner) cricketLoading = false
+        }
+    }
+
+    /**
+     * GET /api/cricket/changes/?bn=N — apply price deltas when available.
+     * On upstream failure returns false so the UI can fall back to full detail refresh.
+     */
+    suspend fun cricketFetchChangesOnce(): Boolean {
+        val matchId = cricketSelectedMatchId ?: return false
+        return try {
+            val resp = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getCricketChanges(cricketChangesBn)
+            }
+            if (resp.isSuccessful) {
+                val body = resp.body()
+                if (body?.error != null) {
+                    cricketChangesError = body.detail ?: body.error
+                    return false
+                }
+                body?.bn?.let { cricketChangesBn = it }
+                cricketChangesError = null
+                val updatedMarkets = body?.markets
+                    ?: body?.events?.firstOrNull { it.id == matchId }?.markets
+                    ?: body?.events?.firstOrNull { it.id == matchId }?.odds?.markets
+                    ?: body?.matches?.firstOrNull { it.id == matchId }?.odds?.markets
+                if (!updatedMarkets.isNullOrEmpty()) {
+                    val live = cricketLive
+                    if (live != null && live.id == matchId) {
+                        cricketLive = live.copy(markets = updatedMarkets.toLiveMarkets())
+                        cricketLiveEpoch++
+                        cricketFetchedAt = body?.last_sync ?: cricketFetchedAt
+                    }
+                }
+                true
+            } else {
+                logoutIfUnauthorized(resp.code())
+                val err = resp.errorBody()?.string()
+                cricketChangesError = parseError(err)
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketChanges", "Failed", e)
+            cricketChangesError = handleException(e)
+            false
+        }
+    }
+
+    /** @deprecated Prefer [cricketFetchMatchDetailOnce] / [cricketFetchChangesOnce]. */
+    suspend fun cricketFetchOnce(): Boolean {
+        val id = cricketSelectedMatchId
+        return if (id != null) cricketFetchMatchDetailOnce(id) else cricketFetchMatchesOnce()
+    }
+
+    /** @deprecated Prefer [cricketFetchScoresOnce]. */
+    suspend fun cricketResultFetchOnce(): Boolean = cricketFetchScoresOnce()
+
+    private fun clearCricketLive(message: String?) {
+        cricketLive = null
+        cricketFetchedAt = null
+        cricketLiveEpoch = 0L
+        cricketError = message?.takeIf { it.isNotBlank() } ?: "Could not load cricket odds."
+    }
+
+    fun refreshCricketFeed() {
+        viewModelScope.launch {
+            val id = cricketSelectedMatchId
+            if (id != null) cricketFetchMatchDetailOnce(id)
+            else cricketFetchMatchesOnce()
+            cricketFetchScoresOnce()
+        }
+    }
+
+    /**
+     * POST /api/cricket/bet/. [onDone] is invoked on the main thread with null on success, or an error message.
+     */
+    fun placeCricketBet(
+        eventId: Long,
+        marketId: Long,
+        outcomeId: Long,
+        stake: Int,
+        onDone: (error: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            cricketBetPlacing = true
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    RetrofitClient.apiService.postCricketBet(
+                        CricketBetRequest(
+                            event_id = eventId,
+                            market_id = marketId,
+                            outcome_id = outcomeId,
+                            stake = stake
+                        )
+                    )
+                }
+                if (resp.isSuccessful) {
+                    fetchWallet()
+                    onDone(null)
+                } else {
+                    logoutIfUnauthorized(resp.code())
+                    val err = resp.errorBody()?.string()
+                    onDone(parseError(err))
+                }
+            } catch (e: Exception) {
+                onDone(e.message ?: "Could not place bet.")
+            } finally {
+                cricketBetPlacing = false
+            }
         }
     }
 
@@ -391,106 +631,6 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                         return@launch
                     }
                 }
-            }
-        }
-    }
-
-    /**
-     * Single fetch for GET /api/cricket/live/. Returns true only when [response has data] and updates [cricketLive].
-     * On any failure, empty body, or missing `data`, clears live odds so the UI shows nothing until a good response.
-     */
-    suspend fun cricketFetchOnce(): Boolean {
-        val showSpinner = cricketLive == null && cricketError == null
-        if (showSpinner) cricketLoading = true
-        return try {
-            val resp = withContext(Dispatchers.IO) {
-                RetrofitClient.apiService.getCricketLive()
-            }
-            if (resp.isSuccessful) {
-                val body = resp.body()
-                val data = body?.data
-                cricketFetchedAt = body?.fetched_at
-                if (data != null) {
-                    val prevEventId = cricketLive?.id
-                    cricketLive = data
-                    cricketLiveEpoch++
-                    if (prevEventId != data.id) {
-                        cricketScore = null
-                        cricketScoreFetchedAt = null
-                        cricketScoreError = null
-                    }
-                    cricketError = null
-                    true
-                } else {
-                    android.util.Log.w("CricketLive", "Empty data in response")
-                    clearCricketLive("No live data")
-                    false
-                }
-            } else {
-                logoutIfUnauthorized(resp.code())
-                val err = resp.errorBody()?.string()
-                val msg = parseError(err)
-                android.util.Log.w("CricketLive", "HTTP ${resp.code()} $err")
-                clearCricketLive(msg)
-                false
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("CricketLive", "Failed", e)
-            clearCricketLive(e.message ?: "Could not load cricket odds.")
-            false
-        } finally {
-            if (showSpinner) cricketLoading = false
-        }
-    }
-
-    private fun clearCricketLive(message: String?) {
-        cricketLive = null
-        cricketFetchedAt = null
-        cricketLiveEpoch = 0L
-        cricketError = message?.takeIf { it.isNotBlank() } ?: "Could not load cricket odds."
-    }
-
-    fun refreshCricketFeed() {
-        viewModelScope.launch {
-            cricketFetchOnce()
-        }
-    }
-
-    /**
-     * POST /api/cricket/bet/. [onDone] is invoked on the main thread with null on success, or an error message.
-     */
-    fun placeCricketBet(
-        eventId: Long,
-        marketId: Long,
-        outcomeId: Long,
-        stake: Int,
-        onDone: (error: String?) -> Unit
-    ) {
-        viewModelScope.launch {
-            cricketBetPlacing = true
-            try {
-                val resp = withContext(Dispatchers.IO) {
-                    RetrofitClient.apiService.postCricketBet(
-                        CricketBetRequest(
-                            event_id = eventId,
-                            market_id = marketId,
-                            outcome_id = outcomeId,
-                            stake = stake
-                        )
-                    )
-                }
-                if (resp.isSuccessful) {
-                    fetchWallet()
-                    onDone(null)
-                } else {
-                    logoutIfUnauthorized(resp.code())
-                    val err = resp.errorBody()?.string()
-                    onDone(parseError(err))
-                }
-            } catch (e: Exception) {
-                onDone(e.message ?: "Could not place bet.")
-            } finally {
-                cricketBetPlacing = false
             }
         }
     }

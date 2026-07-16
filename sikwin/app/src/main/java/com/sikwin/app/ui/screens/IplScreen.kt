@@ -12,6 +12,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -75,13 +77,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sikwin.app.data.models.CricketLiveEventData
 import com.sikwin.app.data.models.CricketLiveMarket
 import com.sikwin.app.data.models.CricketLiveOutcome
+import com.sikwin.app.data.models.CricketMatchSummary
 import com.sikwin.app.data.models.CricketBatsmanRow
 import com.sikwin.app.data.models.CricketBowlerRow
 import com.sikwin.app.data.models.CricketInningsScore
 import com.sikwin.app.data.models.CricketScorePayload
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.DisposableEffect
 import com.sikwin.app.ui.theme.CricketAccentGold
 import com.sikwin.app.ui.theme.CricketChipBorder
 import com.sikwin.app.ui.theme.CricketHeaderBg
@@ -101,8 +105,12 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-private const val CRICKET_POLL_MS = 2000L
-/** Live scorecard from GET /api/cricket/result/ */
+private const val CRICKET_CHANGES_POLL_MS = 3000L
+/** Full match-detail refresh when changes upstream is down. */
+private const val CRICKET_DETAIL_FALLBACK_POLL_MS = 8000L
+/** Match list refresh while browsing. */
+private const val CRICKET_MATCHES_POLL_MS = 15000L
+/** Live score ticker from GET /api/cricket/scores/ */
 private const val CRICKET_SCORE_POLL_MS = 5000L
 /** Blur only after this many failed polls in a row (transient errors won't stop updates). */
 private const val CRICKET_POLL_FAILURES_BEFORE_BLUR = 5
@@ -156,22 +164,60 @@ fun IplScreen(
     // Default to All; filter indices match CricketMarketFilter (0=All, 1=Main, …)
     var filterIndex by remember { mutableIntStateOf(0) }
     var pollSession by remember { mutableIntStateOf(0) }
-    /** null = both panels collapsed; tap a tab to open, tap again to close. */
-    var iplMatchTab by remember { mutableStateOf<IplMatchTab?>(null) }
+    /** null = both panels collapsed; tap a tab to open, tap again to close. Default: Scoreboard open. */
+    var iplMatchTab by remember { mutableStateOf<IplMatchTab?>(IplMatchTab.Scoreboard) }
+    val selectedMatchId = viewModel.cricketSelectedMatchId
 
     fun restartCricketPolling() {
         pollSession++
     }
 
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearCricketMatchSelection() }
+    }
+
+    BackHandler(enabled = selectedMatchId != null) {
+        viewModel.clearCricketMatchSelection()
+        iplMatchTab = IplMatchTab.Scoreboard
+        filterIndex = 0
+    }
+
+    // Match list polling
+    LaunchedEffect(pollSession, selectedMatchId == null) {
+        if (selectedMatchId != null) return@LaunchedEffect
+        viewModel.fetchWallet()
+        viewModel.cricketMatchesError = null
+        while (true) {
+            val start = SystemClock.elapsedRealtime()
+            viewModel.cricketFetchMatchesOnce()
+            val elapsed = SystemClock.elapsedRealtime() - start
+            delay((CRICKET_MATCHES_POLL_MS - elapsed).coerceAtLeast(0L))
+        }
+    }
+
+    // Scores ticker (list + detail)
     LaunchedEffect(pollSession) {
+        while (true) {
+            val start = SystemClock.elapsedRealtime()
+            viewModel.cricketFetchScoresOnce()
+            val elapsed = SystemClock.elapsedRealtime() - start
+            delay((CRICKET_SCORE_POLL_MS - elapsed).coerceAtLeast(0L))
+        }
+    }
+
+    // Detail: changes every 3s, fall back to full detail refresh when changes fails
+    LaunchedEffect(pollSession, selectedMatchId) {
+        val matchId = selectedMatchId ?: return@LaunchedEffect
         viewModel.fetchWallet()
         viewModel.cricketPollStopped = false
         viewModel.cricketError = null
+        viewModel.cricketFetchMatchDetailOnce(matchId)
         var consecutiveFailures = 0
+        var lastDetailRefresh = 0L
         while (true) {
             val start = SystemClock.elapsedRealtime()
-            val ok = viewModel.cricketFetchOnce()
-            if (ok) {
+            val changesOk = viewModel.cricketFetchChangesOnce()
+            if (changesOk) {
                 consecutiveFailures = 0
                 viewModel.cricketPollStopped = false
             } else {
@@ -179,19 +225,17 @@ fun IplScreen(
                 viewModel.cricketPollStopped =
                     consecutiveFailures >= CRICKET_POLL_FAILURES_BEFORE_BLUR &&
                     viewModel.cricketLive != null
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastDetailRefresh >= CRICKET_DETAIL_FALLBACK_POLL_MS) {
+                    if (viewModel.cricketFetchMatchDetailOnce(matchId)) {
+                        consecutiveFailures = 0
+                        viewModel.cricketPollStopped = false
+                    }
+                    lastDetailRefresh = now
+                }
             }
-            // Next poll ~CRICKET_POLL_MS after this one started (not after 2s + request time).
             val elapsed = SystemClock.elapsedRealtime() - start
-            delay((CRICKET_POLL_MS - elapsed).coerceAtLeast(0L))
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            val start = SystemClock.elapsedRealtime()
-            viewModel.cricketResultFetchOnce()
-            val elapsed = SystemClock.elapsedRealtime() - start
-            delay((CRICKET_SCORE_POLL_MS - elapsed).coerceAtLeast(0L))
+            delay((CRICKET_CHANGES_POLL_MS - elapsed).coerceAtLeast(0L))
         }
     }
 
@@ -274,7 +318,15 @@ fun IplScreen(
             CricketTopBar(
                 balance = viewModel.wallet?.balance ?: "0.00",
                 isLoggedIn = viewModel.loginSuccess,
-                onBack = onBack,
+                onBack = {
+                    if (selectedMatchId != null) {
+                        viewModel.clearCricketMatchSelection()
+                        iplMatchTab = IplMatchTab.Scoreboard
+                        filterIndex = 0
+                    } else {
+                        onBack()
+                    }
+                },
                 onWalletOrDeposit = { onNavigate("deposit") },
                 onLogin = { onNavigate("login") },
                 onBettingHistory = {
@@ -292,186 +344,426 @@ fun IplScreen(
                 .padding(padding)
                 .background(CricketScreenBg)
         ) {
-            val live = viewModel.cricketLive
-            when {
-                viewModel.cricketLoading && live == null -> {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = CricketAccentGold)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Loading odds…", color = CricketTextMuted, fontSize = 14.sp)
-                        }
+            if (selectedMatchId == null) {
+                CricketMatchListContent(
+                    viewModel = viewModel,
+                    onRetry = { restartCricketPolling() },
+                    onSelectMatch = { id ->
+                        filterIndex = 0
+                        iplMatchTab = IplMatchTab.Scoreboard
+                        viewModel.selectCricketMatch(id)
+                    }
+                )
+            } else {
+                CricketMatchDetailContent(
+                    viewModel = viewModel,
+                    filterIndex = filterIndex,
+                    onFilterIndex = { filterIndex = it },
+                    iplMatchTab = iplMatchTab,
+                    onIplMatchTab = { iplMatchTab = it },
+                    onRetry = { restartCricketPolling() },
+                    onBetPick = { pick ->
+                        betPick = pick
+                        stakeText = "100"
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.CricketMatchListContent(
+    viewModel: GunduAtaViewModel,
+    onRetry: () -> Unit,
+    onSelectMatch: (Long) -> Unit
+) {
+    val matches = viewModel.cricketMatches
+    when {
+        viewModel.cricketMatchesLoading && matches.isEmpty() -> {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = CricketAccentGold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading matches…", color = CricketTextMuted, fontSize = 14.sp)
+                }
+            }
+        }
+
+        viewModel.cricketMatchesError != null && matches.isEmpty() -> {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = viewModel.cricketMatchesError ?: "Could not load.",
+                    color = CricketTextMuted,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = onRetry,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CricketChipBorder)
+                ) {
+                    Text("Retry", color = CricketAccentGold)
+                }
+            }
+        }
+
+        else -> {
+            LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                item {
+                    Text(
+                        text = "Live matches",
+                        color = TextWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                }
+                viewModel.cricketMatchesSyncedAt?.takeIf { it.isNotBlank() }?.let { ts ->
+                    item {
+                        Text(
+                            text = "Synced $ts",
+                            color = CricketTextMuted,
+                            fontSize = 11.sp
+                        )
                     }
                 }
-
-                viewModel.cricketError != null && live == null -> {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                if (matches.isEmpty()) {
+                    item {
                         Text(
-                            text = viewModel.cricketError ?: "Could not load.",
+                            text = "No live matches right now.",
                             color = CricketTextMuted,
                             fontSize = 14.sp,
-                            lineHeight = 20.sp
+                            modifier = Modifier.padding(vertical = 24.dp)
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedButton(
-                            onClick = { restartCricketPolling() },
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, CricketChipBorder)
-                        ) {
-                            Text("Retry", color = CricketAccentGold)
+                    }
+                } else {
+                    items(matches, key = { it.id }) { match ->
+                        CricketMatchListRow(
+                            match = match,
+                            ticker = viewModel.cricketScoreById[match.id],
+                            onClick = { onSelectMatch(match.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CricketMatchListRow(
+    match: CricketMatchSummary,
+    ticker: CricketMatchSummary?,
+    onClick: () -> Unit
+) {
+    val row = ticker ?: match
+    val title = row.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
+    val competition = listOfNotNull(
+        row.competition?.takeIf { it.isNotBlank() },
+        row.country?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = CricketMarketBg,
+        border = BorderStroke(1.dp, CricketChipBorder),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = row.period?.takeIf { it.isNotBlank() } ?: "Live",
+                    color = CricketAccentGold,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "${row.marketCount()} markets",
+                    color = CricketTextMuted,
+                    fontSize = 11.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = title,
+                color = TextWhite,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (competition.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(competition, color = CricketTextMuted, fontSize = 12.sp, maxLines = 1)
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            row.scores.orEmpty().forEach { s ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = s.team ?: "—",
+                            color = TextWhite,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.width(180.dp)
+                        )
+                        if (s.batting == true) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFF9800))
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = s.score?.takeIf { it.isNotBlank() } ?: "—",
+                            color = TextWhite,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                        if (s.batting == true) {
+                            row.live?.oversLabel()?.let { ov ->
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "($ov ov)",
+                                    color = CricketTextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+}
 
-                else -> {
-                    val blurOdds = viewModel.cricketPollStopped && viewModel.cricketLive != null
-                    val allMarkets = live?.markets.orEmpty()
-                    val filteredMarkets = remember(allMarkets, filterIndex) {
-                        CricketMarketFilter.filter(allMarkets, filterIndex)
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                    ) {
-                        if (viewModel.cricketError != null) {
-                            Text(
-                                text = viewModel.cricketError!!,
-                                color = CricketTextMuted,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+@Composable
+private fun ColumnScope.CricketMatchDetailContent(
+    viewModel: GunduAtaViewModel,
+    filterIndex: Int,
+    onFilterIndex: (Int) -> Unit,
+    iplMatchTab: IplMatchTab?,
+    onIplMatchTab: (IplMatchTab?) -> Unit,
+    onRetry: () -> Unit,
+    onBetPick: (CricketBetPick) -> Unit
+) {
+    val live = viewModel.cricketLive
+    when {
+        viewModel.cricketLoading && live == null -> {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = CricketAccentGold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading odds…", color = CricketTextMuted, fontSize = 14.sp)
+                }
+            }
+        }
+
+        viewModel.cricketError != null && live == null -> {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = viewModel.cricketError ?: "Could not load.",
+                    color = CricketTextMuted,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = onRetry,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CricketChipBorder)
+                ) {
+                    Text("Retry", color = CricketAccentGold)
+                }
+            }
+        }
+
+        else -> {
+            val blurOdds = viewModel.cricketPollStopped && viewModel.cricketLive != null
+            val allMarkets = live?.markets.orEmpty()
+            val filteredMarkets = remember(allMarkets, filterIndex) {
+                CricketMarketFilter.filter(allMarkets, filterIndex)
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                if (viewModel.cricketError != null) {
+                    Text(
+                        text = viewModel.cricketError!!,
+                        color = CricketTextMuted,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    if (live == null) {
+                        viewModel.cricketScore?.matchTitle?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
+                            item {
+                                IplMatchNameTitle(cleanMatchTitle(raw).uppercase(Locale.US))
+                            }
+                        }
+                        item {
+                            IplMatchStreamOrScoreSection(
+                                selectedTab = iplMatchTab,
+                                onTabSelect = { tab ->
+                                    onIplMatchTab(if (iplMatchTab == tab) null else tab)
+                                },
+                                score = viewModel.cricketScore,
+                                scoreError = viewModel.cricketScoreError
                             )
                         }
-                        LazyColumn(
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                        ) {
-                            if (live == null) {
-                                viewModel.cricketScore?.matchTitle?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
-                                    item {
-                                        IplMatchNameTitle(cleanMatchTitle(raw).uppercase(Locale.US))
-                                    }
+                        item {
+                            Text(
+                                "No odds for this match right now.",
+                                color = CricketTextMuted,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                    } else {
+                        item {
+                            val crumb = listOfNotNull(
+                                "Cricket",
+                                live.competition?.takeIf { it.isNotBlank() },
+                                live.period?.takeIf { it.isNotBlank() }
+                            ).joinToString("  ›  ")
+                            Text(
+                                text = crumb,
+                                color = CricketTextMuted,
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        item {
+                            IplMatchNameTitle(
+                                live.description?.trim()?.uppercase()
+                                    ?.takeIf { it.isNotEmpty() } ?: "MATCH"
+                            )
+                        }
+                        item {
+                            IplMatchStreamOrScoreSection(
+                                selectedTab = iplMatchTab,
+                                onTabSelect = { tab ->
+                                    onIplMatchTab(if (iplMatchTab == tab) null else tab)
+                                },
+                                score = viewModel.cricketScore,
+                                scoreError = viewModel.cricketScoreError
+                            )
+                        }
+                        item {
+                            Text(
+                                text = "Markets & Odds",
+                                color = TextWhite,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                            )
+                        }
+                        item {
+                            CricketFilterChips(
+                                markets = allMarkets,
+                                selectedIndex = filterIndex,
+                                onSelect = onFilterIndex
+                            )
+                        }
+                        item {
+                            viewModel.cricketFetchedAt?.takeIf { it.isNotBlank() }?.let { ts ->
+                                Text(
+                                    text = "Updated $ts",
+                                    color = CricketTextMuted.copy(alpha = 0.9f),
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                        }
+                        if (filteredMarkets.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "No markets in this category.",
+                                    color = CricketTextMuted,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                        } else {
+                            items(
+                                items = filteredMarkets,
+                                key = { m ->
+                                    "${m.id}_${viewModel.cricketLiveEpoch}"
                                 }
-                                item {
-                                    IplMatchStreamOrScoreSection(
-                                        selectedTab = iplMatchTab,
-                                        onTabSelect = { tab ->
-                                            iplMatchTab = if (iplMatchTab == tab) null else tab
-                                        },
-                                        score = viewModel.cricketScore,
-                                        scoreError = viewModel.cricketScoreError
-                                    )
-                                }
-                                item {
-                                    Text(
-                                        "No live event from the API right now. Open the full site below.",
-                                        color = CricketTextMuted,
-                                        fontSize = 14.sp,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-                                }
-                            } else {
-                                item {
-                                    Text(
-                                        text = "Cricket  ›  Indian Premier League 2026  ›  Indian Premier League",
-                                        color = CricketTextMuted,
-                                        fontSize = 11.sp,
-                                        lineHeight = 14.sp,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                item {
-                                    IplMatchNameTitle(
-                                        live.description?.trim()?.uppercase()
-                                            ?.takeIf { it.isNotEmpty() } ?: "MATCH"
-                                    )
-                                }
-                                item {
-                                    IplMatchStreamOrScoreSection(
-                                        selectedTab = iplMatchTab,
-                                        onTabSelect = { tab ->
-                                            iplMatchTab = if (iplMatchTab == tab) null else tab
-                                        },
-                                        score = viewModel.cricketScore,
-                                        scoreError = viewModel.cricketScoreError
-                                    )
-                                }
-                                item {
-                                    Text(
-                                        text = "Markets & Odds",
-                                        color = TextWhite,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 15.sp,
-                                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-                                    )
-                                }
-                                item {
-                                    CricketFilterChips(
-                                        markets = allMarkets,
-                                        selectedIndex = filterIndex,
-                                        onSelect = { filterIndex = it }
-                                    )
-                                }
-                                item {
-                                    viewModel.cricketFetchedAt?.takeIf { it.isNotBlank() }?.let { ts ->
-                                        Text(
-                                            text = "Updated $ts",
-                                            color = CricketTextMuted.copy(alpha = 0.9f),
-                                            fontSize = 10.sp,
-                                            modifier = Modifier.padding(bottom = 4.dp)
+                            ) { market ->
+                                CricketMarketBlock(
+                                    market = market,
+                                    blurOdds = blurOdds,
+                                    onOutcomePick = { m, o ->
+                                        onBetPick(
+                                            CricketBetPick(
+                                                eventId = live.id,
+                                                marketId = m.id,
+                                                marketName = m.description?.trim()
+                                                    ?.takeIf { it.isNotEmpty() } ?: "Market",
+                                                outcomeId = o.id,
+                                                outcomeLabel = o.displayLabel(),
+                                                oddsDisplay = o.displayOdds()
+                                            )
                                         )
                                     }
-                                }
-                                if (filteredMarkets.isEmpty()) {
-                                    item {
-                                        Text(
-                                            text = "No markets in this category.",
-                                            color = CricketTextMuted,
-                                            fontSize = 14.sp,
-                                            modifier = Modifier.padding(vertical = 8.dp)
-                                        )
-                                    }
-                                } else {
-                                    items(
-                                        items = filteredMarkets,
-                                        key = { m ->
-                                            "${m.id}_${viewModel.cricketLiveEpoch}"
-                                        }
-                                    ) { market ->
-                                        CricketMarketBlock(
-                                            market = market,
-                                            blurOdds = blurOdds,
-                                            onOutcomePick = { m, o ->
-                                                betPick = CricketBetPick(
-                                                    eventId = live.id,
-                                                    marketId = m.id,
-                                                    marketName = m.description?.trim()
-                                                        ?.takeIf { it.isNotEmpty() } ?: "Market",
-                                                    outcomeId = o.id,
-                                                    outcomeLabel = o.displayLabel(),
-                                                    oddsDisplay = o.displayOdds()
-                                                )
-                                                stakeText = "100"
-                                            }
-                                        )
-                                    }
-                                }
+                                )
                             }
                         }
                     }
@@ -706,7 +998,7 @@ private fun CricketScoreCardSection(
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Text(
-                        text = "Indian Premier League",
+                        text = score.seriesName?.takeIf { it.isNotBlank() } ?: "Cricket",
                         color = ScoreCardHeaderTitle,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
@@ -720,8 +1012,13 @@ private fun CricketScoreCardSection(
                         val abbrev = teamAbbrev(inn.teamName ?: "—")
                         val batting = inn.conclusion?.equals("In Progress", ignoreCase = true) == true
                         val jColor = jerseyColor(abbrev)
-                        val ovAvail = inn.oversAvailable ?: 20
+                        val ovAvail = inn.oversAvailable
                         val ovStr = formatOversDisplay(inn.overs)
+                        val oversText = when {
+                            ovStr.isNotEmpty() && ovAvail != null -> "$ovStr / $ovAvail Ovs"
+                            ovStr.isNotEmpty() -> "$ovStr Ovs"
+                            else -> null
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -760,13 +1057,15 @@ private fun CricketScoreCardSection(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 20.sp
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "$ovStr / $ovAvail Ovs",
-                                    color = CricketTextMuted,
-                                    fontSize = 12.sp,
-                                    maxLines = 1
-                                )
+                                if (oversText != null) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = oversText,
+                                        color = CricketTextMuted,
+                                        fontSize = 12.sp,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }
@@ -1070,6 +1369,7 @@ private fun CricketTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -1231,7 +1531,10 @@ private fun CricketMarketBlock(
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
-            text = "Match · TWO_OUTCOME",
+            text = listOfNotNull(
+                market.period?.takeIf { it.isNotBlank() },
+                market.marketType?.takeIf { it.isNotBlank() }
+            ).joinToString(" · ").ifBlank { "Match" },
             color = CricketTextMuted,
             fontSize = 10.sp
         )

@@ -74,24 +74,24 @@ function WalletIcon({ className }: { className?: string }) {
   );
 }
 
-// Milestone tiers (per-step counts; must match API / APK). Cash tiers credit via backend wallet.
-// Step 3 (25 in step) = Spin & Win only — no automatic cash deposit.
-const MILESTONES: { count: number; reward: string; description?: string }[] = [
-  { count: 3, reward: '₹500', description: '3 referrals in step 1 — auto-credited to wallet' },
-  { count: 12, reward: '₹2,200', description: '12 referrals in step 2 — auto-credited to wallet' },
-  { count: 25, reward: 'Spin & Win', description: '25 referrals in step 3 — mega spin (not cash)' },
+const COMMISSION_TIERS = [
+  { range: '1–10 referrals', rate: '2%' },
+  { range: '11–30 referrals', rate: '3%' },
+  { range: '31–50 referrals', rate: '4%' },
+  { range: '51–100 referrals', rate: '6%' },
+  { range: '101+ referrals', rate: '8%' },
 ];
 
 const HOW_IT_WORKS = [
   'Share your code with friends',
-  'Friend registers & deposits ₹100+',
-  'You get ₹100 instantly; milestone cash (₹500 / ₹2,200) is added to your wallet automatically. At 25 referrals in the final step you unlock Spin & Win instead of a cash payout.',
+  'Friend registers with your referral code',
+  'You get ₹100 when they make their first approved deposit',
+  'Earn daily commission on your referrals\' wallet losses (credited each night IST)',
 ];
 
 export function ReferEarnPage() {
   const nav = useNavigate();
   const { user } = useAuth();
-  const [showAllMilestones, setShowAllMilestones] = useState(false);
   const [referralData, setReferralData] = useState<ReferralDataType | null>(null);
 
   const referralCode = referralData?.referral_code || user?.referral_code || '';
@@ -150,15 +150,19 @@ export function ReferEarnPage() {
   }, [referralCode, referralSignupLink]);
 
   const totalReferrals = referralData?.total_referrals ?? 0;
-  const depositedCount = referralData?.referrals?.filter((r) => r.has_deposit).length ?? 0;
+  const depositedCount = referralData?.active_referrals ?? referralData?.referrals?.filter((r) => r.has_deposit).length ?? 0;
   const totalEarned = referralData?.total_earnings ?? '0';
-  const nextMilestoneFromApi = referralData?.next_milestone;
-  const nextMilestoneCount = nextMilestoneFromApi?.next_milestone ?? MILESTONES[0].count;
-  const nextMilestoneMatch = MILESTONES.find((m) => m.count === nextMilestoneCount) ?? MILESTONES[0];
-  const nextMilestoneReward =
-    nextMilestoneFromApi?.next_bonus_display ??
-    (typeof nextMilestoneFromApi?.next_bonus === 'number' ? `₹${nextMilestoneFromApi.next_bonus}` : nextMilestoneMatch.reward);
-  const currentProgress = nextMilestoneFromApi?.current_progress ?? 0;
+  const commissionRate = referralData?.commission_tier_percent ?? '2%';
+  const tiers = referralData?.commission_tiers?.length
+    ? referralData.commission_tiers.map((t) => ({
+        range: t.max_referrals != null ? `${t.min_referrals}–${t.max_referrals} referrals` : `${t.min_referrals}+ referrals`,
+        rate: t.rate_percent,
+        active: t.active,
+      }))
+    : COMMISSION_TIERS.map((t, i) => ({
+        ...t,
+        active: totalReferrals >= [1, 11, 31, 51, 101][i] && (i === 4 || totalReferrals <= [10, 30, 50, 100, Infinity][i]),
+      }));
 
   return (
     <div className="mobile-frame min-h-dvh bg-[#121212]">
@@ -240,60 +244,25 @@ export function ReferEarnPage() {
           </div>
         </div>
 
-        {/* Milestone bonuses */}
+        {/* Daily commission tiers */}
         <div className="mt-6">
-          <h3 className="mb-3 text-base font-bold text-white">Milestone bonuses</h3>
-          {!showAllMilestones ? (
-            <>
-              <div className="rounded-2xl bg-[#1E1E1E] px-4 py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs text-[#BDBDBD]">Next reward</div>
-                    <div className="mt-1 text-xl font-bold text-[#FFCC00]">{nextMilestoneReward}</div>
-                  </div>
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-[#4a4a4a] text-sm font-medium text-white">
-                    {currentProgress}/{nextMilestoneCount}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAllMilestones(true)}
-                className="mt-4 w-full text-center text-sm font-semibold text-[#FFCC00]"
+          <h3 className="mb-3 text-base font-bold text-white">Daily commission tiers</h3>
+          <div className="mb-3 rounded-2xl border border-[#FFCC00]/40 bg-[#1E1E1E] px-4 py-4">
+            <div className="text-xs text-[#BDBDBD]">Your commission rate</div>
+            <div className="mt-1 text-3xl font-bold text-[#FFCC00]">{commissionRate}</div>
+            <div className="mt-2 text-xs text-white">On each referral&apos;s daily wallet loss</div>
+          </div>
+          <div className="space-y-2">
+            {tiers.map((t) => (
+              <div
+                key={t.range}
+                className={`flex items-center justify-between rounded-xl px-4 py-3 ${t.active ? 'border border-[#FFCC00] bg-[#FFCC00]/10' : 'bg-[#1E1E1E]'}`}
               >
-                View All
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="space-y-3">
-                {MILESTONES.map((m) => (
-                  <div
-                    key={m.count}
-                    className="flex items-center gap-4 rounded-2xl bg-[#1E1E1E] px-4 py-3"
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-[#4a4a4a] text-sm font-medium text-white">
-                      0/{m.count}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-white">{m.count} Referrals</div>
-                      <div className="text-xs text-[#BDBDBD]">
-                        {m.description ?? `0 / ${m.count} Referrals`}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right font-bold text-white">{m.reward}</div>
-                  </div>
-                ))}
+                <span className="text-sm text-white">{t.range}</span>
+                <span className="font-bold text-[#FFCC00]">{t.rate}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAllMilestones(false)}
-                className="mt-4 w-full text-center text-sm font-semibold text-[#FFCC00]"
-              >
-                View Less
-              </button>
-            </>
-          )}
+            ))}
+          </div>
         </div>
 
         {/* Summary cards */}

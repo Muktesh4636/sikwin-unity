@@ -113,6 +113,7 @@ fun HeroHomeScreen(
         containerColor = Color.Black,
         bottomBar = {
             HeroBottomBar(
+                selectedTab = DualNavTab.HOME,
                 onHome = { /* already home */ },
                 onPromo = { onNavigate("affiliate") },
                 onVip = { onNavigate("leaderboard") },
@@ -136,21 +137,18 @@ fun HeroHomeScreen(
 
             SearchBar(onSearch = { searchQuery = it })
 
-            // LIVE CASINO hero banner (artwork includes title + PLAY NOW)
+            // Gundu Ata LIVE banner — only PLAY NOW opens game mode picker
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(220.dp)
+                    .aspectRatio(LIVE_CASINO_BANNER_ASPECT_RATIO)
                     .clip(RoundedCornerShape(16.dp))
-                    .clickable {
-                        requireLoginOr { showGunduAtaChoiceDialog = true }
-                    }
             ) {
-                LiveCasinoBannerImage(
+                LiveCasinoBannerWithPlayNow(
                     defaultResId = R.drawable.live_casino_banner,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onPlayNowClick = { requireLoginOr { showGunduAtaChoiceDialog = true } }
                 )
             }
 
@@ -198,7 +196,7 @@ fun HeroHomeScreen(
                     requireLoginOr { showGunduAtaChoiceDialog = true }
                 }
                 HeroCategoryChip(
-                    label = "H&T",
+                    label = "Chit Pat",
                     icon = Icons.Default.MonetizationOn,
                     selected = selectedCategory == "coin"
                 ) {
@@ -395,7 +393,8 @@ private fun HeroCategoryChip(
 }
 
 @Composable
-private fun HeroBottomBar(
+fun HeroBottomBar(
+    selectedTab: DualNavTab = DualNavTab.HOME,
     onHome: () -> Unit,
     onPromo: () -> Unit,
     onVip: () -> Unit,
@@ -416,8 +415,8 @@ private fun HeroBottomBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            HeroNavItem("HOME", Icons.Default.Home, true, onHome)
-            HeroNavItem("PROMO", Icons.Default.CardGiftcard, false, onPromo)
+            HeroNavItem("HOME", Icons.Default.Home, selectedTab == DualNavTab.HOME, onHome)
+            HeroNavItem("PROMO", Icons.Default.CardGiftcard, selectedTab == DualNavTab.PROMO, onPromo)
             Box(
                 modifier = Modifier
                     .offset(y = (-12).dp)
@@ -429,8 +428,8 @@ private fun HeroBottomBar(
             ) {
                 Icon(Icons.Default.WorkspacePremium, contentDescription = "VIP", tint = Color.Black, modifier = Modifier.size(32.dp))
             }
-            HeroNavItem("WALLET", Icons.Default.AccountBalanceWallet, false, onWallet)
-            HeroNavItem("PROFILE", Icons.Default.Person, false, onProfile)
+            HeroNavItem("WALLET", Icons.Default.AccountBalanceWallet, selectedTab == DualNavTab.WALLET, onWallet)
+            HeroNavItem("PROFILE", Icons.Default.Person, selectedTab == DualNavTab.PROFILE, onProfile)
         }
     }
 }

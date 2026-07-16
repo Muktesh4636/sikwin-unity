@@ -118,11 +118,33 @@ data class ReferralData(
     val total_referrals: Int,
     val active_referrals: Int,
     val total_earnings: String,
-    val current_milestone_bonus: String,
-    val next_milestone: NextMilestone?,
-    val milestones: List<Milestone>,
-    val recent_bonuses: List<RecentBonus>,
+    val instant_bonus_per_referee: String? = null,
+    val total_instant_bonuses: String? = null,
+    val total_commission_earnings: String? = null,
+    val commission_tier_rate: Double? = null,
+    val commission_tier_percent: String? = null,
+    val commission_tiers: List<CommissionTier> = emptyList(),
+    val next_commission_tier: NextCommissionTier? = null,
+    val current_milestone_bonus: String? = null,
+    val next_milestone: NextMilestone? = null,
+    val milestones: List<Milestone> = emptyList(),
+    val recent_bonuses: List<RecentBonus> = emptyList(),
     val referrals: List<ReferralItem> = emptyList()
+)
+
+data class CommissionTier(
+    val min_referrals: Int,
+    val max_referrals: Int? = null,
+    val rate_percent: String,
+    val rate: Double,
+    val active: Boolean = false
+)
+
+data class NextCommissionTier(
+    val target_referrals: Int,
+    val referrals_needed: Int,
+    val rate: Double,
+    val rate_percent: String
 )
 
 data class ReferralItem(
@@ -204,18 +226,163 @@ data class CoinFlipResponse(
     val wallet_balance: String? = null
 )
 
-// --- Cricket / IPL: GET /api/cricket/live/, POST /api/cricket/bet/ ---
+// --- Cricket / IPL: matches, scores, changes (+ bet) ---
 
-/** GET https://gunduata.tech/api/cricket/live/ */
-data class CricketLiveResponse(
-    val data: CricketLiveEventData? = null,
-    val fetched_at: String? = null,
-    val source_url: String? = null
+/** GET /api/cricket/matches/ */
+data class CricketMatchesResponse(
+    val count: Int? = null,
+    val last_sync: String? = null,
+    val matches: List<CricketMatchSummary>? = null
 )
 
+/** Row from matches list (and overlapping fields on scores ticker). */
+data class CricketMatchSummary(
+    val id: Long = 0L,
+    val match: String? = null,
+    val competition: String? = null,
+    val country: String? = null,
+    val date: String? = null,
+    val period: String? = null,
+    val period_number: Int? = null,
+    val clock: CricketMatchClock? = null,
+    val scores: List<CricketTeamScore>? = null,
+    val batting: String? = null,
+    /** Live over/ball progress from scores / match detail. */
+    val live: CricketLiveInfo? = null,
+    /** List endpoint: market count as Int. */
+    val markets: Int? = null,
+    val live_market_count: Int? = null,
+    val detail_url: String? = null,
+    val betradar_id: Long? = null,
+    val slug: String? = null
+) {
+    fun marketCount(): Int = live_market_count ?: markets ?: 0
+}
+
+data class CricketMatchClock(
+    val running: Boolean? = null,
+    val minutes: Int? = null,
+    val seconds: Int? = null,
+    val status: String? = null
+)
+
+data class CricketTeamScore(
+    val team: String? = null,
+    val team_id: Long? = null,
+    val score: String? = null,
+    val batting: Boolean? = null
+)
+
+/**
+ * Live over/ball block from GET /api/cricket/scores/ and match detail.
+ * Example: `{ "current_over": 12, "current_ball": null, "source": "market_inference" }`
+ */
+data class CricketLiveInfo(
+    val current_over: Int? = null,
+    val current_ball: Int? = null,
+    val current_over_balls: Int? = null,
+    val last_ball_timestamp: String? = null,
+    val recent_overs: List<CricketRecentOver>? = null,
+    val source: String? = null
+) {
+    /** Cricket-style overs decimal, e.g. 12.3 (over 12, ball 3). */
+    fun oversDecimal(): Double? {
+        val over = current_over ?: return null
+        val ball = (current_ball ?: current_over_balls)?.coerceIn(0, 5) ?: 0
+        return over + ball / 10.0
+    }
+
+    fun oversLabel(): String? {
+        val over = current_over ?: return null
+        val ball = current_ball ?: current_over_balls
+        return if (ball != null) "$over.$ball" else over.toString()
+    }
+}
+
+/** GET /api/cricket/matches/{id}/ */
+data class CricketMatchDetailResponse(
+    val last_sync: String? = null,
+    val match: CricketMatchDetail? = null
+)
+
+data class CricketMatchDetail(
+    val id: Long = 0L,
+    val match: String? = null,
+    val competition: String? = null,
+    val country: String? = null,
+    val date: String? = null,
+    val period: String? = null,
+    val period_number: Int? = null,
+    val clock: CricketMatchClock? = null,
+    val scores: List<CricketTeamScore>? = null,
+    val live: CricketLiveInfo? = null,
+    val live_market_count: Int? = null,
+    val betradar_id: Long? = null,
+    val slug: String? = null,
+    val odds: CricketOddsBundle? = null
+)
+
+data class CricketOddsBundle(
+    val market_count: Int? = null,
+    val markets: List<CricketOddsMarket>? = null
+)
+
+data class CricketOddsMarket(
+    val id: Long = 0L,
+    val description: String? = null,
+    val market_type: String? = null,
+    val market_type_id: Long? = null,
+    val status: String? = null,
+    val period: String? = null,
+    val period_id: Long? = null,
+    val team: String? = null,
+    val outcomes: List<CricketOddsOutcome>? = null
+)
+
+data class CricketOddsOutcome(
+    val id: Long = 0L,
+    val description: String? = null,
+    val price_decimal: Double? = null,
+    val price_formatted: String? = null,
+    val prev_price_decimal: Double? = null,
+    val line: Double? = null,
+    val withdrawn: Boolean? = null,
+    val hidden: Boolean? = null
+)
+
+/** GET /api/cricket/scores/ */
+data class CricketScoresResponse(
+    val count: Int? = null,
+    val last_sync: String? = null,
+    val matches: List<CricketMatchSummary>? = null
+)
+
+/**
+ * GET /api/cricket/changes/?bn=N — live price deltas.
+ * Upstream may be flaky; [bn] advances when present.
+ */
+data class CricketChangesResponse(
+    val bn: Long? = null,
+    val last_sync: String? = null,
+    val markets: List<CricketOddsMarket>? = null,
+    val events: List<CricketChangeEvent>? = null,
+    val matches: List<CricketMatchDetail>? = null,
+    val error: String? = null,
+    val detail: String? = null
+)
+
+data class CricketChangeEvent(
+    val id: Long = 0L,
+    val markets: List<CricketOddsMarket>? = null,
+    val odds: CricketOddsBundle? = null
+)
+
+/** UI-friendly live event built from match detail / changes. */
 data class CricketLiveEventData(
     val id: Long = 0L,
     val description: String? = null,
+    val competition: String? = null,
+    val period: String? = null,
     val markets: List<CricketLiveMarket>? = null
 )
 
@@ -223,13 +390,17 @@ data class CricketLiveMarket(
     val id: Long = 0L,
     val description: String? = null,
     val status: String? = null,
+    val marketType: String? = null,
+    val period: String? = null,
     val outcomes: List<CricketLiveOutcome>? = null
 )
 
 data class CricketLiveOutcome(
     val id: Long = 0L,
     val description: String? = null,
-    val consolidatedPrice: CricketConsolidatedPrice? = null
+    val consolidatedPrice: CricketConsolidatedPrice? = null,
+    val withdrawn: Boolean? = null,
+    val hidden: Boolean? = null
 ) {
     fun displayLabel(): String = description?.trim()?.takeIf { it.isNotEmpty() } ?: "—"
     fun displayOdds(): String {
@@ -248,6 +419,101 @@ data class CricketCurrentPrice(
     val decimal: Double? = null,
     val format: String? = null
 )
+
+/** Maps provider odds markets into the UI market model. */
+fun List<CricketOddsMarket>.toLiveMarkets(): List<CricketLiveMarket> =
+    map { m ->
+        CricketLiveMarket(
+            id = m.id,
+            description = m.description,
+            status = m.status,
+            marketType = m.market_type,
+            period = m.period,
+            outcomes = m.outcomes.orEmpty()
+                .filter { it.hidden != true && it.withdrawn != true }
+                .map { o ->
+                    CricketLiveOutcome(
+                        id = o.id,
+                        description = o.description,
+                        consolidatedPrice = CricketConsolidatedPrice(
+                            currentPrice = CricketCurrentPrice(
+                                decimal = o.price_decimal,
+                                format = o.price_formatted
+                            )
+                        ),
+                        withdrawn = o.withdrawn,
+                        hidden = o.hidden
+                    )
+                }
+        )
+    }
+
+fun CricketMatchDetail.toLiveEvent(): CricketLiveEventData =
+    CricketLiveEventData(
+        id = id,
+        description = match,
+        competition = competition?.takeIf { it.isNotBlank() } ?: country,
+        period = period,
+        markets = odds?.markets.orEmpty().toLiveMarkets()
+    )
+
+fun CricketMatchDetail.toScorePayload(): CricketScorePayload =
+    CricketMatchSummary(
+        id = id,
+        match = match,
+        competition = competition,
+        country = country,
+        date = date,
+        period = period,
+        period_number = period_number,
+        clock = clock,
+        scores = scores,
+        live = live,
+        live_market_count = live_market_count,
+        betradar_id = betradar_id,
+        slug = slug
+    ).toScorePayload()
+
+/** Builds a lightweight scorecard from ticker scores for the scoreboard panel. */
+fun CricketMatchSummary.toScorePayload(): CricketScorePayload {
+    val liveOvers = live?.oversDecimal()
+    val liveLabel = live?.oversLabel()
+    val innings = scores.orEmpty().mapIndexed { index, s ->
+        val (runs, wickets) = parseCricketScoreLine(s.score)
+        val batting = s.batting == true
+        CricketInningsScore(
+            teamName = s.team,
+            summary = s.score,
+            conclusion = if (batting) "In Progress" else null,
+            runs = runs,
+            wickets = wickets,
+            // Attach live overs to the batting side when API provides them.
+            overs = if (batting) liveOvers else null,
+            inningsNumber = index + 1
+        )
+    }
+    val overNote = liveLabel?.let { "Ov $it" }
+    return CricketScorePayload(
+        matchTitle = match,
+        matchCommentary = listOfNotNull(
+            period,
+            overNote,
+            competition?.takeIf { it.isNotBlank() }
+        ).joinToString(" · ").ifBlank { null },
+        seriesName = competition?.takeIf { it.isNotBlank() } ?: country,
+        recentOvers = live?.recent_overs,
+        innings = innings
+    )
+}
+
+fun parseCricketScoreLine(raw: String?): Pair<Int?, Int?> {
+    val s = raw?.trim().orEmpty()
+    if (s.isEmpty() || s == "-" || s.equals("yet to bat", true)) return null to null
+    val parts = s.split("-", limit = 2)
+    val runs = parts.getOrNull(0)?.trim()?.toIntOrNull()
+    val wickets = parts.getOrNull(1)?.trim()?.substringBefore(" ")?.toIntOrNull()
+    return runs to wickets
+}
 
 /** POST /api/cricket/bet/ */
 data class CricketBetRequest(
@@ -295,16 +561,7 @@ data class CricketBetListWrapper(
     val results: List<CricketBetHistoryItem>? = null
 )
 
-// --- Cricket scorecard: GET /api/cricket/result/ (live match JSON from provider) ---
-
-/** GET https://gunduata.tech/api/cricket/result/ */
-data class CricketResultResponse(
-    val match_id: String? = null,
-    val fetched_at: String? = null,
-    val score: CricketScorePayload? = null,
-    val action: String? = null,
-    val message: String? = null
-)
+// --- Cricket scorecard helpers (built from GET /api/cricket/scores/) ---
 
 data class CricketScorePayload(
     val matchTitle: String? = null,

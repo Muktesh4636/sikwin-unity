@@ -12,17 +12,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -38,8 +33,11 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.compose.material.icons.filled.AddBox
 import com.sikwin.app.R
+import com.sikwin.app.data.prefs.ThemePreferences
 import com.sikwin.app.ui.theme.*
+import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 // ─── Chip amounts ────────────────────────────────────────────────────────────
@@ -49,12 +47,20 @@ private const val BET_WINDOW_SECONDS = 30
 private val DarkGreen = Color(0xFF062006)
 private val HeaderGreen = Color(0xFF0A2A0A)
 private val GoldBorder = Color(0xFFD4A017)
-private val ResultRed = Color(0xFF5A0802)
 private val HistoryTan = Color(0xFFD2A653)
 private val HistoryNum = Color(0xFF2A2A2A)
+private val GridGreen = Color(0xFF0A280A)
+private val BetGold = Color(0xFFE8C252)
+
+private fun parseWalletBalance(balance: String): Double =
+    balance.replace(",", "").trim().toDoubleOrNull() ?: 0.0
 
 @Composable
-fun GunduAtaLiveScreen(onBack: () -> Unit) {
+fun GunduAtaLiveScreen(
+    viewModel: GunduAtaViewModel,
+    onBack: () -> Unit,
+    onNavigate: (String) -> Unit
+) {
     var selectedChip by remember { mutableStateOf(50) }
     var bets by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     var phase by remember { mutableStateOf("BETTING") } // BETTING | ROLLING | RESULT
@@ -64,11 +70,36 @@ fun GunduAtaLiveScreen(onBack: () -> Unit) {
     var diceCount by remember { mutableStateOf(0) }
     var recentResults by remember { mutableStateOf(listOf(4, 6, 5, 1, 6, 4)) }
     var winMessage by remember { mutableStateOf("") }
-    var balance by remember { mutableStateOf(5000) }
+    var sessionBalance by remember { mutableStateOf(0.0) }
     var statusText by remember { mutableStateOf("Tap a number to place your bet") }
     var leaving by remember { mutableStateOf(false) }
-    var boardSize by remember { mutableStateOf(IntSize.Zero) }
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.checkSession()
+                if (viewModel.loginSuccess) viewModel.fetchWallet()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.checkSession()
+        if (viewModel.loginSuccess) viewModel.fetchWallet()
+    }
+
+    val walletBalance = viewModel.wallet?.balance ?: "0.00"
+
+    LaunchedEffect(viewModel.wallet?.balance, bets.isEmpty()) {
+        viewModel.wallet?.balance?.let { walletStr ->
+            if (bets.isEmpty()) {
+                sessionBalance = parseWalletBalance(walletStr)
+            }
+        }
+    }
 
     fun goBack() {
         if (leaving) return
@@ -99,12 +130,10 @@ fun GunduAtaLiveScreen(onBack: () -> Unit) {
         label = "liveDot"
     )
 
-    val bannerText = if (bettingOpen) "PLACE YOUR BETS" else "BETS CLOSED"
-
     fun clearBets() {
         if (!bettingOpen || phase != "BETTING") return
         val refund = bets.values.sum()
-        balance += refund
+        sessionBalance += refund
         bets = emptyMap()
         statusText = "Bets cleared — tap a number to place bet"
     }
@@ -115,11 +144,11 @@ fun GunduAtaLiveScreen(onBack: () -> Unit) {
             return
         }
         if (number !in 1..6) return
-        if (balance < selectedChip) {
+        if (sessionBalance < selectedChip) {
             statusText = "Insufficient balance"
             return
         }
-        balance -= selectedChip
+        sessionBalance -= selectedChip
         val next = bets.toMutableMap()
         next[number] = (next[number] ?: 0) + selectedChip
         bets = next
@@ -131,22 +160,6 @@ fun GunduAtaLiveScreen(onBack: () -> Unit) {
         val idx = CHIPS.indexOf(selectedChip)
         selectedChip = CHIPS[(idx + 1) % CHIPS.size]
         statusText = "Chip ₹$selectedChip selected — tap a number"
-    }
-
-    fun hitTest(offset: Offset, size: IntSize): Int? {
-        if (size.width <= 0 || size.height <= 0) return null
-        val x = offset.x
-        val y = offset.y
-        val w = size.width.toFloat()
-        val h = size.height.toFloat()
-        val row = if (y < h * 0.5f) 0 else 1
-        val col = ((x / w) * 4f).toInt().coerceIn(0, 3)
-        return when {
-            row == 0 -> col + 1
-            col == 0 -> 5
-            col == 3 -> 6
-            else -> 0 // peacock / chip zone
-        }
     }
 
     // Alternate PLACE YOUR BETS / BETS CLOSED every 30 seconds
@@ -186,7 +199,7 @@ fun GunduAtaLiveScreen(onBack: () -> Unit) {
             val stake = bets[r] ?: 0
             if (stake > 0) {
                 val win = stake * c
-                balance += win
+                sessionBalance += win
                 winMessage = "YOU WIN! +₹$win"
                 statusText = "Number $r hit — won ₹$win"
             } else {
@@ -202,52 +215,31 @@ fun GunduAtaLiveScreen(onBack: () -> Unit) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkGreen)
-            .statusBarsPadding()
-    ) {
-        // ── Header ────────────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(HeaderGreen)
-                .border(BorderStroke(1.dp, GoldBorder))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { goBack() }, modifier = Modifier.size(34.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = PrimaryYellow,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Text(
-                "GUNDU ATA",
-                color = PrimaryYellow,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 20.sp,
-                fontFamily = FontFamily.Serif,
-                letterSpacing = 1.2.sp,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 4.dp),
-                textAlign = TextAlign.Center
+    Scaffold(
+        containerColor = DualScreenBlack,
+        topBar = {
+            GunduAtaLiveTopBar(
+                viewModel = viewModel,
+                balance = walletBalance,
+                onBack = { goBack() },
+                onDeposit = {
+                    if (viewModel.loginSuccess) onNavigate("deposit") else onNavigate("login")
+                },
+                onLogin = { onNavigate("login") }
             )
-            Column(horizontalAlignment = Alignment.End) {
-                Text("₹$balance", color = PrimaryYellow, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text("EXP: ₹0.00", color = PrimaryYellow.copy(alpha = 0.85f), fontSize = 10.sp)
-            }
         }
-
-        // ── Live video (slightly larger) ──────────────────────────────────────
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(DarkGreen)
+        ) {
+        // ── Live video ────────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.40f)
+                .weight(0.42f)
                 .border(BorderStroke(1.dp, GoldBorder))
                 .background(Color(0xFF0A280A))
         ) {
@@ -312,227 +304,381 @@ fun GunduAtaLiveScreen(onBack: () -> Unit) {
             }
         }
 
-        // ── PLACE YOUR BETS / BETS CLOSED card (larger, covers full width) ────
+        // ── Betting grid — full phone width, shorter height only ──────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
-                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .weight(0.30f)
+        ) {
+            GunduBettingGrid(
+                bets = bets,
+                selectedChip = selectedChip,
+                bettingOpen = bettingOpen,
+                phase = phase,
+                onRefresh = { clearBets() },
+                onNumberBet = { placeBetOn(it) },
+                onCycleChip = { cycleChip() },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        GunduDiceResultBar(
+            diceResult = diceResult,
+            diceCount = diceCount
+        )
+
+        GunduReferenceHistoryStrip(
+            recentResults = recentResults,
+            modifier = Modifier.navigationBarsPadding()
+        )
+        }
+    }
+}
+
+/** Top bar on Live — uses the same theme as the home screen (Dual Cards / Hero / Classic). */
+@Composable
+private fun GunduAtaLiveTopBar(
+    viewModel: GunduAtaViewModel,
+    balance: String,
+    onBack: () -> Unit,
+    onDeposit: () -> Unit,
+    onLogin: () -> Unit
+) {
+    val context = LocalContext.current
+    val appTheme = remember {
+        ThemePreferences(context).getAppTheme()
+    }
+
+    when (appTheme) {
+        ThemePreferences.THEME_DUAL_CARDS,
+        ThemePreferences.THEME_HERO -> {
+            DualCardsTopBar(
+                balance = balance,
+                isLoggedIn = viewModel.loginSuccess,
+                onLeadingClick = onBack,
+                leadingIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                onDeposit = onDeposit,
+                onLogin = onLogin
+            )
+        }
+        else -> {
+            GunduAtaClassicLiveTopBar(
+                balance = balance,
+                isLoggedIn = viewModel.loginSuccess,
+                onBack = onBack,
+                onDeposit = onDeposit,
+                onLogin = onLogin
+            )
+        }
+    }
+}
+
+/** Classic home theme top bar with back button (matches [HomeTopBar] styling). */
+@Composable
+private fun GunduAtaClassicLiveTopBar(
+    balance: String,
+    isLoggedIn: Boolean,
+    onBack: () -> Unit,
+    onDeposit: () -> Unit,
+    onLogin: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BlackBackground)
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = PrimaryYellow,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(R.drawable.gundu_header_bar),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.FillBounds
+                painter = painterResource(id = R.drawable.gundu_ata_logo_gold),
+                contentDescription = "Gundu Ata",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.height(44.dp)
             )
+        }
+
+        if (isLoggedIn) {
+            Surface(color = SurfaceColor, shape = RoundedCornerShape(20.dp)) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.clickable { onDeposit() },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("₹", color = PrimaryYellow, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(balance, color = TextWhite, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        Icons.Default.AddBox,
+                        contentDescription = "Add money",
+                        tint = PrimaryYellow,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable { onDeposit() }
+                    )
+                }
+            }
+        } else {
+            TextButton(onClick = onLogin) {
+                Text("Login", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+// ─── Number grid image (1–6 only from Generated_image.png) ───────────────────
+@Composable
+private fun GunduBettingGrid(
+    bets: Map<Int, Int>,
+    selectedChip: Int,
+    bettingOpen: Boolean,
+    phase: String,
+    onRefresh: () -> Unit,
+    onNumberBet: (Int) -> Unit,
+    onCycleChip: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val enabled = bettingOpen && phase == "BETTING"
+    Box(
+        modifier = modifier
+            .background(GridGreen)
+            .border(BorderStroke(1.5.dp, GoldBorder))
+    ) {
+        Image(
+            painter = painterResource(R.drawable.gundu_bet_grid_only),
+            contentDescription = "Betting numbers",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds
+        )
+
+        if (!bettingOpen) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(HeaderGreen.copy(alpha = 0.55f))
-                    .border(BorderStroke(1.5.dp, GoldBorder))
-            )
-            Text(
-                text = bannerText,
-                color = Color(0xFFFFD700),
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 24.sp,
-                fontFamily = FontFamily.Serif,
-                letterSpacing = 1.8.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier.align(Alignment.Center)
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 6.dp)
-                    .size(48.dp)
-                    .clickable(enabled = bettingOpen && phase == "BETTING") { clearBets() },
-                contentAlignment = Alignment.Center
+                    .align(Alignment.TopCenter)
+                    .padding(top = 6.dp)
+                    .background(HeaderGreen.copy(alpha = 0.9f))
+                    .border(1.dp, GoldBorder)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
-                Text("↻", color = Color(0xFFFFD700), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "BETS CLOSED",
+                    color = BetGold,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Serif
+                )
             }
         }
 
-        // ── Number grid only (image has no PLACE YOUR BETS text) ──────────────
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.44f)
-                .onSizeChanged { boardSize = it }
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(36.dp)
+                .border(BorderStroke(1.5.dp, GoldBorder))
+                .background(HeaderGreen)
+                .clickable(enabled = enabled) { onRefresh() },
+            contentAlignment = Alignment.Center
         ) {
-            val rowH = maxHeight / 2f
-            val colW = maxWidth / 4f
+            Text("↻", color = BetGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
 
-            Image(
-                painter = painterResource(R.drawable.gundu_live_board),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.FillBounds
-            )
-
-            // Chip overlays on numbers that have bets (visual only)
-            bets.forEach { (number, amount) ->
-                val (ox, oy) = when (number) {
-                    1 -> 0 to 0
-                    2 -> 1 to 0
-                    3 -> 2 to 0
-                    4 -> 3 to 0
-                    5 -> 0 to 1
-                    else -> 3 to 1
-                }
-                val chipSize = if (colW < rowH) colW * 0.42f else rowH * 0.42f
-                Box(
-                    modifier = Modifier
-                        .offset(x = colW * ox, y = rowH * oy)
-                        .size(width = colW, height = rowH),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.gundu_chip_red),
-                        contentDescription = null,
-                        modifier = Modifier.size(chipSize),
-                        contentScale = ContentScale.Fit
-                    )
-                    Text(
-                        if (amount >= 1000) "${amount / 1000}K" else "$amount",
-                        color = Color.White,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 11.sp
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                listOf(1, 2, 3, 4).forEach { num ->
+                    GunduGridHotspot(
+                        betAmount = bets[num],
+                        enabled = enabled,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        onClick = { onNumberBet(num) }
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                GunduGridHotspot(
+                    betAmount = bets[5],
+                    enabled = enabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    onClick = { onNumberBet(5) }
+                )
+                GunduPeacockChipOverlay(
+                    chipAmount = selectedChip,
+                    enabled = enabled,
+                    modifier = Modifier
+                        .weight(2f)
+                        .fillMaxHeight(),
+                    onClick = onCycleChip
+                )
+                GunduGridHotspot(
+                    betAmount = bets[6],
+                    enabled = enabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    onClick = { onNumberBet(6) }
+                )
+            }
+        }
+    }
+}
 
-            // Center selected chip label
+@Composable
+private fun GunduGridHotspot(
+    betAmount: Int?,
+    enabled: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    val hasBet = betAmount != null && betAmount > 0
+    Box(
+        modifier = modifier.clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        if (hasBet) {
             Box(
                 modifier = Modifier
-                    .offset(x = colW, y = rowH)
-                    .size(width = colW * 2f, height = rowH),
+                    .padding(bottom = 6.dp)
+                    .size(26.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.gundu_chip_red),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+                Text(
+                    text = if (betAmount!! >= 1000) "${betAmount / 1000}K" else "$betAmount",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 9.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GunduPeacockChipOverlay(
+    chipAmount: Int,
+    enabled: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier.clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        // Cover baked chip value when user cycles away from 50
+        if (chipAmount != 50) {
+            Box(
+                modifier = Modifier
+                    .size(width = 38.dp, height = 38.dp)
+                    .background(Color(0xFFC62828), CircleShape)
+                    .border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (selectedChip >= 1000) "${selectedChip / 1000}K" else "$selectedChip",
+                    text = if (chipAmount >= 1000) "${chipAmount / 1000}K" else "$chipAmount",
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
                     textAlign = TextAlign.Center
                 )
             }
+        }
+    }
+}
 
-            // Full-size tap layer
+// ─── Dice result — text only, no image ─────────────────────────────────────────
+@Composable
+private fun GunduDiceResultBar(diceResult: Int, diceCount: Int) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(GridGreen)
+            .border(BorderStroke(1.dp, GoldBorder.copy(alpha = 0.55f)))
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (diceResult > 0) "Dice Rolled: $diceResult($diceCount)" else "Dice Rolled: —",
+            color = BetGold,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            fontFamily = FontFamily.Serif,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun GunduReferenceHistoryStrip(
+    recentResults: List<Int>,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .background(HistoryTan)
+            .border(BorderStroke(1.dp, Color(0xFF8B6914)))
+    ) {
+        recentResults.take(6).forEachIndexed { index, num ->
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(phase, bettingOpen, selectedChip, balance, bets) {
-                        detectTapGestures { tap ->
-                            if (phase != "BETTING" || !bettingOpen) return@detectTapGestures
-                            when (val hit = hitTest(tap, boardSize)) {
-                                null -> Unit
-                                0 -> cycleChip()
-                                else -> placeBetOn(hit)
-                            }
-                        }
-                    }
-            )
-        }
-
-        // ── Chip selector ─────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0A280A))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CHIPS.forEach { chip ->
-                val selected = selectedChip == chip
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (selected) Color(0xFFC62828) else Color(0xFF3E2723))
-                        .border(
-                            1.5.dp,
-                            if (selected) Color(0xFFFFD700) else Color(0xFF6D4C41),
-                            RoundedCornerShape(18.dp)
-                        )
-                        .clickable(enabled = bettingOpen && phase == "BETTING") {
-                            selectedChip = chip
-                            statusText = "Chip ₹$chip — tap a number to place bet"
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        if (chip >= 1000) "1K" else "$chip",
-                        color = if (bettingOpen) Color.White else Color.White.copy(alpha = 0.45f),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-            }
-        }
-
-        Text(
-            text = if (bettingOpen) "${secondsLeft}s left to bet" else "Bets closed — ${secondsLeft}s",
-            color = Color(0xFFFFD700),
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Serif,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0A280A))
-                .padding(bottom = 4.dp)
-        )
-
-        // ── Dice result ───────────────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .background(ResultRed)
-                .border(BorderStroke(1.dp, GoldBorder.copy(alpha = 0.55f))),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (diceResult > 0) "Dice Rolled: $diceResult($diceCount)" else "Dice Rolled: —",
-                color = Color(0xFFFFD700),
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                fontFamily = FontFamily.Serif
-            )
-        }
-
-        // ── History strip ─────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(42.dp)
-                .background(HistoryTan)
-                .border(1.dp, Color(0xFF8B6914))
-                .navigationBarsPadding()
-        ) {
-            recentResults.take(6).forEachIndexed { index, num ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .then(
-                            if (index < recentResults.take(6).lastIndex)
-                                Modifier.border(BorderStroke(0.5.dp, Color(0xFF8B6914)))
-                            else Modifier
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "$num",
-                        color = HistoryNum,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        fontFamily = FontFamily.Serif
-                    )
-                }
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .then(
+                        if (index < recentResults.take(6).lastIndex)
+                            Modifier.border(BorderStroke(0.5.dp, Color(0xFF8B6914)))
+                        else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "$num",
+                    color = HistoryNum,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    fontFamily = FontFamily.Serif
+                )
             }
         }
     }

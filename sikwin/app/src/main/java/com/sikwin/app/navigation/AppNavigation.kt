@@ -843,7 +843,11 @@ fun AppNavigation(
             )
         }
         composable("gundu_ata_live") {
-            GunduAtaLiveScreen(onBack = { navController.popBackStack() })
+            GunduAtaLiveScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) }
+            )
         }
         composable("leaderboard") {
             LeaderboardScreen(

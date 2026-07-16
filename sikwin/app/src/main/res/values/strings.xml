@@ -83,7 +83,7 @@
     <string name="daily_prize">Daily Prize</string>
     <string name="win_prize">Win ₹1,000</string>
     <string name="refer_earn">REFER &amp; EARN</string>
-    <string name="refer_earn_subtitle">Invite friends and win up to ₹1 Lakh!</string>
+    <string name="refer_earn_subtitle">Invite friends — earn ₹100 per deposit + daily commission</string>
     
     <!-- Auth -->
     <string name="sign_in_required">Sign In Required</string>
@@ -286,7 +286,14 @@
     <string name="how_it_works">HOW IT WORKS</string>
     <string name="step_share_code">Share your code with friends</string>
     <string name="step_friend_deposits">Friend registers &amp; deposits ₹100+</string>
-    <string name="step_get_bonus">You get ₹100 instantly!</string>
+    <string name="step_get_bonus">You get ₹100 when they make their first deposit</string>
+    <string name="referral_commission_note">Instant ₹100 bonus on each friend\'s first approved deposit. Daily commission is credited on your referrals\' wallet losses (previous day, IST).</string>
+    <string name="daily_commission_tiers">DAILY COMMISSION TIERS</string>
+    <string name="your_commission_rate">Your commission rate</string>
+    <string name="commission_on_referee_loss">On each referral\'s daily wallet loss</string>
+    <string name="next_commission_tier_hint">%1$d more referrals to unlock %2$s commission</string>
+    <string name="instant_bonuses_earned">Instant Bonuses</string>
+    <string name="commission_earned">Commission</string>
     <string name="referral_milestone_auto_credit_note">Milestone cash (₹500, ₹2,200) is added to your wallet automatically when you finish each step. The final step (25 referrals) unlocks Spin &amp; Win — not an automatic cash deposit.</string>
     <string name="step_milestone_bonuses">Steps: 3 refs → ₹500, then 12 more (0/12) → ₹2,200 (15 total), then 25 more → Spin (40 total)</string>
     <string name="milestone_complete_next_level">%1$d/%2$d referrals done — milestone complete. Next level: %3$d referrals.</string>

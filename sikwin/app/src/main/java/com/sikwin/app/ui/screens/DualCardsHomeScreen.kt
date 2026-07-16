@@ -32,13 +32,6 @@ import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 
-private val GoldLight = Color(0xFFFFE082)
-private val GoldMid = Color(0xFFFFD54F)
-private val GoldDeep = Color(0xFFC9A227)
-private val GoldBrush = Brush.verticalGradient(listOf(GoldLight, GoldMid, GoldDeep))
-private val ScreenBlack = Color(0xFF000000)
-private val CardDark = Color(0xFF0D0D0D)
-
 /**
  * Dual Cards home theme — coded Compose UI matching PHOTO dual-cards design.
  * Selectable from Profile → Themes.
@@ -114,9 +107,10 @@ fun DualCardsHomeScreen(
     }
 
     Scaffold(
-        containerColor = ScreenBlack,
+        containerColor = DualScreenBlack,
         bottomBar = {
             DualCardsBottomBar(
+                selectedTab = DualNavTab.HOME,
                 onHome = { },
                 onPromo = { onNavigate("affiliate") },
                 onVip = { onNavigate("leaderboard") },
@@ -134,27 +128,25 @@ fun DualCardsHomeScreen(
             DualCardsTopBar(
                 balance = viewModel.wallet?.balance ?: "0.00",
                 isLoggedIn = viewModel.loginSuccess,
-                onMenu = { onNavigate("me") },
+                onLeadingClick = { onNavigate("me") },
                 onDeposit = { requireLoginOr { onNavigate("deposit") } },
                 onLogin = { onNavigate("login") }
             )
 
             SearchBar(onSearch = { searchQuery = it })
 
-            // LIVE CASINO hero banner (artwork includes title + PLAY NOW)
+            // Gundu Ata LIVE banner — only PLAY NOW opens game mode picker
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(220.dp)
+                    .aspectRatio(LIVE_CASINO_BANNER_ASPECT_RATIO)
                     .clip(RoundedCornerShape(18.dp))
-                    .clickable { requireLoginOr { showGunduAtaChoiceDialog = true } }
             ) {
-                LiveCasinoBannerImage(
+                LiveCasinoBannerWithPlayNow(
                     defaultResId = R.drawable.live_casino_banner,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onPlayNowClick = { requireLoginOr { showGunduAtaChoiceDialog = true } }
                 )
             }
 
@@ -177,13 +169,13 @@ fun DualCardsHomeScreen(
                 DualCategoryCircle("CRICKET", Icons.Default.SportsCricket) {
                     requireLoginOr { onNavigate("ipl") }
                 }
-                DualCategoryCircle("SLOTS", Icons.Default.Casino) {
+                DualCategoryCircle("Rangu", Icons.Default.Casino) {
                     requireLoginOr { onNavigate("colour_game") }
                 }
                 DualCategoryCircle("LIVE", Icons.Default.Videocam) {
                     requireLoginOr { onNavigate("gundu_ata_live") }
                 }
-                DualCategoryCircle("H&T", Icons.Default.MonetizationOn) {
+                DualCategoryCircle("Chit Pat", Icons.Default.MonetizationOn) {
                     requireLoginOr { onNavigate("coin") }
                 }
             }
@@ -203,8 +195,8 @@ fun DualCardsHomeScreen(
                         .weight(1f)
                         .height(260.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(CardDark)
-                        .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                        .background(DualCardDark)
+                        .border(1.dp, DualGoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
                         .clickable { requireLoginOr { onNavigate("gundu_ata_live") } }
                 ) {
                     VideoPlayer(
@@ -220,7 +212,7 @@ fun DualCardsHomeScreen(
                         .height(260.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF0B3D2E))
-                        .border(1.dp, GoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                        .border(1.dp, DualGoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
                         .clickable { requireLoginOr { onGameClick("gundu_ata") } }
                 ) {
                     VideoPlayer(
@@ -231,67 +223,6 @@ fun DualCardsHomeScreen(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun DualCardsTopBar(
-    balance: String,
-    isLoggedIn: Boolean,
-    onMenu: () -> Unit,
-    onDeposit: () -> Unit,
-    onLogin: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = GoldMid, modifier = Modifier.size(26.dp))
-        }
-
-        Image(
-            painter = painterResource(id = R.drawable.gundu_ata_logo_gold),
-            contentDescription = "Gundu Ata",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .weight(1f)
-                .height(58.dp)
-                .padding(horizontal = 8.dp)
-        )
-
-        if (isLoggedIn) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xFF1A1A1A))
-                    .border(1.dp, GoldDeep.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                    .padding(start = 12.dp, end = 5.dp, top = 5.dp, bottom = 5.dp)
-                    .clickable(onClick = onDeposit),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = GoldMid, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("₹$balance", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Spacer(modifier = Modifier.width(6.dp))
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(GoldBrush),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Black, modifier = Modifier.size(18.dp))
-                }
-            }
-        } else {
-            TextButton(onClick = onLogin) {
-                Text(stringResource(R.string.login), color = GoldMid, fontWeight = FontWeight.Bold)
-            }
         }
     }
 }
@@ -314,7 +245,7 @@ private fun DualCategoryCircle(
                 .size(54.dp)
                 .clip(CircleShape)
                 .background(Color(0xFF121212))
-                .border(1.5.dp, GoldMid, CircleShape),
+                .border(1.5.dp, DualGoldMid, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             if (imageRes != null) {
@@ -325,87 +256,16 @@ private fun DualCategoryCircle(
                     modifier = Modifier.size(40.dp)
                 )
             } else if (icon != null) {
-                Icon(icon, contentDescription = label, tint = GoldMid, modifier = Modifier.size(26.dp))
+                Icon(icon, contentDescription = label, tint = DualGoldMid, modifier = Modifier.size(26.dp))
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             label,
-            color = GoldMid,
+            color = DualGoldMid,
             fontSize = if (label.length > 6) 8.sp else 10.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun GoldPlayButton(text: String, fullWidth: Boolean = false, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier.wrapContentWidth())
-            .height(36.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(GoldBrush)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text,
-            color = Color.Black,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = if (fullWidth) 0.dp else 18.dp)
-        )
-    }
-}
-
-@Composable
-private fun DualCardsBottomBar(
-    onHome: () -> Unit,
-    onPromo: () -> Unit,
-    onVip: () -> Unit,
-    onWallet: () -> Unit,
-    onProfile: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF0A0A0A))
-            .navigationBarsPadding()
-            .height(78.dp)
-            .padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        DualNavItem("HOME", Icons.Default.Home, true, onHome)
-        DualNavItem("PROMO", Icons.Default.CardGiftcard, false, onPromo)
-        DualNavItem("VIP", Icons.Default.WorkspacePremium, false, onVip)
-        DualNavItem("WALLET", Icons.Default.AccountBalanceWallet, false, onWallet)
-        DualNavItem("PROFILE", Icons.Default.Person, false, onProfile)
-    }
-}
-
-@Composable
-private fun DualNavItem(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp)
-    ) {
-        Icon(
-            icon,
-            contentDescription = label,
-            tint = if (selected) GoldMid else GoldDeep.copy(alpha = 0.7f),
-            modifier = Modifier.size(28.dp)
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            label,
-            color = if (selected) GoldMid else GoldDeep.copy(alpha = 0.7f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
         )
     }
 }

@@ -215,25 +215,25 @@ export type ReferralData = {
   total_referrals: number;
   active_referrals: number;
   total_earnings: string;
-  current_milestone_bonus?: string;
-  next_milestone?: {
-    next_milestone?: number;
-    next_bonus: number;
-    next_bonus_display?: string;
-    current_progress: number;
-    progress_percentage: number;
-    target?: number;
-    tier?: number;
-  };
-  milestones?: Array<{
-    count: number;
-    bonus: number;
-    bonus_display?: string;
-    achieved?: boolean;
-    progress_current?: number;
-    target?: number;
+  instant_bonus_per_referee?: string;
+  total_instant_bonuses?: string;
+  total_commission_earnings?: string;
+  commission_tier_rate?: number;
+  commission_tier_percent?: string;
+  commission_tiers?: Array<{
+    min_referrals: number;
+    max_referrals?: number | null;
+    rate_percent: string;
+    rate: number;
+    active?: boolean;
   }>;
-  referrals?: Array<{ id: number; username: string; has_deposit?: boolean }>;
+  next_commission_tier?: {
+    target_referrals: number;
+    referrals_needed: number;
+    rate: number;
+    rate_percent: string;
+  };
+  referrals?: Array<{ id: number; username: string; has_deposit?: boolean; instant_bonus_paid?: boolean }>;
 };
 
 export async function apiReferralData() {

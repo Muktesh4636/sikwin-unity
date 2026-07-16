@@ -41,6 +41,9 @@ deploy_one() {
   fi
 }
 
+echo "==> Syncing latest APK into public/ (and dist/ if present)..."
+"$SCRIPT_DIR/copy-apk-for-download.sh"
+
 echo "==> Building website..."
 if [ -f "$SCRIPT_DIR/node_modules/typescript/lib/tsc.js" ]; then
   node "$SCRIPT_DIR/node_modules/typescript/lib/tsc.js" -b && node "$SCRIPT_DIR/node_modules/vite/bin/vite.js" build

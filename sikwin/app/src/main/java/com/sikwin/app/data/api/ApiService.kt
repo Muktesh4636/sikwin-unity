@@ -115,13 +115,21 @@ interface ApiService {
     @DELETE("auth/bank-details/{id}/")
     suspend fun deleteBankDetail(@Path("id") id: Int): Response<Unit>
 
-    /** Live event + markets + odds — see [CricketLiveResponse]. */
-    @GET("cricket/live/")
-    suspend fun getCricketLive(): Response<CricketLiveResponse>
+    /** Match list — app open / match list screen. No auth. */
+    @GET("cricket/matches/")
+    suspend fun getCricketMatches(): Response<CricketMatchesResponse>
 
-    /** Live scorecard / ball-by-ball context — see [CricketResultResponse]. No auth required. */
-    @GET("cricket/result/")
-    suspend fun getCricketResult(@Query("match_id") matchId: Long? = null): Response<CricketResultResponse>
+    /** Match detail + odds — user taps a match. No auth. */
+    @GET("cricket/matches/{id}/")
+    suspend fun getCricketMatch(@Path("id") id: Long): Response<CricketMatchDetailResponse>
+
+    /** Score ticker widget. No auth. */
+    @GET("cricket/scores/")
+    suspend fun getCricketScores(): Response<CricketScoresResponse>
+
+    /** Live price deltas — poll every ~3s with bookmark [bn]. No auth. */
+    @GET("cricket/changes/")
+    suspend fun getCricketChanges(@Query("bn") bn: Long): Response<CricketChangesResponse>
 
     @POST("cricket/bet/")
     suspend fun postCricketBet(@Body body: CricketBetRequest): Response<CricketBetResponse>
