@@ -80,12 +80,15 @@ import androidx.compose.ui.unit.sp
 import com.sikwin.app.data.models.CricketLiveMarket
 import com.sikwin.app.data.models.CricketLiveOutcome
 import com.sikwin.app.data.models.CricketMatchSummary
+import com.sikwin.app.data.models.CricketUpcomingMatch
 import com.sikwin.app.data.models.CricketBatsmanRow
 import com.sikwin.app.data.models.CricketBowlerRow
 import com.sikwin.app.data.models.CricketInningsScore
 import com.sikwin.app.data.models.CricketScorePayload
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.DisposableEffect
+import java.text.SimpleDateFormat
+import java.util.TimeZone
 import com.sikwin.app.ui.theme.CricketAccentGold
 import com.sikwin.app.ui.theme.CricketChipBorder
 import com.sikwin.app.ui.theme.CricketHeaderBg
@@ -110,10 +113,17 @@ private const val CRICKET_CHANGES_POLL_MS = 3000L
 private const val CRICKET_DETAIL_FALLBACK_POLL_MS = 8000L
 /** Match list refresh while browsing. */
 private const val CRICKET_MATCHES_POLL_MS = 15000L
+/** Upcoming list refresh. */
+private const val CRICKET_UPCOMING_POLL_MS = 30000L
 /** Live score ticker from GET /api/cricket/scores/ */
 private const val CRICKET_SCORE_POLL_MS = 5000L
 /** Blur only after this many failed polls in a row (transient errors won't stop updates). */
 private const val CRICKET_POLL_FAILURES_BEFORE_BLUR = 5
+
+private enum class CricketListTab {
+    Live,
+    Upcoming
+}
 
 /** Slight blur on odds when live polling has stopped after a failed fetch (API 31+); softer alpha on older APIs. */
 private fun Modifier.oddsBlurIf(blur: Boolean): Modifier = when {
@@ -166,7 +176,10 @@ fun IplScreen(
     var pollSession by remember { mutableIntStateOf(0) }
     /** null = both panels collapsed; tap a tab to open, tap again to close. Default: Scoreboard open. */
     var iplMatchTab by remember { mutableStateOf<IplMatchTab?>(IplMatchTab.Scoreboard) }
+    var listTab by remember { mutableStateOf(CricketListTab.Live) }
+    var autoSwitchedToUpcoming by remember { mutableStateOf(false) }
     val selectedMatchId = viewModel.cricketSelectedMatchId
+    val fromUpcoming = viewModel.cricketSelectedFromUpcoming
 
     fun restartCricketPolling() {
         pollSession++
@@ -182,7 +195,21 @@ fun IplScreen(
         filterIndex = 0
     }
 
-    // Match list polling
+    // If live list loads empty, default to Upcoming once.
+    LaunchedEffect(viewModel.cricketMatches, viewModel.cricketMatchesLoading, viewModel.cricketUpcoming) {
+        if (
+            !autoSwitchedToUpcoming &&
+            !viewModel.cricketMatchesLoading &&
+            viewModel.cricketMatches.isEmpty() &&
+            viewModel.cricketUpcoming.isNotEmpty() &&
+            listTab == CricketListTab.Live
+        ) {
+            listTab = CricketListTab.Upcoming
+            autoSwitchedToUpcoming = true
+        }
+    }
+
+    // Live match list polling
     LaunchedEffect(pollSession, selectedMatchId == null) {
         if (selectedMatchId != null) return@LaunchedEffect
         viewModel.fetchWallet()
@@ -195,7 +222,18 @@ fun IplScreen(
         }
     }
 
-    // Scores ticker (list + detail)
+    // Upcoming list polling
+    LaunchedEffect(pollSession, selectedMatchId == null) {
+        if (selectedMatchId != null && !fromUpcoming) return@LaunchedEffect
+        while (true) {
+            val start = SystemClock.elapsedRealtime()
+            viewModel.cricketFetchUpcomingOnce()
+            val elapsed = SystemClock.elapsedRealtime() - start
+            delay((CRICKET_UPCOMING_POLL_MS - elapsed).coerceAtLeast(0L))
+        }
+    }
+
+    // Scores ticker (list + live detail)
     LaunchedEffect(pollSession) {
         while (true) {
             val start = SystemClock.elapsedRealtime()
@@ -205,9 +243,10 @@ fun IplScreen(
         }
     }
 
-    // Detail: changes every 3s, fall back to full detail refresh when changes fails
-    LaunchedEffect(pollSession, selectedMatchId) {
+    // Live detail: changes every 3s, fall back to full detail refresh when changes fails
+    LaunchedEffect(pollSession, selectedMatchId, fromUpcoming) {
         val matchId = selectedMatchId ?: return@LaunchedEffect
+        if (fromUpcoming) return@LaunchedEffect
         viewModel.fetchWallet()
         viewModel.cricketPollStopped = false
         viewModel.cricketError = null
@@ -236,6 +275,17 @@ fun IplScreen(
             }
             val elapsed = SystemClock.elapsedRealtime() - start
             delay((CRICKET_CHANGES_POLL_MS - elapsed).coerceAtLeast(0L))
+        }
+    }
+
+    // Upcoming detail: refresh inline odds from upcoming list
+    LaunchedEffect(pollSession, selectedMatchId, fromUpcoming) {
+        if (selectedMatchId == null || !fromUpcoming) return@LaunchedEffect
+        while (true) {
+            val start = SystemClock.elapsedRealtime()
+            viewModel.cricketFetchUpcomingOnce()
+            val elapsed = SystemClock.elapsedRealtime() - start
+            delay((CRICKET_UPCOMING_POLL_MS - elapsed).coerceAtLeast(0L))
         }
     }
 
@@ -347,11 +397,18 @@ fun IplScreen(
             if (selectedMatchId == null) {
                 CricketMatchListContent(
                     viewModel = viewModel,
+                    listTab = listTab,
+                    onListTab = { listTab = it },
                     onRetry = { restartCricketPolling() },
-                    onSelectMatch = { id ->
+                    onSelectLiveMatch = { id ->
                         filterIndex = 0
                         iplMatchTab = IplMatchTab.Scoreboard
-                        viewModel.selectCricketMatch(id)
+                        viewModel.selectCricketMatch(id, fromUpcoming = false)
+                    },
+                    onSelectUpcomingMatch = { id ->
+                        filterIndex = 0
+                        iplMatchTab = null
+                        viewModel.selectCricketMatch(id, fromUpcoming = true)
                     }
                 )
             } else {
@@ -375,97 +432,334 @@ fun IplScreen(
 @Composable
 private fun ColumnScope.CricketMatchListContent(
     viewModel: GunduAtaViewModel,
+    listTab: CricketListTab,
+    onListTab: (CricketListTab) -> Unit,
     onRetry: () -> Unit,
-    onSelectMatch: (Long) -> Unit
+    onSelectLiveMatch: (Long) -> Unit,
+    onSelectUpcomingMatch: (Long) -> Unit
 ) {
-    val matches = viewModel.cricketMatches
-    when {
-        viewModel.cricketMatchesLoading && matches.isEmpty() -> {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = CricketAccentGold)
+    val liveMatches = viewModel.cricketMatches
+    val upcomingMatches = viewModel.cricketUpcoming
+    val loading = when (listTab) {
+        CricketListTab.Live -> viewModel.cricketMatchesLoading && liveMatches.isEmpty()
+        CricketListTab.Upcoming -> viewModel.cricketUpcomingLoading && upcomingMatches.isEmpty()
+    }
+    val error = when (listTab) {
+        CricketListTab.Live -> viewModel.cricketMatchesError.takeIf { liveMatches.isEmpty() }
+        CricketListTab.Upcoming -> viewModel.cricketUpcomingError.takeIf { upcomingMatches.isEmpty() }
+    }
+
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxSize()
+    ) {
+        CricketLiveUpcomingTabs(
+            selected = listTab,
+            liveCount = liveMatches.size,
+            upcomingCount = upcomingMatches.size,
+            onSelect = onListTab,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        )
+
+        when {
+            loading -> {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = CricketAccentGold)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            if (listTab == CricketListTab.Live) "Loading live matches…" else "Loading upcoming…",
+                            color = CricketTextMuted,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
+            error != null -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = error,
+                        color = CricketTextMuted,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Loading matches…", color = CricketTextMuted, fontSize = 14.sp)
+                    OutlinedButton(
+                        onClick = onRetry,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, CricketChipBorder)
+                    ) {
+                        Text("Retry", color = CricketAccentGold)
+                    }
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    when (listTab) {
+                        CricketListTab.Live -> {
+                            val synced = viewModel.cricketMatchesSyncedAt
+                            if (!synced.isNullOrBlank()) {
+                                item {
+                                    Text("Synced $synced", color = CricketTextMuted, fontSize = 11.sp)
+                                }
+                            }
+                            if (liveMatches.isEmpty()) {
+                                item {
+                                    Text(
+                                        text = "No live matches right now. Check Upcoming.",
+                                        color = CricketTextMuted,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.padding(vertical = 24.dp)
+                                    )
+                                }
+                            } else {
+                                items(liveMatches, key = { "live_${it.id}" }) { match ->
+                                    CricketMatchListRow(
+                                        match = match,
+                                        ticker = viewModel.cricketScoreById[match.id],
+                                        onClick = { onSelectLiveMatch(match.id) }
+                                    )
+                                }
+                            }
+                        }
+
+                        CricketListTab.Upcoming -> {
+                            val synced = viewModel.cricketUpcomingSyncedAt
+                            if (!synced.isNullOrBlank()) {
+                                item {
+                                    Text("Synced $synced", color = CricketTextMuted, fontSize = 11.sp)
+                                }
+                            }
+                            if (upcomingMatches.isEmpty()) {
+                                item {
+                                    Text(
+                                        text = "No upcoming matches right now.",
+                                        color = CricketTextMuted,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.padding(vertical = 24.dp)
+                                    )
+                                }
+                            } else {
+                                val grouped = upcomingMatches.groupBy {
+                                    it.competition?.takeIf { c -> c.isNotBlank() }
+                                        ?: it.country?.takeIf { c -> c.isNotBlank() }
+                                        ?: "Upcoming fixtures"
+                                }
+                                grouped.forEach { (competition, matches) ->
+                                    item(key = "hdr_$competition") {
+                                        Text(
+                                            text = competition.uppercase(Locale.US),
+                                            color = UpcomingAccent,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            letterSpacing = 0.6.sp,
+                                            modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                                        )
+                                    }
+                                    items(matches, key = { "up_${it.id}" }) { match ->
+                                        CricketUpcomingListRow(
+                                            match = match,
+                                            onClick = { onSelectUpcomingMatch(match.id) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+}
 
-        viewModel.cricketMatchesError != null && matches.isEmpty() -> {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+@Composable
+private fun CricketLiveUpcomingTabs(
+    selected: CricketListTab,
+    liveCount: Int,
+    upcomingCount: Int,
+    onSelect: (CricketListTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        listOf(
+            CricketListTab.Live to ("Live ($liveCount)" to CricketAccentGold),
+            CricketListTab.Upcoming to ("Upcoming ($upcomingCount)" to UpcomingAccent)
+        ).forEach { (tab, labelAccent) ->
+            val (label, accent) = labelAccent
+            val isSelected = selected == tab
+            Surface(
+                onClick = { onSelect(tab) },
+                shape = RoundedCornerShape(20.dp),
+                color = if (isSelected) accent.copy(alpha = 0.16f) else CricketMarketBg,
+                border = BorderStroke(
+                    1.dp,
+                    if (isSelected) accent else CricketChipBorder
+                ),
+                modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = viewModel.cricketMatchesError ?: "Could not load.",
-                    color = CricketTextMuted,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                    text = label,
+                    color = if (isSelected) accent else CricketTextMuted,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedButton(
-                    onClick = onRetry,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, CricketChipBorder)
-                ) {
-                    Text("Retry", color = CricketAccentGold)
-                }
             }
         }
+    }
+}
 
-        else -> {
-            LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+private val UpcomingCardBg = Color(0xFF121A28)
+private val UpcomingCardBorder = Color(0xFF2A3F5C)
+private val UpcomingAccent = Color(0xFF6EB6FF)
+
+@Composable
+private fun CricketUpcomingListRow(
+    match: CricketUpcomingMatch,
+    onClick: () -> Unit
+) {
+    val title = match.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
+    val (teamA, teamB) = splitCricketMatchTeams(title)
+    val whenText = formatCricketUpcomingDate(match.date)
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = UpcomingCardBg,
+        border = BorderStroke(1.dp, UpcomingCardBorder),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                item {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = UpcomingAccent.copy(alpha = 0.14f)
+                ) {
                     Text(
-                        text = "Live matches",
-                        color = TextWhite,
+                        text = "FIXTURE",
+                        color = UpcomingAccent,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
-                viewModel.cricketMatchesSyncedAt?.takeIf { it.isNotBlank() }?.let { ts ->
-                    item {
-                        Text(
-                            text = "Synced $ts",
-                            color = CricketTextMuted,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-                if (matches.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No live matches right now.",
-                            color = CricketTextMuted,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(vertical = 24.dp)
-                        )
-                    }
-                } else {
-                    items(matches, key = { it.id }) { match ->
-                        CricketMatchListRow(
-                            match = match,
-                            ticker = viewModel.cricketScoreById[match.id],
-                            onClick = { onSelectMatch(match.id) }
-                        )
-                    }
-                }
+                Text(
+                    text = whenText ?: "TBD",
+                    color = TextWhite,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = teamA,
+                color = TextWhite,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "vs",
+                color = UpcomingAccent.copy(alpha = 0.9f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            Text(
+                text = teamB,
+                color = TextWhite,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = UpcomingCardBorder.copy(alpha = 0.8f), thickness = 1.dp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (match.marketCount() > 0) "${match.marketCount()} markets available" else "Odds soon",
+                    color = CricketTextMuted,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "View odds ›",
+                    color = UpcomingAccent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
+    }
+}
+
+/** Split "A vs B" / "A v B" into two team names for fixture cards. */
+private fun splitCricketMatchTeams(title: String): Pair<String, String> {
+    val parts = title.split(Regex("\\s+vs\\.?\\s+|\\s+v\\.?\\s+", RegexOption.IGNORE_CASE), limit = 2)
+    return if (parts.size == 2) {
+        parts[0].trim() to parts[1].trim()
+    } else {
+        title to "TBD"
+    }
+}
+
+private fun formatCricketUpcomingDate(raw: String?): String? {
+    val s = raw?.trim().orEmpty()
+    if (s.isEmpty()) return null
+    return try {
+        val inFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        // API uses +0000 without colon
+        val normalized = s.replace(Regex("([+-]\\d{2}):(\\d{2})$"), "$1$2")
+        val date = inFmt.parse(normalized) ?: return s
+        val outFmt = SimpleDateFormat("dd MMM, hh:mm a", Locale.US)
+        outFmt.format(date)
+    } catch (_: Exception) {
+        s.take(16)
     }
 }
 

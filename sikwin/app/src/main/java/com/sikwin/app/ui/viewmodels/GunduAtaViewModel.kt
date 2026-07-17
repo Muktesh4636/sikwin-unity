@@ -234,8 +234,16 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     var cricketMatchesError by mutableStateOf<String?>(null)
     var cricketMatchesSyncedAt by mutableStateOf<String?>(null)
 
+    /** GET /api/cricket/upcoming/ */
+    var cricketUpcoming by mutableStateOf<List<CricketUpcomingMatch>>(emptyList())
+    var cricketUpcomingLoading by mutableStateOf(false)
+    var cricketUpcomingError by mutableStateOf<String?>(null)
+    var cricketUpcomingSyncedAt by mutableStateOf<String?>(null)
+
     /** Selected match id — null shows the list. */
     var cricketSelectedMatchId by mutableStateOf<Long?>(null)
+    /** True when selection came from upcoming list (use inline odds; detail API may 404). */
+    var cricketSelectedFromUpcoming by mutableStateOf(false)
 
     /** Mapped live event for the selected match (detail + changes). */
     var cricketLive by mutableStateOf<CricketLiveEventData?>(null)
@@ -290,6 +298,48 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         }
     }
 
+    /** Fetch upcoming / pre-match list. */
+    suspend fun cricketFetchUpcomingOnce(): Boolean {
+        val showSpinner = cricketUpcoming.isEmpty() && cricketUpcomingError == null
+        if (showSpinner) cricketUpcomingLoading = true
+        return try {
+            val resp = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getCricketUpcoming()
+            }
+            if (resp.isSuccessful) {
+                val body = resp.body()
+                val list = body?.matches.orEmpty()
+                cricketUpcoming = list
+                cricketUpcomingSyncedAt = body?.last_sync
+                cricketUpcomingError = if (list.isEmpty()) "No upcoming matches right now." else null
+                // If user is viewing an upcoming match, refresh inline odds.
+                val sel = cricketSelectedMatchId
+                if (cricketSelectedFromUpcoming && sel != null) {
+                    list.firstOrNull { it.id == sel }?.let { u ->
+                        cricketLive = u.toLiveEvent()
+                        cricketLiveEpoch++
+                        cricketFetchedAt = body?.last_sync
+                        cricketError = null
+                    }
+                }
+                true
+            } else {
+                logoutIfUnauthorized(resp.code())
+                val err = resp.errorBody()?.string()
+                if (cricketUpcoming.isEmpty()) cricketUpcomingError = parseError(err)
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketUpcoming", "Failed", e)
+            if (cricketUpcoming.isEmpty()) {
+                cricketUpcomingError = handleException(e)
+            }
+            false
+        } finally {
+            if (showSpinner) cricketUpcomingLoading = false
+        }
+    }
+
     /** Fetch scores ticker and refresh scorecard for the selected match. */
     suspend fun cricketFetchScoresOnce(): Boolean {
         return try {
@@ -338,15 +388,31 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         cricketScore = row?.toScorePayload()
     }
 
-    fun selectCricketMatch(matchId: Long) {
-        if (cricketSelectedMatchId == matchId) return
+    fun selectCricketMatch(matchId: Long, fromUpcoming: Boolean = false) {
+        if (cricketSelectedMatchId == matchId && cricketSelectedFromUpcoming == fromUpcoming) return
         cricketSelectedMatchId = matchId
+        cricketSelectedFromUpcoming = fromUpcoming
         cricketLive = null
         cricketLiveEpoch = 0L
         cricketError = null
         cricketPollStopped = false
         cricketChangesBn = 0L
         cricketChangesError = null
+        if (fromUpcoming) {
+            cricketScore = null
+            cricketScoreError = null
+            val upcoming = cricketUpcoming.firstOrNull { it.id == matchId }
+            if (upcoming != null) {
+                cricketLive = upcoming.toLiveEvent()
+                cricketLiveEpoch++
+                cricketFetchedAt = cricketUpcomingSyncedAt
+                cricketError = null
+                cricketLoading = false
+            } else {
+                cricketError = "Could not load upcoming match."
+            }
+            return
+        }
         applySelectedMatchScore()
         viewModelScope.launch {
             cricketFetchMatchDetailOnce(matchId)
@@ -355,6 +421,7 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
 
     fun clearCricketMatchSelection() {
         cricketSelectedMatchId = null
+        cricketSelectedFromUpcoming = false
         cricketLive = null
         cricketFetchedAt = null
         cricketLiveEpoch = 0L
@@ -474,8 +541,14 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     fun refreshCricketFeed() {
         viewModelScope.launch {
             val id = cricketSelectedMatchId
-            if (id != null) cricketFetchMatchDetailOnce(id)
-            else cricketFetchMatchesOnce()
+            when {
+                id != null && cricketSelectedFromUpcoming -> cricketFetchUpcomingOnce()
+                id != null -> cricketFetchMatchDetailOnce(id)
+                else -> {
+                    cricketFetchMatchesOnce()
+                    cricketFetchUpcomingOnce()
+                }
+            }
             cricketFetchScoresOnce()
         }
     }

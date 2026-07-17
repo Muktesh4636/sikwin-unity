@@ -115,9 +115,13 @@ interface ApiService {
     @DELETE("auth/bank-details/{id}/")
     suspend fun deleteBankDetail(@Path("id") id: Int): Response<Unit>
 
-    /** Match list — app open / match list screen. No auth. */
+    /** Match list — live matches. No auth. */
     @GET("cricket/matches/")
     suspend fun getCricketMatches(): Response<CricketMatchesResponse>
+
+    /** Upcoming / pre-match list with odds. No auth. */
+    @GET("cricket/upcoming/")
+    suspend fun getCricketUpcoming(): Response<CricketUpcomingResponse>
 
     /** Match detail + odds — user taps a match. No auth. */
     @GET("cricket/matches/{id}/")

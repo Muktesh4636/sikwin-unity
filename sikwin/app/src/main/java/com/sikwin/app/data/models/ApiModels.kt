@@ -235,6 +235,56 @@ data class CricketMatchesResponse(
     val matches: List<CricketMatchSummary>? = null
 )
 
+/** GET /api/cricket/upcoming/ */
+data class CricketUpcomingResponse(
+    val count: Int? = null,
+    val last_sync: String? = null,
+    val matches: List<CricketUpcomingMatch>? = null
+)
+
+/** Pre-match row — includes inline odds (detail URL may 404 for these ids). */
+data class CricketUpcomingMatch(
+    val id: Long = 0L,
+    val match: String? = null,
+    val competition: String? = null,
+    val country: String? = null,
+    val date: String? = null,
+    val slug: String? = null,
+    val betradar_id: Long? = null,
+    val odds: CricketOddsBundle? = null
+) {
+    fun marketCount(): Int = odds?.market_count ?: odds?.markets?.size ?: 0
+
+    fun toLiveEvent(): CricketLiveEventData =
+        CricketLiveEventData(
+            id = id,
+            description = match,
+            competition = competition?.takeIf { it.isNotBlank() } ?: country,
+            period = "Upcoming",
+            markets = odds?.markets.orEmpty().toLiveMarkets()
+        )
+
+    /** First open market outcomes for list preview (usually H2H). */
+    fun previewOutcomes(): List<CricketLiveOutcome> {
+        val markets = odds?.markets.orEmpty()
+        val open = markets.firstOrNull { it.status.equals("open", true) } ?: markets.firstOrNull()
+        return open?.outcomes.orEmpty()
+            .filter { it.hidden != true && it.withdrawn != true }
+            .map {
+                CricketLiveOutcome(
+                    id = it.id,
+                    description = it.description,
+                    consolidatedPrice = CricketConsolidatedPrice(
+                        currentPrice = CricketCurrentPrice(
+                            decimal = it.price_decimal,
+                            format = it.price_formatted
+                        )
+                    )
+                )
+            }
+    }
+}
+
 /** Row from matches list (and overlapping fields on scores ticker). */
 data class CricketMatchSummary(
     val id: Long = 0L,
@@ -276,13 +326,16 @@ data class CricketTeamScore(
 /**
  * Live over/ball block from GET /api/cricket/scores/ and match detail.
  * Example: `{ "current_over": 12, "current_ball": null, "source": "market_inference" }`
+ *
+ * When [source] is `ball_by_ball`, [recent_overs] uses comma-separated [CricketLiveRecentOver.balls]
+ * strings (not arrays) — wrong typing here used to break Gson for the entire matches/scores payload.
  */
 data class CricketLiveInfo(
     val current_over: Int? = null,
     val current_ball: Int? = null,
     val current_over_balls: Int? = null,
-    val last_ball_timestamp: String? = null,
-    val recent_overs: List<CricketRecentOver>? = null,
+    val last_ball_timestamp: Long? = null,
+    val recent_overs: List<CricketLiveRecentOver>? = null,
     val source: String? = null
 ) {
     /** Cricket-style overs decimal, e.g. 12.3 (over 12, ball 3). */
@@ -297,6 +350,27 @@ data class CricketLiveInfo(
         val ball = current_ball ?: current_over_balls
         return if (ball != null) "$over.$ball" else over.toString()
     }
+}
+
+/** One over from live.recent_overs (ball_by_ball source). */
+data class CricketLiveRecentOver(
+    val over: Int? = null,
+    /** Comma-separated codes, e.g. `"1,dot,4,W,wide"`. */
+    val balls: String? = null,
+    val runs: Int? = null,
+    val wickets: Int? = null,
+    val complete: Boolean? = null
+) {
+    fun ballCodes(): List<String> =
+        balls?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+
+    fun toUiRecentOver(): CricketRecentOver =
+        CricketRecentOver(
+            overNumber = over,
+            runs = runs,
+            isCurrentOver = complete == false,
+            balls = ballCodes()
+        )
 }
 
 /** GET /api/cricket/matches/{id}/ */
@@ -501,7 +575,7 @@ fun CricketMatchSummary.toScorePayload(): CricketScorePayload {
             competition?.takeIf { it.isNotBlank() }
         ).joinToString(" · ").ifBlank { null },
         seriesName = competition?.takeIf { it.isNotBlank() } ?: country,
-        recentOvers = live?.recent_overs,
+        recentOvers = live?.recent_overs?.map { it.toUiRecentOver() },
         innings = innings
     )
 }
