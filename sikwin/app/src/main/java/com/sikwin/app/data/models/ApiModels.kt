@@ -327,13 +327,16 @@ data class CricketTeamScore(
  * Live over/ball block from GET /api/cricket/scores/ and match detail.
  * Example: `{ "current_over": 12, "current_ball": null, "source": "market_inference" }`
  *
- * When [source] is `ball_by_ball`, [recent_overs] uses comma-separated [CricketLiveRecentOver.balls]
- * strings (not arrays) — wrong typing here used to break Gson for the entire matches/scores payload.
+ * When [source] is `ball_by_ball`:
+ * - [recent_overs].balls is a comma-separated string (not an array)
+ * - [current_over_balls] is also a comma-separated string (e.g. `"dot,1,W,wide"`)
+ * Wrong typing here used to break Gson for the entire matches/scores payload.
  */
 data class CricketLiveInfo(
     val current_over: Int? = null,
     val current_ball: Int? = null,
-    val current_over_balls: Int? = null,
+    /** Ball codes for the current over, e.g. `"dot,1,W,wide"` — not an Int. */
+    val current_over_balls: String? = null,
     val last_ball_timestamp: Long? = null,
     val recent_overs: List<CricketLiveRecentOver>? = null,
     val source: String? = null
@@ -341,15 +344,18 @@ data class CricketLiveInfo(
     /** Cricket-style overs decimal, e.g. 12.3 (over 12, ball 3). */
     fun oversDecimal(): Double? {
         val over = current_over ?: return null
-        val ball = (current_ball ?: current_over_balls)?.coerceIn(0, 5) ?: 0
+        val ball = current_ball?.coerceIn(0, 5) ?: 0
         return over + ball / 10.0
     }
 
     fun oversLabel(): String? {
         val over = current_over ?: return null
-        val ball = current_ball ?: current_over_balls
+        val ball = current_ball
         return if (ball != null) "$over.$ball" else over.toString()
     }
+
+    fun currentOverBallCodes(): List<String> =
+        current_over_balls?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
 }
 
 /** One over from live.recent_overs (ball_by_ball source). */

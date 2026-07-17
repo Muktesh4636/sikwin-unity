@@ -38,7 +38,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.SportsCricket
+import java.util.Calendar
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,6 +94,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.DisposableEffect
 import java.text.SimpleDateFormat
 import java.util.TimeZone
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import com.sikwin.app.ui.theme.CricketAccentGold
 import com.sikwin.app.ui.theme.CricketChipBorder
 import com.sikwin.app.ui.theme.CricketHeaderBg
@@ -385,7 +397,20 @@ fun IplScreen(
                 }
             )
         },
-        bottomBar = {},
+        bottomBar = {
+            CricketBottomNavBar(
+                onHome = { onNavigate("home") },
+                onPromotions = { onNavigate("affiliate") },
+                onCasino = {
+                    if (!viewModel.loginSuccess) onNavigate("login")
+                    else onNavigate("casino_games")
+                },
+                onProfile = {
+                    if (!viewModel.loginSuccess) onNavigate("login")
+                    else onNavigate("me")
+                }
+            )
+        },
         containerColor = CricketScreenBg
     ) { padding ->
         Column(
@@ -440,6 +465,17 @@ private fun ColumnScope.CricketMatchListContent(
 ) {
     val liveMatches = viewModel.cricketMatches
     val upcomingMatches = viewModel.cricketUpcoming
+    /** Leagues start open; keys here are collapsed. Multiple can stay open. */
+    var collapsedLeagues by remember { mutableStateOf(setOf<String>()) }
+
+    fun toggleLeague(key: String) {
+        collapsedLeagues = if (key in collapsedLeagues) {
+            collapsedLeagues - key
+        } else {
+            collapsedLeagues + key
+        }
+    }
+
     val loading = when (listTab) {
         CricketListTab.Live -> viewModel.cricketMatchesLoading && liveMatches.isEmpty()
         CricketListTab.Upcoming -> viewModel.cricketUpcomingLoading && upcomingMatches.isEmpty()
@@ -512,7 +548,7 @@ private fun ColumnScope.CricketMatchListContent(
 
             else -> {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .weight(1f)
@@ -520,70 +556,96 @@ private fun ColumnScope.CricketMatchListContent(
                 ) {
                     when (listTab) {
                         CricketListTab.Live -> {
-                            val synced = viewModel.cricketMatchesSyncedAt
-                            if (!synced.isNullOrBlank()) {
-                                item {
-                                    Text("Synced $synced", color = CricketTextMuted, fontSize = 11.sp)
-                                }
-                            }
                             if (liveMatches.isEmpty()) {
                                 item {
                                     Text(
                                         text = "No live matches right now. Check Upcoming.",
                                         color = CricketTextMuted,
                                         fontSize = 14.sp,
-                                        modifier = Modifier.padding(vertical = 24.dp)
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
                                     )
                                 }
                             } else {
-                                items(liveMatches, key = { "live_${it.id}" }) { match ->
-                                    CricketMatchListRow(
-                                        match = match,
-                                        ticker = viewModel.cricketScoreById[match.id],
-                                        onClick = { onSelectLiveMatch(match.id) }
-                                    )
+                                val grouped = liveMatches.groupBy { it.leagueLabel() }
+                                grouped.forEach { (league, matches) ->
+                                    val leagueKey = "live:$league"
+                                    val open = leagueKey !in collapsedLeagues
+                                    item(key = "hdr_$leagueKey") {
+                                        CricketLeagueHeader(
+                                            title = league,
+                                            matchCount = matches.size,
+                                            expanded = open,
+                                            onClick = { toggleLeague(leagueKey) }
+                                        )
+                                    }
+                                    if (open) {
+                                        item(key = "panel_$leagueKey") {
+                                            CricketLeagueMatchPanel {
+                                                matches.forEachIndexed { index, match ->
+                                                    val row = viewModel.cricketScoreById[match.id] ?: match
+                                                    CricketLiveScoreMatchRow(
+                                                        match = row,
+                                                        onClick = { onSelectLiveMatch(match.id) }
+                                                    )
+                                                    if (index < matches.lastIndex) {
+                                                        HorizontalDivider(
+                                                            color = BetstrikeDivider,
+                                                            thickness = 1.dp
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
 
                         CricketListTab.Upcoming -> {
-                            val synced = viewModel.cricketUpcomingSyncedAt
-                            if (!synced.isNullOrBlank()) {
-                                item {
-                                    Text("Synced $synced", color = CricketTextMuted, fontSize = 11.sp)
-                                }
-                            }
                             if (upcomingMatches.isEmpty()) {
                                 item {
                                     Text(
                                         text = "No upcoming matches right now.",
                                         color = CricketTextMuted,
                                         fontSize = 14.sp,
-                                        modifier = Modifier.padding(vertical = 24.dp)
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
                                     )
                                 }
                             } else {
-                                val grouped = upcomingMatches.groupBy {
-                                    it.competition?.takeIf { c -> c.isNotBlank() }
-                                        ?: it.country?.takeIf { c -> c.isNotBlank() }
-                                        ?: "Upcoming fixtures"
-                                }
-                                grouped.forEach { (competition, matches) ->
-                                    item(key = "hdr_$competition") {
-                                        Text(
-                                            text = competition.uppercase(Locale.US),
-                                            color = UpcomingAccent,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            letterSpacing = 0.6.sp,
-                                            modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                                val grouped = upcomingMatches.groupBy { it.leagueLabel() }
+                                grouped.forEach { (league, matches) ->
+                                    val leagueKey = "up:$league"
+                                    val open = leagueKey !in collapsedLeagues
+                                    item(key = "hdr_$leagueKey") {
+                                        CricketLeagueHeader(
+                                            title = league,
+                                            matchCount = matches.size,
+                                            expanded = open,
+                                            onClick = { toggleLeague(leagueKey) }
                                         )
                                     }
-                                    items(matches, key = { "up_${it.id}" }) { match ->
-                                        CricketUpcomingListRow(
-                                            match = match,
-                                            onClick = { onSelectUpcomingMatch(match.id) }
-                                        )
+                                    if (open) {
+                                        item(key = "panel_$leagueKey") {
+                                            CricketLeagueMatchPanel {
+                                                matches.forEachIndexed { index, match ->
+                                                    val title = match.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
+                                                    val (teamA, teamB) = splitCricketMatchTeams(title)
+                                                    CricketBetstrikeMatchRow(
+                                                        teamA = teamA,
+                                                        teamB = teamB,
+                                                        centerTop = "VS",
+                                                        centerBottom = formatCricketUpcomingDate(match.date) ?: "TBD",
+                                                        onClick = { onSelectUpcomingMatch(match.id) }
+                                                    )
+                                                    if (index < matches.lastIndex) {
+                                                        HorizontalDivider(
+                                                            color = BetstrikeDivider,
+                                                            thickness = 1.dp
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -591,6 +653,369 @@ private fun ColumnScope.CricketMatchListContent(
                     }
                 }
             }
+        }
+    }
+}
+
+private val BetstrikeLeagueBar = Color(0xFF1C1C1C)
+private val BetstrikeMatchPanel = Color(0xFF0A0A0A)
+private val BetstrikeDivider = Color(0xFF2A2A2A)
+private val BetstrikeMuted = Color(0xFF8E8E8E)
+/** Soft steel — not bright yellow — for league headers. */
+private val BetstrikeLeagueAccent = Color(0xFF8FB4C9)
+private val BetstrikeLeagueBadge = Color(0xFF2A3A45)
+private val BetstrikeLeagueTitle = Color(0xFFE8EEF2)
+
+@Composable
+private fun CricketBottomNavBar(
+    onHome: () -> Unit,
+    onPromotions: () -> Unit,
+    onCasino: () -> Unit,
+    onProfile: () -> Unit
+) {
+    // Same gold yellow as DualCards home bottom nav
+    val activeGold = DualGoldMid
+    val idleGold = DualGoldDeep.copy(alpha = 0.7f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0A0A0A))
+            .navigationBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(78.dp)
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CricketBottomNavItem("HOME", Icons.Filled.Home, idleGold, onClick = onHome)
+            CricketBottomNavItem("PROMOTIONS", Icons.Filled.CardGiftcard, idleGold, onClick = onPromotions)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .offset(y = (-8).dp)
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(DualGoldDeep.copy(alpha = 0.25f))
+                        .border(BorderStroke(1.5.dp, activeGold), CircleShape)
+                        .clickable(onClick = { /* already on cricket */ }),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SportsCricket,
+                        contentDescription = "Cricket",
+                        tint = activeGold,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Text(
+                    text = "CRICKET",
+                    color = activeGold,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.offset(y = (-4).dp)
+                )
+            }
+            CricketBottomNavItem("CASINO", Icons.Filled.Casino, idleGold, onClick = onCasino)
+            CricketBottomNavItem("PROFILE", Icons.Filled.Person, idleGold, onClick = onProfile)
+        }
+    }
+}
+
+@Composable
+private fun CricketBottomNavItem(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = color,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = label,
+            color = color,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun CricketLeagueHeader(
+    title: String,
+    matchCount: Int,
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = BetstrikeLeagueBar,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(BetstrikeLeagueAccent)
+            )
+            Box(
+                modifier = Modifier
+                    .padding(start = 10.dp)
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(BetstrikeLeagueBadge),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.SportsCricket,
+                    contentDescription = null,
+                    tint = BetstrikeLeagueAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Text(
+                text = title.uppercase(Locale.US),
+                color = BetstrikeLeagueTitle,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                letterSpacing = 0.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp)
+            )
+            Text(
+                text = if (matchCount == 1) "1 MATCH" else "$matchCount MATCHES",
+                color = BetstrikeMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = BetstrikeLeagueAccent,
+                modifier = Modifier
+                    .padding(start = 4.dp, end = 10.dp)
+                    .size(22.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CricketLeagueMatchPanel(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BetstrikeMatchPanel),
+        content = content
+    )
+}
+
+@Composable
+private fun CricketBetstrikeMatchRow(
+    teamA: String,
+    teamB: String,
+    centerTop: String,
+    centerBottom: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = teamA,
+            color = TextWhite,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.weight(1f)
+        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .weight(0.85f)
+                .padding(horizontal = 6.dp)
+        ) {
+            Text(
+                text = centerTop,
+                color = BetstrikeMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.4.sp
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = centerBottom,
+                color = BetstrikeMuted,
+                fontSize = 11.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
+        Text(
+            text = teamB,
+            color = TextWhite,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/** Live list row: team names + scores visible without opening the match. */
+@Composable
+private fun CricketLiveScoreMatchRow(
+    match: CricketMatchSummary,
+    onClick: () -> Unit
+) {
+    val scores = match.scores.orEmpty()
+    val teamA = scores.getOrNull(0)
+    val teamB = scores.getOrNull(1)
+    val (fallbackA, fallbackB) = liveMatchTeams(match)
+    val nameA = teamA?.team?.takeIf { it.isNotBlank() } ?: fallbackA
+    val nameB = teamB?.team?.takeIf { it.isNotBlank() } ?: fallbackB
+    val scoreA = teamA?.score?.takeIf { it.isNotBlank() } ?: "—"
+    val scoreB = teamB?.score?.takeIf { it.isNotBlank() } ?: "—"
+    val battingA = teamA?.batting == true
+    val battingB = teamB?.batting == true
+    val period = match.period?.takeIf { it.isNotBlank() } ?: "Live"
+    val overs = match.live?.oversLabel()?.let { "$it Ov" }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = nameA,
+                    color = TextWhite,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (battingA) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(BetstrikeLeagueAccent)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = scoreA,
+                color = BetstrikeLeagueTitle,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                maxLines = 1
+            )
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .weight(0.9f)
+                .padding(horizontal = 6.dp)
+        ) {
+            Text(
+                text = "LIVE",
+                color = Color(0xFFE53935),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = period,
+                color = BetstrikeMuted,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+            if (overs != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = overs,
+                    color = BetstrikeMuted,
+                    fontSize = 10.sp,
+                    maxLines = 1
+                )
+            }
+        }
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier.weight(1f)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (battingB) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(BetstrikeLeagueAccent)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(
+                    text = nameB,
+                    color = TextWhite,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = scoreB,
+                color = BetstrikeLeagueTitle,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                maxLines = 1,
+                textAlign = TextAlign.End
+            )
         }
     }
 }
@@ -605,138 +1030,66 @@ private fun CricketLiveUpcomingTabs(
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         listOf(
-            CricketListTab.Live to ("Live ($liveCount)" to CricketAccentGold),
-            CricketListTab.Upcoming to ("Upcoming ($upcomingCount)" to UpcomingAccent)
-        ).forEach { (tab, labelAccent) ->
-            val (label, accent) = labelAccent
+            Triple(CricketListTab.Live, "LIVE ($liveCount)", Icons.Filled.LiveTv),
+            Triple(CricketListTab.Upcoming, "UPCOMING ($upcomingCount)", Icons.Filled.CalendarMonth)
+        ).forEach { (tab, label, icon) ->
             val isSelected = selected == tab
-            Surface(
-                onClick = { onSelect(tab) },
-                shape = RoundedCornerShape(20.dp),
-                color = if (isSelected) accent.copy(alpha = 0.16f) else CricketMarketBg,
-                border = BorderStroke(
-                    1.dp,
-                    if (isSelected) accent else CricketChipBorder
-                ),
-                modifier = Modifier.weight(1f)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onSelect(tab) }
+                    .padding(vertical = 6.dp)
             ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = if (isSelected) CricketAccentGold else BetstrikeMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = label,
-                    color = if (isSelected) accent else CricketTextMuted,
+                    color = if (isSelected) CricketAccentGold else BetstrikeMuted,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
+                    fontSize = 12.sp,
+                    letterSpacing = 0.4.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 10.dp)
+                        .fillMaxWidth(0.55f)
+                        .height(2.dp)
+                        .background(if (isSelected) CricketAccentGold else Color.Transparent)
                 )
             }
         }
     }
 }
 
-private val UpcomingCardBg = Color(0xFF121A28)
-private val UpcomingCardBorder = Color(0xFF2A3F5C)
-private val UpcomingAccent = Color(0xFF6EB6FF)
+private fun CricketMatchSummary.leagueLabel(): String =
+    competition?.takeIf { it.isNotBlank() }
+        ?: country?.takeIf { it.isNotBlank() }
+        ?: "Other matches"
 
-@Composable
-private fun CricketUpcomingListRow(
-    match: CricketUpcomingMatch,
-    onClick: () -> Unit
-) {
-    val title = match.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
-    val (teamA, teamB) = splitCricketMatchTeams(title)
-    val whenText = formatCricketUpcomingDate(match.date)
+private fun CricketUpcomingMatch.leagueLabel(): String =
+    competition?.takeIf { it.isNotBlank() }
+        ?: country?.takeIf { it.isNotBlank() }
+        ?: "Upcoming fixtures"
 
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = UpcomingCardBg,
-        border = BorderStroke(1.dp, UpcomingCardBorder),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = UpcomingAccent.copy(alpha = 0.14f)
-                ) {
-                    Text(
-                        text = "FIXTURE",
-                        color = UpcomingAccent,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.8.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-                Text(
-                    text = whenText ?: "TBD",
-                    color = TextWhite,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = teamA,
-                color = TextWhite,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "vs",
-                color = UpcomingAccent.copy(alpha = 0.9f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-            Text(
-                text = teamB,
-                color = TextWhite,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = UpcomingCardBorder.copy(alpha = 0.8f), thickness = 1.dp)
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (match.marketCount() > 0) "${match.marketCount()} markets available" else "Odds soon",
-                    color = CricketTextMuted,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "View odds ›",
-                    color = UpcomingAccent,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
+private fun liveMatchTeams(row: CricketMatchSummary): Pair<String, String> {
+    val scores = row.scores.orEmpty()
+    if (scores.size >= 2) {
+        return (scores[0].team ?: "Team A") to (scores[1].team ?: "Team B")
     }
+    val title = row.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
+    return splitCricketMatchTeams(title)
 }
 
-/** Split "A vs B" / "A v B" into two team names for fixture cards. */
+/** Split "A vs B" / "A v B" into two team names. */
 private fun splitCricketMatchTeams(title: String): Pair<String, String> {
     val parts = title.split(Regex("\\s+vs\\.?\\s+|\\s+v\\.?\\s+", RegexOption.IGNORE_CASE), limit = 2)
     return if (parts.size == 2) {
@@ -753,116 +1106,32 @@ private fun formatCricketUpcomingDate(raw: String?): String? {
         val inFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }
-        // API uses +0000 without colon
         val normalized = s.replace(Regex("([+-]\\d{2}):(\\d{2})$"), "$1$2")
         val date = inFmt.parse(normalized) ?: return s
-        val outFmt = SimpleDateFormat("dd MMM, hh:mm a", Locale.US)
-        outFmt.format(date)
+        val timeFmt = SimpleDateFormat("h:mm a", Locale.US)
+        val dayFmt = SimpleDateFormat("dd MMM", Locale.US)
+        val timePart = timeFmt.format(date)
+        val calMatch = Calendar.getInstance().apply { time = date }
+        val calNow = Calendar.getInstance()
+        val dayLabel = when {
+            isSameDay(calMatch, calNow) -> "Today"
+            run {
+                calNow.add(Calendar.DAY_OF_YEAR, 1)
+                val tomorrow = isSameDay(calMatch, calNow)
+                calNow.add(Calendar.DAY_OF_YEAR, -1)
+                tomorrow
+            } -> "Tomorrow"
+            else -> dayFmt.format(date)
+        }
+        "$dayLabel, $timePart"
     } catch (_: Exception) {
         s.take(16)
     }
 }
 
-@Composable
-private fun CricketMatchListRow(
-    match: CricketMatchSummary,
-    ticker: CricketMatchSummary?,
-    onClick: () -> Unit
-) {
-    val row = ticker ?: match
-    val title = row.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
-    val competition = listOfNotNull(
-        row.competition?.takeIf { it.isNotBlank() },
-        row.country?.takeIf { it.isNotBlank() }
-    ).joinToString(" · ")
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = CricketMarketBg,
-        border = BorderStroke(1.dp, CricketChipBorder),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = row.period?.takeIf { it.isNotBlank() } ?: "Live",
-                    color = CricketAccentGold,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "${row.marketCount()} markets",
-                    color = CricketTextMuted,
-                    fontSize = 11.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = title,
-                color = TextWhite,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (competition.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(competition, color = CricketTextMuted, fontSize = 12.sp, maxLines = 1)
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            row.scores.orEmpty().forEach { s ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = s.team ?: "—",
-                            color = TextWhite,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.width(180.dp)
-                        )
-                        if (s.batting == true) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFFF9800))
-                            )
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = s.score?.takeIf { it.isNotBlank() } ?: "—",
-                            color = TextWhite,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
-                        if (s.batting == true) {
-                            row.live?.oversLabel()?.let { ov ->
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "($ov ov)",
-                                    color = CricketTextMuted,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+private fun isSameDay(a: Calendar, b: Calendar): Boolean =
+    a.get(Calendar.YEAR) == b.get(Calendar.YEAR) &&
+        a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
 
 @Composable
 private fun ColumnScope.CricketMatchDetailContent(
@@ -1340,7 +1609,7 @@ private fun CricketScoreCardSection(
                                         modifier = Modifier
                                             .size(8.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFFFF9800))
+                                            .background(BetstrikeLeagueAccent)
                                     )
                                 }
                             }

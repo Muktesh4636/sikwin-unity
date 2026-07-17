@@ -116,7 +116,7 @@ fun HeroHomeScreen(
                 selectedTab = DualNavTab.HOME,
                 onHome = { /* already home */ },
                 onPromo = { onNavigate("affiliate") },
-                onVip = { onNavigate("leaderboard") },
+                onCasino = { requireLoginOr { onNavigate("casino_games") } },
                 onWallet = { requireLoginOr { onNavigate("wallet") } },
                 onProfile = { onNavigate("me") }
             )
@@ -397,7 +397,7 @@ fun HeroBottomBar(
     selectedTab: DualNavTab = DualNavTab.HOME,
     onHome: () -> Unit,
     onPromo: () -> Unit,
-    onVip: () -> Unit,
+    onCasino: () -> Unit,
     onWallet: () -> Unit,
     onProfile: () -> Unit
 ) {
@@ -417,16 +417,30 @@ fun HeroBottomBar(
         ) {
             HeroNavItem("HOME", Icons.Default.Home, selectedTab == DualNavTab.HOME, onHome)
             HeroNavItem("PROMO", Icons.Default.CardGiftcard, selectedTab == DualNavTab.PROMO, onPromo)
-            Box(
-                modifier = Modifier
-                    .offset(y = (-12).dp)
-                    .size(62.dp)
-                    .clip(CircleShape)
-                    .background(PrimaryYellow)
-                    .clickable(onClick = onVip),
-                contentAlignment = Alignment.Center
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.offset(y = (-8).dp)
             ) {
-                Icon(Icons.Default.WorkspacePremium, contentDescription = "VIP", tint = Color.Black, modifier = Modifier.size(32.dp))
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(PrimaryYellow)
+                        .clickable(onClick = onCasino),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TwoDiceIcon(
+                        selected = true,
+                        modifier = Modifier.size(34.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    "CASINO",
+                    color = if (selectedTab == DualNavTab.CASINO) PrimaryYellow else TextGrey,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
             HeroNavItem("WALLET", Icons.Default.AccountBalanceWallet, selectedTab == DualNavTab.WALLET, onWallet)
             HeroNavItem("PROFILE", Icons.Default.Person, selectedTab == DualNavTab.PROFILE, onProfile)

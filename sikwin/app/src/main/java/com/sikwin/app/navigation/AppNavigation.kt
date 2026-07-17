@@ -679,6 +679,45 @@ fun AppNavigation(
                 }
             )
         }
+        composable("casino_games") {
+            CasinoGamesScreen(
+                onBack = { navController.popBackStack() },
+                onSelectGame = { route ->
+                    when (route) {
+                        "gundu_ata" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                viewModel.syncAuthToUnity()
+                                executeGameLaunch()
+                            }
+                        }
+                        "gundu_ata_live" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("gundu_ata_live")
+                            }
+                        }
+                        "colour_game" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("colour_game")
+                            }
+                        }
+                        "coin" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("coin")
+                            }
+                        }
+                        else -> navController.navigate(route)
+                    }
+                }
+            )
+        }
         composable("coin") {
             HeadsTailsScreen(
                 viewModel = viewModel,

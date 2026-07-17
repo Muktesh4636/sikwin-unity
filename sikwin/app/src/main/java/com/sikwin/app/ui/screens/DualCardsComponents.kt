@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -36,7 +37,7 @@ val DualGoldBrush = Brush.verticalGradient(listOf(DualGoldLight, DualGoldMid, Du
 val DualScreenBlack = Color(0xFF000000)
 val DualCardDark = Color(0xFF0D0D0D)
 
-enum class DualNavTab { HOME, PROMO, VIP, WALLET, PROFILE }
+enum class DualNavTab { HOME, PROMO, CASINO, WALLET, PROFILE, NONE }
 
 @Composable
 fun DualCardsTopBar(
@@ -127,7 +128,7 @@ fun DualCardsBottomBar(
     selectedTab: DualNavTab = DualNavTab.HOME,
     onHome: () -> Unit,
     onPromo: () -> Unit,
-    onVip: () -> Unit,
+    onCasino: () -> Unit,
     onWallet: () -> Unit,
     onProfile: () -> Unit
 ) {
@@ -143,9 +144,65 @@ fun DualCardsBottomBar(
     ) {
         DualNavItem("HOME", Icons.Default.Home, selectedTab == DualNavTab.HOME, onHome)
         DualNavItem("PROMO", Icons.Default.CardGiftcard, selectedTab == DualNavTab.PROMO, onPromo)
-        DualNavItem("VIP", Icons.Default.WorkspacePremium, selectedTab == DualNavTab.VIP, onVip)
+        DualCasinoNavItem(selected = selectedTab == DualNavTab.CASINO, onClick = onCasino)
         DualNavItem("WALLET", Icons.Default.AccountBalanceWallet, selectedTab == DualNavTab.WALLET, onWallet)
         DualNavItem("PROFILE", Icons.Default.Person, selectedTab == DualNavTab.PROFILE, onProfile)
+    }
+}
+
+@Composable
+fun DualCasinoNavItem(selected: Boolean, onClick: () -> Unit) {
+    val labelColor = if (selected) DualGoldMid else DualGoldDeep.copy(alpha = 0.7f)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    ) {
+        TwoDiceIcon(
+            selected = selected,
+            modifier = Modifier.size(30.dp)
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            "CASINO",
+            color = labelColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+fun TwoDiceIcon(
+    selected: Boolean = true,
+    tint: Color? = null,
+    modifier: Modifier = Modifier
+) {
+    val alpha = if (selected) 1f else 0.65f
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_gundu_ata_nav),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            colorFilter = tint?.let { androidx.compose.ui.graphics.ColorFilter.tint(it) },
+            modifier = Modifier
+                .size(20.dp)
+                .align(Alignment.BottomStart)
+                .offset(x = (-1).dp, y = 1.dp)
+                .graphicsLayer { this.alpha = alpha }
+        )
+        Image(
+            painter = painterResource(id = R.drawable.ic_gundu_ata_nav),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            colorFilter = tint?.let { androidx.compose.ui.graphics.ColorFilter.tint(it) },
+            modifier = Modifier
+                .size(20.dp)
+                .align(Alignment.TopEnd)
+                .offset(x = 1.dp, y = (-1).dp)
+                .graphicsLayer { this.alpha = alpha }
+        )
     }
 }
 

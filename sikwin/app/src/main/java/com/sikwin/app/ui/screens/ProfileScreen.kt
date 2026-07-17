@@ -365,7 +365,7 @@ private fun ModernProfileScreen(
                     selectedTab = DualNavTab.PROFILE,
                     onHome = { navBottom("home") },
                     onPromo = { navBottom("affiliate") },
-                    onVip = { navBottom("leaderboard") },
+                    onCasino = { navBottom("casino_games") },
                     onWallet = { navBottom("wallet") },
                     onProfile = { }
                 )
@@ -374,7 +374,7 @@ private fun ModernProfileScreen(
                     selectedTab = DualNavTab.PROFILE,
                     onHome = { navBottom("home") },
                     onPromo = { navBottom("affiliate") },
-                    onVip = { navBottom("leaderboard") },
+                    onCasino = { navBottom("casino_games") },
                     onWallet = { navBottom("wallet") },
                     onProfile = { }
                 )
