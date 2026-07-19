@@ -1,10 +1,11 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package com.sikwin.app.ui.screens
 
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +27,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.LinearEasing
@@ -63,7 +69,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -98,6 +106,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.filled.CardGiftcard
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -380,15 +390,6 @@ fun IplScreen(
             CricketTopBar(
                 balance = viewModel.wallet?.balance ?: "0.00",
                 isLoggedIn = viewModel.loginSuccess,
-                onBack = {
-                    if (selectedMatchId != null) {
-                        viewModel.clearCricketMatchSelection()
-                        iplMatchTab = IplMatchTab.Scoreboard
-                        filterIndex = 0
-                    } else {
-                        onBack()
-                    }
-                },
                 onWalletOrDeposit = { onNavigate("deposit") },
                 onLogin = { onNavigate("login") },
                 onBettingHistory = {
@@ -467,6 +468,31 @@ private fun ColumnScope.CricketMatchListContent(
     val upcomingMatches = viewModel.cricketUpcoming
     /** Leagues start open; keys here are collapsed. Multiple can stay open. */
     var collapsedLeagues by remember { mutableStateOf(setOf<String>()) }
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = if (listTab == CricketListTab.Upcoming) 1 else 0,
+        pageCount = { 2 }
+    )
+    // Drive tab highlight from pager so swipe in either direction stays in sync
+    val selectedTab =
+        if (pagerState.currentPage == 0) CricketListTab.Live else CricketListTab.Upcoming
+    val liveListState = rememberLazyListState()
+    val upcomingListState = rememberLazyListState()
+    val listScrolling by remember {
+        derivedStateOf {
+            liveListState.isScrollInProgress || upcomingListState.isScrollInProgress
+        }
+    }
+    // Freeze live score overlays while the user is scrolling to avoid mid-fling recomposition jumps
+    var frozenScoreById by remember { mutableStateOf<Map<Long, CricketMatchSummary>?>(null) }
+    LaunchedEffect(listScrolling, viewModel.cricketScoreById) {
+        if (listScrolling) {
+            if (frozenScoreById == null) frozenScoreById = viewModel.cricketScoreById
+        } else {
+            frozenScoreById = null
+        }
+    }
+    val scoreById = frozenScoreById ?: viewModel.cricketScoreById
 
     fun toggleLeague(key: String) {
         collapsedLeagues = if (key in collapsedLeagues) {
@@ -476,13 +502,32 @@ private fun ColumnScope.CricketMatchListContent(
         }
     }
 
-    val loading = when (listTab) {
-        CricketListTab.Live -> viewModel.cricketMatchesLoading && liveMatches.isEmpty()
-        CricketListTab.Upcoming -> viewModel.cricketUpcomingLoading && upcomingMatches.isEmpty()
+    // Swipe → keep parent listTab in sync (do not compare against stale listTab)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                onListTab(if (page == 0) CricketListTab.Live else CricketListTab.Upcoming)
+            }
     }
-    val error = when (listTab) {
-        CricketListTab.Live -> viewModel.cricketMatchesError.takeIf { liveMatches.isEmpty() }
-        CricketListTab.Upcoming -> viewModel.cricketUpcomingError.takeIf { upcomingMatches.isEmpty() }
+
+    // Tab tap / auto-switch → animate pager (skip while user is actively swiping)
+    LaunchedEffect(listTab) {
+        val target = if (listTab == CricketListTab.Live) 0 else 1
+        if (pagerState.currentPage != target && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(target)
+        }
+    }
+
+    val liveGrouped = remember(liveMatches) {
+        liveMatches
+            .groupBy { it.leagueLabel() }
+            .mapValues { (_, matches) -> matches.sortedBy { it.marketCount() <= 0 } }
+            .entries
+            .sortedBy { (_, matches) -> matches.none { it.marketCount() > 0 } }
+    }
+    val upcomingGrouped = remember(upcomingMatches) {
+        upcomingMatches.groupBy { it.leagueLabel() }.entries.toList()
     }
 
     Column(
@@ -491,168 +536,213 @@ private fun ColumnScope.CricketMatchListContent(
             .fillMaxSize()
     ) {
         CricketLiveUpcomingTabs(
-            selected = listTab,
+            selected = selectedTab,
             liveCount = liveMatches.size,
             upcomingCount = upcomingMatches.size,
-            onSelect = onListTab,
+            onSelect = { tab ->
+                onListTab(tab)
+                scope.launch {
+                    pagerState.animateScrollToPage(
+                        if (tab == CricketListTab.Live) 0 else 1
+                    )
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         )
 
-        when {
-            loading -> {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            // Avoid starting adjacent-page composition mid-gesture (helps vertical scroll feel)
+            beyondBoundsPageCount = 0,
+            userScrollEnabled = !listScrolling
+        ) { page ->
+            when (page) {
+                0 -> CricketMatchListPage(
+                    loading = viewModel.cricketMatchesLoading && liveMatches.isEmpty(),
+                    loadingLabel = "Loading live matches…",
+                    error = viewModel.cricketMatchesError.takeIf { liveMatches.isEmpty() },
+                    onRetry = onRetry,
+                    listState = liveListState
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = CricketAccentGold)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            if (listTab == CricketListTab.Live) "Loading live matches…" else "Loading upcoming…",
-                            color = CricketTextMuted,
-                            fontSize = 14.sp
-                        )
+                    if (liveMatches.isEmpty()) {
+                        item(key = "live_empty") {
+                            Text(
+                                text = "No live matches right now. Check Upcoming.",
+                                color = CricketTextMuted,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
+                            )
+                        }
+                    } else {
+                        liveGrouped.forEach { (league, matches) ->
+                            val leagueKey = "live:$league"
+                            val open = leagueKey !in collapsedLeagues
+                            item(key = "hdr_$leagueKey") {
+                                CricketLeagueHeader(
+                                    title = league,
+                                    matchCount = matches.size,
+                                    expanded = open,
+                                    onClick = { toggleLeague(leagueKey) }
+                                )
+                            }
+                            if (open) {
+                                itemsIndexed(
+                                    items = matches,
+                                    key = { _, m -> "live_match_${m.id}" }
+                                ) { index, match ->
+                                    val row = scoreById[match.id] ?: match
+                                    Column(modifier = Modifier.background(BetstrikeMatchPanel)) {
+                                        CricketLiveScoreMatchRow(
+                                            match = row,
+                                            onClick = { onSelectLiveMatch(match.id) }
+                                        )
+                                        if (index < matches.lastIndex) {
+                                            HorizontalDivider(
+                                                color = BetstrikeDivider,
+                                                thickness = 1.dp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            item(key = "gap_$leagueKey") {
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+                        }
+                    }
+                }
+
+                else -> CricketMatchListPage(
+                    loading = viewModel.cricketUpcomingLoading && upcomingMatches.isEmpty(),
+                    loadingLabel = "Loading upcoming…",
+                    error = viewModel.cricketUpcomingError.takeIf { upcomingMatches.isEmpty() },
+                    onRetry = onRetry,
+                    listState = upcomingListState
+                ) {
+                    if (upcomingMatches.isEmpty()) {
+                        item(key = "up_empty") {
+                            Text(
+                                text = "No upcoming matches right now.",
+                                color = CricketTextMuted,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
+                            )
+                        }
+                    } else {
+                        upcomingGrouped.forEach { (league, matches) ->
+                            val leagueKey = "up:$league"
+                            val open = leagueKey !in collapsedLeagues
+                            item(key = "hdr_$leagueKey") {
+                                CricketLeagueHeader(
+                                    title = league,
+                                    matchCount = matches.size,
+                                    expanded = open,
+                                    onClick = { toggleLeague(leagueKey) }
+                                )
+                            }
+                            if (open) {
+                                itemsIndexed(
+                                    items = matches,
+                                    key = { _, m -> "up_match_${m.id}" }
+                                ) { index, match ->
+                                    val title = match.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
+                                    val (teamA, teamB) = splitCricketMatchTeams(title)
+                                    Column(modifier = Modifier.background(BetstrikeMatchPanel)) {
+                                        CricketBetstrikeMatchRow(
+                                            teamA = teamA,
+                                            teamB = teamB,
+                                            centerTop = "VS",
+                                            centerBottom = formatCricketUpcomingDate(match.date) ?: "TBD",
+                                            countryHint = listOfNotNull(match.country, match.competition)
+                                                .joinToString(" ")
+                                                .ifBlank { null },
+                                            onClick = { onSelectUpcomingMatch(match.id) }
+                                        )
+                                        if (index < matches.lastIndex) {
+                                            HorizontalDivider(
+                                                color = BetstrikeDivider,
+                                                thickness = 1.dp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            item(key = "gap_$leagueKey") {
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+}
 
-            error != null -> {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = error,
-                        color = CricketTextMuted,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
+@Composable
+private fun CricketMatchListPage(
+    loading: Boolean,
+    loadingLabel: String,
+    error: String?,
+    onRetry: () -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    listContent: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
+) {
+    when {
+        loading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = CricketAccentGold)
                     Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedButton(
-                        onClick = onRetry,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, CricketChipBorder)
-                    ) {
-                        Text("Retry", color = CricketAccentGold)
-                    }
+                    Text(
+                        loadingLabel,
+                        color = CricketTextMuted,
+                        fontSize = 14.sp
+                    )
                 }
             }
+        }
 
-            else -> {
-                LazyColumn(
-                    contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+        error != null -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = error,
+                    color = CricketTextMuted,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = onRetry,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CricketChipBorder)
                 ) {
-                    when (listTab) {
-                        CricketListTab.Live -> {
-                            if (liveMatches.isEmpty()) {
-                                item {
-                                    Text(
-                                        text = "No live matches right now. Check Upcoming.",
-                                        color = CricketTextMuted,
-                                        fontSize = 14.sp,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
-                                    )
-                                }
-                            } else {
-                                val grouped = liveMatches.groupBy { it.leagueLabel() }
-                                grouped.forEach { (league, matches) ->
-                                    val leagueKey = "live:$league"
-                                    val open = leagueKey !in collapsedLeagues
-                                    item(key = "hdr_$leagueKey") {
-                                        CricketLeagueHeader(
-                                            title = league,
-                                            matchCount = matches.size,
-                                            expanded = open,
-                                            onClick = { toggleLeague(leagueKey) }
-                                        )
-                                    }
-                                    if (open) {
-                                        item(key = "panel_$leagueKey") {
-                                            CricketLeagueMatchPanel {
-                                                matches.forEachIndexed { index, match ->
-                                                    val row = viewModel.cricketScoreById[match.id] ?: match
-                                                    CricketLiveScoreMatchRow(
-                                                        match = row,
-                                                        onClick = { onSelectLiveMatch(match.id) }
-                                                    )
-                                                    if (index < matches.lastIndex) {
-                                                        HorizontalDivider(
-                                                            color = BetstrikeDivider,
-                                                            thickness = 1.dp
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        CricketListTab.Upcoming -> {
-                            if (upcomingMatches.isEmpty()) {
-                                item {
-                                    Text(
-                                        text = "No upcoming matches right now.",
-                                        color = CricketTextMuted,
-                                        fontSize = 14.sp,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
-                                    )
-                                }
-                            } else {
-                                val grouped = upcomingMatches.groupBy { it.leagueLabel() }
-                                grouped.forEach { (league, matches) ->
-                                    val leagueKey = "up:$league"
-                                    val open = leagueKey !in collapsedLeagues
-                                    item(key = "hdr_$leagueKey") {
-                                        CricketLeagueHeader(
-                                            title = league,
-                                            matchCount = matches.size,
-                                            expanded = open,
-                                            onClick = { toggleLeague(leagueKey) }
-                                        )
-                                    }
-                                    if (open) {
-                                        item(key = "panel_$leagueKey") {
-                                            CricketLeagueMatchPanel {
-                                                matches.forEachIndexed { index, match ->
-                                                    val title = match.match?.trim()?.takeIf { it.isNotEmpty() } ?: "Match"
-                                                    val (teamA, teamB) = splitCricketMatchTeams(title)
-                                                    CricketBetstrikeMatchRow(
-                                                        teamA = teamA,
-                                                        teamB = teamB,
-                                                        centerTop = "VS",
-                                                        centerBottom = formatCricketUpcomingDate(match.date) ?: "TBD",
-                                                        onClick = { onSelectUpcomingMatch(match.id) }
-                                                    )
-                                                    if (index < matches.lastIndex) {
-                                                        HorizontalDivider(
-                                                            color = BetstrikeDivider,
-                                                            thickness = 1.dp
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    Text("Retry", color = CricketAccentGold)
                 }
             }
+        }
+
+        else -> {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+                modifier = Modifier.fillMaxSize(),
+                content = listContent
+            )
         }
     }
 }
@@ -840,6 +930,7 @@ private fun CricketBetstrikeMatchRow(
     teamB: String,
     centerTop: String,
     centerBottom: String,
+    countryHint: String? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -849,16 +940,23 @@ private fun CricketBetstrikeMatchRow(
             .padding(horizontal = 14.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = teamA,
-            color = TextWhite,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Start,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
-        )
+        ) {
+            CricketTeamFlag(teamName = teamA, countryHint = countryHint, size = 24.dp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = teamA,
+                color = TextWhite,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.weight(1f)
+            )
+        }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -882,16 +980,24 @@ private fun CricketBetstrikeMatchRow(
                 textAlign = TextAlign.Center
             )
         }
-        Text(
-            text = teamB,
-            color = TextWhite,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.End,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
             modifier = Modifier.weight(1f)
-        )
+        ) {
+            Text(
+                text = teamB,
+                color = TextWhite,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            CricketTeamFlag(teamName = teamB, countryHint = countryHint, size = 24.dp)
+        }
     }
 }
 
@@ -913,6 +1019,7 @@ private fun CricketLiveScoreMatchRow(
     val battingB = teamB?.batting == true
     val period = match.period?.takeIf { it.isNotBlank() } ?: "Live"
     val overs = match.live?.oversLabel()?.let { "$it Ov" }
+    val countryHint = match.country ?: match.competition
 
     Row(
         modifier = Modifier
@@ -923,6 +1030,8 @@ private fun CricketLiveScoreMatchRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                CricketTeamFlag(teamName = nameA, countryHint = countryHint, size = 22.dp)
+                Spacer(modifier = Modifier.width(7.dp))
                 Text(
                     text = nameA,
                     color = TextWhite,
@@ -948,7 +1057,8 @@ private fun CricketLiveScoreMatchRow(
                 color = BetstrikeLeagueTitle,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
-                maxLines = 1
+                maxLines = 1,
+                modifier = Modifier.padding(start = 29.dp)
             )
         }
         Column(
@@ -987,7 +1097,10 @@ private fun CricketLiveScoreMatchRow(
             horizontalAlignment = Alignment.End,
             modifier = Modifier.weight(1f)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
                 if (battingB) {
                     Box(
                         modifier = Modifier
@@ -1004,8 +1117,11 @@ private fun CricketLiveScoreMatchRow(
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.End
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+                Spacer(modifier = Modifier.width(7.dp))
+                CricketTeamFlag(teamName = nameB, countryHint = countryHint, size = 22.dp)
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -1014,7 +1130,8 @@ private fun CricketLiveScoreMatchRow(
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 maxLines = 1,
-                textAlign = TextAlign.End
+                textAlign = TextAlign.End,
+                modifier = Modifier.padding(end = 29.dp)
             )
         }
     }
@@ -1923,7 +2040,6 @@ private fun StatTableRow5(
 private fun CricketTopBar(
     balance: String,
     isLoggedIn: Boolean,
-    onBack: () -> Unit = {},
     onWalletOrDeposit: () -> Unit,
     onLogin: () -> Unit,
     onBettingHistory: () -> Unit
@@ -1941,18 +2057,6 @@ private fun CricketTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // Back button
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF2A2A2A))
-                        .clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("←", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
                 Image(
                     painter = painterResource(R.drawable.ic_ipl_nav),
                     contentDescription = null,

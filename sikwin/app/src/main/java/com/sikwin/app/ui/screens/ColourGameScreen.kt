@@ -70,6 +70,7 @@ import com.sikwin.app.data.models.ColourPublicResultItem
 import com.sikwin.app.data.models.ColourRoundResultResponse
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Reference palette (COLOUR GAME)
@@ -116,6 +117,8 @@ fun ColourGameScreen(
     var placingBet by remember { mutableStateOf(false) }
     var betTarget by remember { mutableStateOf<ColourBetTarget?>(null) }
     var soundEnabled by remember { mutableStateOf(true) }
+    // Stay on the loading UI until the first backend prefetch completes (avoids empty flash).
+    var showLaunchLoading by remember { mutableStateOf(true) }
 
     val round = viewModel.colourRound
     val timerSec = viewModel.colourDisplayTimerSeconds.coerceAtLeast(0)
@@ -129,6 +132,14 @@ fun ColourGameScreen(
     DisposableEffect(Unit) {
         viewModel.startColourGameSession()
         onDispose { viewModel.stopColourGameSession() }
+    }
+
+    LaunchedEffect(Unit) {
+        // startColourGameSession() (above) sets isColourGamePrefetching synchronously.
+        while (viewModel.isColourGamePrefetching) {
+            delay(16)
+        }
+        showLaunchLoading = false
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -167,15 +178,8 @@ fun ColourGameScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.fetchWallet()
-        if (viewModel.loginSuccess) {
-            viewModel.fetchColourBetsHistory()
-        }
-    }
-
     LaunchedEffect(viewModel.loginSuccess) {
-        if (viewModel.loginSuccess) {
+        if (viewModel.loginSuccess && !viewModel.isColourGamePrefetching) {
             viewModel.fetchColourBetsHistory()
         }
     }
@@ -329,6 +333,29 @@ fun ColourGameScreen(
             )
         }
     ) { padding ->
+        if (showLaunchLoading || viewModel.isColourGamePrefetching) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        color = GoldTitle,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.colour_game_loading),
+                        color = Color(0xFF9CA3AF),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -553,6 +580,7 @@ fun ColourGameScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
         }
     }
 }

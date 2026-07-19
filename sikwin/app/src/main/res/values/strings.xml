@@ -330,6 +330,7 @@
     <string name="heads_tails_round_result_badge">Result</string>
 
     <!-- Colour Game (in-app) -->
+    <string name="colour_game_loading">Loading Rangu…</string>
     <string name="colour_game_title">COLOUR GAME</string>
     <string name="colour_game_round_id_fmt">Round ID %1$s</string>
     <string name="colour_countdown_label">COUNT DOWN</string>

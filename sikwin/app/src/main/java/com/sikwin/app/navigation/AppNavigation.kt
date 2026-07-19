@@ -620,8 +620,13 @@ fun AppNavigation(
                             launchSingleTop = true
                         }
                     } else if (route == "home") {
-                        navController.navigate("home") {
-                            popUpTo("home") { inclusive = true }
+                        // Soft-restore existing home — avoid inclusive destroy/recreate
+                        // which remounts Dual Cards ExoPlayers and can leave a black screen
+                        if (!navController.popBackStack("home", inclusive = false)) {
+                            navController.navigate("home") {
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     } else if (route == "login") {
                         navController.navigate("login") {
@@ -665,8 +670,11 @@ fun AppNavigation(
                             executeGameLaunch()
                         }
                     } else if (route == "home") {
-                        navController.navigate("home") {
-                            popUpTo("home") { inclusive = true }
+                        if (!navController.popBackStack("home", inclusive = false)) {
+                            navController.navigate("home") {
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     } else if (route == "login") {
                         navController.navigate("login") {
@@ -733,8 +741,11 @@ fun AppNavigation(
                             }
                         }
                         route == "home" -> {
-                            navController.navigate("home") {
-                                popUpTo("home") { inclusive = true }
+                            if (!navController.popBackStack("home", inclusive = false)) {
+                                navController.navigate("home") {
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         }
                         route == "login" -> {

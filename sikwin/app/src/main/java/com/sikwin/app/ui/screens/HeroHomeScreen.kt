@@ -429,7 +429,7 @@ fun HeroBottomBar(
                         .clickable(onClick = onCasino),
                     contentAlignment = Alignment.Center
                 ) {
-                    TwoDiceIcon(
+                    CasinoChipIcon(
                         selected = true,
                         modifier = Modifier.size(34.dp)
                     )

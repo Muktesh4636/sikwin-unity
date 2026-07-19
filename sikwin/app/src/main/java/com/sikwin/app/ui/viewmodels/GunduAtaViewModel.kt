@@ -11,6 +11,7 @@ import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.data.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -353,20 +354,8 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                 cricketScoreFetchedAt = body?.last_sync
                 cricketScoreError = null
                 applySelectedMatchScore()
-                // Soft-refresh list row scores when we already have matches
-                if (cricketMatches.isNotEmpty() && list.isNotEmpty()) {
-                    val scoreMap = list.associateBy { it.id }
-                    cricketMatches = cricketMatches.map { m ->
-                        val s = scoreMap[m.id] ?: return@map m
-                        m.copy(
-                            scores = s.scores ?: m.scores,
-                            period = s.period ?: m.period,
-                            clock = s.clock ?: m.clock,
-                            live = s.live ?: m.live,
-                            live_market_count = s.live_market_count ?: m.live_market_count
-                        )
-                    }
-                }
+                // Keep cricketMatches identity stable — list rows read scores from cricketScoreById.
+                // Rewriting the matches list every poll was causing scroll jank.
                 true
             } else {
                 logoutIfUnauthorized(resp.code())
@@ -607,6 +596,8 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     var colourBetsHistory by mutableStateOf<List<ColourBetHistoryItem>>(emptyList())
     /** GET /api/colour/results/ — global recent results for Colour Game table. */
     var colourPublicResults by mutableStateOf<List<ColourPublicResultItem>>(emptyList())
+    /** True while initial round/results are being prefetched on open. */
+    var isColourGamePrefetching by mutableStateOf(false)
 
     private var colourLocalTickJob: Job? = null
     private var colourRoundPollJob: Job? = null
@@ -629,16 +620,28 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         colourRoundPollJob?.cancel()
         colourResultPollJob?.cancel()
         colourPublicResultsPollJob?.cancel()
+        isColourGamePrefetching = true
         startColourLocalTimer()
+        // Kick off wallet/history in parallel with round prefetch (non-blocking).
+        fetchWallet()
+        if (loginSuccess) fetchColourBetsHistory()
         colourRoundPollJob = viewModelScope.launch {
-            refreshColourRound()
+            try {
+                // Prefetch critical game data before unlocking the UI.
+                coroutineScope {
+                    launch { refreshColourRound() }
+                    launch { fetchColourPublicResults() }
+                }
+            } finally {
+                isColourGamePrefetching = false
+            }
             while (isActive) {
                 delay(COLOUR_ROUND_POLL_INTERVAL_MS)
                 refreshColourRound()
             }
         }
         colourPublicResultsPollJob = viewModelScope.launch {
-            fetchColourPublicResults()
+            // Initial results fetch is done in the prefetch above.
             while (isActive) {
                 delay(COLOUR_PUBLIC_RESULTS_POLL_MS)
                 fetchColourPublicResults()
@@ -656,6 +659,7 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
         colourLocalTickJob?.cancel()
         colourLocalTickJob = null
         colourLocalRoundId = null
+        isColourGamePrefetching = false
     }
 
     /** Call when Colour Game screen resumes — updates betting_open / round id; does not reset local timer. */

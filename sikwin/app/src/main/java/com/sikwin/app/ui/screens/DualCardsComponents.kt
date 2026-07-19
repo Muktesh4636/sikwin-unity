@@ -53,7 +53,7 @@ fun DualCardsTopBar(
             .fillMaxWidth()
             .background(DualScreenBlack)
             .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(
@@ -74,7 +74,7 @@ fun DualCardsTopBar(
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .weight(1f)
-                .height(58.dp)
+                .height(48.dp)
                 .padding(horizontal = 4.dp)
         )
 
@@ -159,9 +159,9 @@ fun DualCasinoNavItem(selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
-        TwoDiceIcon(
+        CasinoChipIcon(
             selected = selected,
-            modifier = Modifier.size(30.dp)
+            modifier = Modifier.size(34.dp)
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
@@ -174,36 +174,16 @@ fun DualCasinoNavItem(selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun TwoDiceIcon(
+fun CasinoChipIcon(
     selected: Boolean = true,
-    tint: Color? = null,
     modifier: Modifier = Modifier
 ) {
-    val alpha = if (selected) 1f else 0.65f
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_gundu_ata_nav),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            colorFilter = tint?.let { androidx.compose.ui.graphics.ColorFilter.tint(it) },
-            modifier = Modifier
-                .size(20.dp)
-                .align(Alignment.BottomStart)
-                .offset(x = (-1).dp, y = 1.dp)
-                .graphicsLayer { this.alpha = alpha }
-        )
-        Image(
-            painter = painterResource(id = R.drawable.ic_gundu_ata_nav),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            colorFilter = tint?.let { androidx.compose.ui.graphics.ColorFilter.tint(it) },
-            modifier = Modifier
-                .size(20.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = 1.dp, y = (-1).dp)
-                .graphicsLayer { this.alpha = alpha }
-        )
-    }
+    Image(
+        painter = painterResource(id = R.drawable.ic_casino_chip),
+        contentDescription = "Casino",
+        contentScale = ContentScale.Fit,
+        modifier = modifier.graphicsLayer { alpha = if (selected) 1f else 0.65f }
+    )
 }
 
 @Composable
