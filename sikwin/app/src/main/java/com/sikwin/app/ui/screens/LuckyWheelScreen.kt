@@ -29,6 +29,7 @@ import com.sikwin.app.ui.theme.BlackBackground
 import com.sikwin.app.ui.theme.PrimaryYellow
 import com.sikwin.app.ui.theme.SurfaceColor
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 import android.media.MediaPlayer
 import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.Job
@@ -223,7 +224,7 @@ fun WheelHeader(onBack: () -> Unit, balance: String) {
             Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("₹", color = PrimaryYellow, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(balance, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(MoneyFormat.format(balance), color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }

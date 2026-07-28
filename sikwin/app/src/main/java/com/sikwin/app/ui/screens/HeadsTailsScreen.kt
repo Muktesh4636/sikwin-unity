@@ -90,6 +90,7 @@ import com.sikwin.app.ui.theme.SurfaceColor
 import com.sikwin.app.ui.theme.TextGrey
 import com.sikwin.app.ui.theme.TextWhite
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -292,7 +293,7 @@ fun HeadsTailsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "₹$bal",
+                            text = MoneyFormat.formatRupee(bal),
                             color = PrimaryYellow,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp

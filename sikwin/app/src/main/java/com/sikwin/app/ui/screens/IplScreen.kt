@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -122,6 +123,7 @@ import com.sikwin.app.ui.theme.CricketScreenBg
 import com.sikwin.app.ui.theme.CricketTextMuted
 import com.sikwin.app.ui.theme.TextWhite
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 import com.sikwin.app.R
 import android.os.SystemClock
 import kotlinx.coroutines.delay
@@ -200,6 +202,8 @@ fun IplScreen(
     var iplMatchTab by remember { mutableStateOf<IplMatchTab?>(IplMatchTab.Scoreboard) }
     var listTab by remember { mutableStateOf(CricketListTab.Live) }
     var autoSwitchedToUpcoming by remember { mutableStateOf(false) }
+    // Stay on loading UI until first backend prefetch completes (same pattern as Rangu).
+    var showLaunchLoading by remember { mutableStateOf(true) }
     val selectedMatchId = viewModel.cricketSelectedMatchId
     val fromUpcoming = viewModel.cricketSelectedFromUpcoming
 
@@ -208,7 +212,15 @@ fun IplScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose { viewModel.clearCricketMatchSelection() }
+        viewModel.startCricketSession()
+        onDispose { viewModel.stopCricketSession() }
+    }
+
+    LaunchedEffect(Unit) {
+        while (viewModel.isCricketPrefetching) {
+            delay(16)
+        }
+        showLaunchLoading = false
     }
 
     BackHandler(enabled = selectedMatchId != null) {
@@ -222,6 +234,7 @@ fun IplScreen(
         if (
             !autoSwitchedToUpcoming &&
             !viewModel.cricketMatchesLoading &&
+            !viewModel.isCricketPrefetching &&
             viewModel.cricketMatches.isEmpty() &&
             viewModel.cricketUpcoming.isNotEmpty() &&
             listTab == CricketListTab.Live
@@ -231,8 +244,9 @@ fun IplScreen(
         }
     }
 
-    // Live match list polling
-    LaunchedEffect(pollSession, selectedMatchId == null) {
+    // Live match list polling (after initial prefetch)
+    LaunchedEffect(pollSession, selectedMatchId == null, viewModel.isCricketPrefetching) {
+        if (viewModel.isCricketPrefetching) return@LaunchedEffect
         if (selectedMatchId != null) return@LaunchedEffect
         viewModel.fetchWallet()
         viewModel.cricketMatchesError = null
@@ -244,8 +258,9 @@ fun IplScreen(
         }
     }
 
-    // Upcoming list polling
-    LaunchedEffect(pollSession, selectedMatchId == null) {
+    // Upcoming list polling (after initial prefetch)
+    LaunchedEffect(pollSession, selectedMatchId == null, viewModel.isCricketPrefetching) {
+        if (viewModel.isCricketPrefetching) return@LaunchedEffect
         if (selectedMatchId != null && !fromUpcoming) return@LaunchedEffect
         while (true) {
             val start = SystemClock.elapsedRealtime()
@@ -255,8 +270,9 @@ fun IplScreen(
         }
     }
 
-    // Scores ticker (list + live detail)
-    LaunchedEffect(pollSession) {
+    // Scores ticker (list + live detail) — after initial prefetch
+    LaunchedEffect(pollSession, viewModel.isCricketPrefetching) {
+        if (viewModel.isCricketPrefetching) return@LaunchedEffect
         while (true) {
             val start = SystemClock.elapsedRealtime()
             viewModel.cricketFetchScoresOnce()
@@ -414,6 +430,30 @@ fun IplScreen(
         },
         containerColor = CricketScreenBg
     ) { padding ->
+        if (showLaunchLoading || viewModel.isCricketPrefetching) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(CricketScreenBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        color = CricketAccentGold,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.cricket_game_loading),
+                        color = CricketTextMuted,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -451,6 +491,7 @@ fun IplScreen(
                     }
                 )
             }
+        }
         }
     }
 }
@@ -1691,7 +1732,6 @@ private fun CricketScoreCardSection(
                     inningsSorted.take(2).forEach { inn ->
                         val abbrev = teamAbbrev(inn.teamName ?: "—")
                         val batting = inn.conclusion?.equals("In Progress", ignoreCase = true) == true
-                        val jColor = jerseyColor(abbrev)
                         val ovAvail = inn.oversAvailable
                         val ovStr = formatOversDisplay(inn.overs)
                         val oversText = when {
@@ -1707,11 +1747,10 @@ private fun CricketScoreCardSection(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(jColor)
+                                CricketTeamFlag(
+                                    teamName = inn.teamName,
+                                    countryHint = score.seriesName,
+                                    size = 30.dp
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
@@ -2099,7 +2138,7 @@ private fun CricketTopBar(
                     ) {
                         Text("₹", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(balance, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(MoneyFormat.format(balance), color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(

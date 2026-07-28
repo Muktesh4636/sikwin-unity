@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,12 +44,13 @@ fun WalletScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A)) // Dark background like in image
+            .statusBarsPadding()
     ) {
         // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -111,7 +113,7 @@ fun WalletScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "₹$balance",
+                                MoneyFormat.formatRupee(balance),
                                 color = Color.Black,
                                 fontSize = 36.sp,
                                 fontWeight = FontWeight.Bold
@@ -222,7 +224,7 @@ fun WalletCard(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Text(
-                    "₹$amount",
+                    MoneyFormat.formatRupee(amount),
                     color = Color.Black,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold

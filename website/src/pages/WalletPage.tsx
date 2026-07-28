@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { apiWallet, type Wallet } from '../api/endpoints';
+import { formatIndian } from '../utils/formatMoney';
 
 /** Faint wallet icon on gold card — same as APK Icons.Default.AccountBalanceWallet, white 20% */
 function WalletIconFaint() {
@@ -64,7 +65,7 @@ export function WalletPage() {
     load();
   }, []);
 
-  const balance = wallet?.balance ?? '0.00';
+  const balance = formatIndian(wallet?.balance ?? '0.00');
 
   return (
     <div className="mobile-frame min-h-dvh bg-[#1A1A1A]">

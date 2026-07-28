@@ -2,6 +2,7 @@ package com.sikwin.app.data.api
 
 import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.utils.Constants
+import com.sikwin.app.utils.EventLogger
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -79,6 +80,27 @@ object RetrofitClient {
                 requestBuilder.addHeader("Authorization", "Bearer $it")
             }
             val resp = chain.proceed(requestBuilder.build())
+            // Report API failures (except telemetry itself) so we can fix production issues.
+            try {
+                val path = resp.request.url.encodedPath
+                if (!resp.isSuccessful && !path.contains("client-events")) {
+                    val snippet = try {
+                        resp.peekBody(2 * 1024).string().take(500)
+                    } catch (_: Exception) {
+                        ""
+                    }
+                    EventLogger.error(
+                        name = "api_${resp.code}",
+                        message = snippet.ifBlank { "HTTP ${resp.code}" },
+                        props = mapOf(
+                            "method" to resp.request.method,
+                            "path" to path,
+                            "code" to resp.code
+                        )
+                    )
+                }
+            } catch (_: Exception) {
+            }
             // Do NOT hard-logout on generic 403 (could be a permission issue or a transient edge case).
             // Only force logout when the response clearly indicates auth/session invalidation.
             if (resp.code == 403) {

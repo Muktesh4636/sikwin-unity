@@ -38,6 +38,7 @@ import com.sikwin.app.R
 import com.sikwin.app.data.prefs.ThemePreferences
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 // ─── Chip amounts ────────────────────────────────────────────────────────────
@@ -424,7 +425,7 @@ private fun GunduAtaClassicLiveTopBar(
                     ) {
                         Text("₹", color = PrimaryYellow, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(balance, color = TextWhite, fontWeight = FontWeight.Bold)
+                        Text(MoneyFormat.format(balance), color = TextWhite, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Icon(

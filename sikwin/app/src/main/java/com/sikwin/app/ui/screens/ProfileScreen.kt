@@ -29,6 +29,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 
 @Composable
 fun ProfileScreen(
@@ -373,7 +374,7 @@ fun ProfileHeader(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("₹", color = PrimaryYellow, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.width(8.dp))
-            Text(balance, color = TextWhite, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            Text(MoneyFormat.format(balance), color = TextWhite, fontSize = 32.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.width(12.dp))
 
             var rotationTarget by remember { mutableStateOf(0f) }

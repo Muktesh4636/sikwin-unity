@@ -93,12 +93,13 @@ fun TransactionHistoryScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BlackBackground)
+            .statusBarsPadding()
     ) {
         // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {

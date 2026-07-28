@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,13 +58,14 @@ fun WithdrawScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BlackBackground)
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
         // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -84,6 +86,8 @@ fun WithdrawScreen(
             )
             Spacer(modifier = Modifier.width(48.dp))
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Tabs
         Column(
@@ -107,7 +111,7 @@ fun WithdrawScreen(
 
         Divider(color = BorderColor, thickness = 1.dp)
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Wallet Balance Info
         viewModel.wallet?.let { wallet ->
@@ -124,11 +128,11 @@ fun WithdrawScreen(
                 ) {
                     Column {
                         Text(stringResource(R.string.available_balance), color = TextGrey, fontSize = 12.sp)
-                        Text("₹${wallet.withdrawable_balance}", color = PrimaryYellow, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(MoneyFormat.formatRupee(wallet.withdrawable_balance), color = PrimaryYellow, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(stringResource(R.string.unavailable_balance), color = TextGrey, fontSize = 12.sp)
-                        Text("₹${wallet.unavailableBalanceDisplay}", color = Color.Gray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(MoneyFormat.formatRupee(wallet.unavailableBalanceDisplay), color = Color.Gray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

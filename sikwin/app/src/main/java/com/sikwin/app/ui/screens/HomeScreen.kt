@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.window.Dialog
 import com.sikwin.app.data.api.RetrofitClient
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -404,7 +405,7 @@ fun HomeTopBar(
                         ) {
                             Text("₹", color = PrimaryYellow, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(balance, color = TextWhite, fontWeight = FontWeight.Bold)
+                            Text(MoneyFormat.format(balance), color = TextWhite, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(

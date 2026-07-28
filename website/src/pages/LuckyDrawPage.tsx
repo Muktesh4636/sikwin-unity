@@ -8,6 +8,7 @@ import {
   type LuckyDrawStatus,
   type Wallet,
 } from '../api/endpoints';
+import { formatIndian } from '../utils/formatMoney';
 
 // Same 6 segments as Kotlin LuckyDrawScreen
 const WHEEL_SEGMENTS = [
@@ -203,7 +204,7 @@ export function LuckyDrawPage() {
         </button>
         <div className="rounded-xl bg-[#1E1E1E] px-4 py-2">
           <span className="font-bold text-primaryYellow">₹ </span>
-          <span className="font-bold text-white">{wallet?.balance ?? '0.00'}</span>
+          <span className="font-bold text-white">{formatIndian(wallet?.balance ?? '0.00')}</span>
         </div>
       </header>
 

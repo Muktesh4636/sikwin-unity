@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiWallet, type Wallet } from '../api/endpoints';
 import { useTranslations } from '../context/LocaleContext';
+import { formatIndian } from '../utils/formatMoney';
 
 function RefreshIcon({ className }: { className?: string }) {
   return (
@@ -176,7 +177,7 @@ export function ProfilePage() {
     fetchWallet();
   }, []);
 
-  const balance = wallet?.balance ?? '0.00';
+  const balance = formatIndian(wallet?.balance ?? '0.00');
   const username = auth.user?.username ?? 'User';
 
   return (

@@ -6,6 +6,8 @@ import { useTranslations } from '../context/LocaleContext';
 import { useLoginSignupModal } from '../context/LoginSignupModalContext';
 import { GAME_PAGE_HREF } from '../config';
 import { prefetchGameAssets } from '../utils/prefetchGameAssets';
+import { formatIndian } from '../utils/formatMoney';
+import { SideMenu } from '../components/SideMenu';
 
 function openGame() {
   // Start downloading Unity assets immediately, then navigate a moment later.
@@ -366,10 +368,19 @@ function HotGamesSection({ onPlayGame }: { onPlayGame: () => void }) {
   );
 }
 
+function HamburgerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+      <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
 export function HomePage() {
   const auth = useAuth();
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [showDownloadApk, setShowDownloadApk] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -385,7 +396,7 @@ export function HomePage() {
   }, []);
 
   const t = useTranslations();
-  const balance = wallet?.balance ?? '0.00';
+  const balance = formatIndian(wallet?.balance ?? '0.00');
   const loggedIn = !!auth.user;
   const { showLoginSignupModal } = useLoginSignupModal();
   const openGameOrShowLogin = useCallback(() => {
@@ -395,33 +406,45 @@ export function HomePage() {
 
   return (
     <div className="mobile-frame min-h-dvh bg-appBg pb-20">
-      {/* Header: logo + GUNDU ATA (left) | Login + Register or balance + (right) */}
+      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+
+      {/* Header: ☰ + logo | Login/Register or balance + */}
       <header className="flex items-center justify-between bg-appBg px-3 py-3">
-        <button
-          type="button"
-          onClick={openGameOrShowLogin}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          aria-label="Play Gundu Ata"
-        >
-          <img
-            src="/app_logo.jpg"
-            alt="Gundu Ata"
-            className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-border"
-          />
-          <span
-            className="gundu-ata-shimmer truncate text-xl font-black tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #FFCC00 0%, #FFCC00 35%, #ffffff 50%, #FFCC00 65%, #FFCC00 100%)',
-              backgroundSize: '400% 100%',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              animation: 'gundu-ata-shimmer 2.5s linear infinite',
-            }}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-primaryYellow transition-opacity hover:opacity-90 active:opacity-80"
+            aria-label="Open menu"
           >
-            GUNDU ATA
-          </span>
-        </button>
+            <HamburgerIcon className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            onClick={openGameOrShowLogin}
+            className="flex min-w-0 items-center gap-2 text-left"
+            aria-label="Play Gundu Ata"
+          >
+            <img
+              src="/app_logo.jpg"
+              alt="Gundu Ata"
+              className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-border"
+            />
+            <span
+              className="gundu-ata-shimmer truncate text-xl font-black tracking-wide"
+              style={{
+                background: 'linear-gradient(90deg, #FFCC00 0%, #FFCC00 35%, #ffffff 50%, #FFCC00 65%, #FFCC00 100%)',
+                backgroundSize: '400% 100%',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                animation: 'gundu-ata-shimmer 2.5s linear infinite',
+              }}
+            >
+              GUNDU ATA
+            </span>
+          </button>
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           {loggedIn ? (
             <>

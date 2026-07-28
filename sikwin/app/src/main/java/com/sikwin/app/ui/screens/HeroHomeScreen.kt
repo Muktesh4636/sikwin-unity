@@ -33,6 +33,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 
 /**
  * New "Hero" theme home — matches the casino lobby sample (LIVE banner + categories + featured card).
@@ -137,20 +138,23 @@ fun HeroHomeScreen(
 
             SearchBar(onSearch = { searchQuery = it })
 
-            // Gundu Ata LIVE banner — only PLAY NOW opens game mode picker
-            Box(
+            // Promo banners — infinite side-scroll (360° loop)
+            HomePromoBannerCarousel(
+                banners = listOf(
+                    HomePromoBanner(
+                        imageRes = R.drawable.live_casino_banner,
+                        allowCustomLiveCasino = true,
+                        onPlayNow = { requireLoginOr { showGunduAtaChoiceDialog = true } }
+                    ),
+                    HomePromoBanner(
+                        imageRes = R.drawable.auto_roulette_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("roulette") } }
+                    )
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .aspectRatio(LIVE_CASINO_BANNER_ASPECT_RATIO)
-                    .clip(RoundedCornerShape(16.dp))
-            ) {
-                LiveCasinoBannerWithPlayNow(
-                    defaultResId = R.drawable.live_casino_banner,
-                    modifier = Modifier.fillMaxSize(),
-                    onPlayNowClick = { requireLoginOr { showGunduAtaChoiceDialog = true } }
-                )
-            }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -188,12 +192,36 @@ fun HeroHomeScreen(
                     requireLoginOr { onNavigate("colour_game") }
                 }
                 HeroCategoryChip(
-                    label = "LIVE",
-                    icon = Icons.Default.Videocam,
-                    selected = selectedCategory == "live"
+                    label = "Auto Roulette",
+                    icon = Icons.Default.Album,
+                    selected = selectedCategory == "roulette"
                 ) {
-                    selectedCategory = "live"
-                    requireLoginOr { showGunduAtaChoiceDialog = true }
+                    selectedCategory = "roulette"
+                    requireLoginOr { onNavigate("roulette") }
+                }
+                HeroCategoryChip(
+                    label = "Stock Market",
+                    icon = Icons.Default.ShowChart,
+                    selected = selectedCategory == "trading"
+                ) {
+                    selectedCategory = "trading"
+                    requireLoginOr { onNavigate("trading") }
+                }
+                HeroCategoryChip(
+                    label = "Chicken Road",
+                    icon = Icons.Default.Pets,
+                    selected = selectedCategory == "chicken_road"
+                ) {
+                    selectedCategory = "chicken_road"
+                    requireLoginOr { onNavigate("chicken_road") }
+                }
+                HeroCategoryChip(
+                    label = "Chicken Road 2",
+                    icon = Icons.Default.Egg,
+                    selected = selectedCategory == "chicken_road_2"
+                ) {
+                    selectedCategory = "chicken_road_2"
+                    requireLoginOr { onNavigate("chicken_road_2") }
                 }
                 HeroCategoryChip(
                     label = "Chit Pat",
@@ -317,7 +345,7 @@ private fun HeroTopBar(
                     modifier = Modifier.padding(start = 12.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("₹ $balance", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(MoneyFormat.formatRupee(balance), color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier

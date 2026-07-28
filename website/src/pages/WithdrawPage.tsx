@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { apiBankDetails, apiInitiateWithdraw, apiWallet, type Wallet } from '../api/endpoints';
+import { formatIndian } from '../utils/formatMoney';
 
 type Bank = {
   bank_name: string;
@@ -42,9 +43,9 @@ export function WithdrawPage() {
     load();
   }, []);
 
-  const withdrawable = useMemo(() => wallet?.withdrawable_balance ?? '0', [wallet]);
+  const withdrawable = useMemo(() => formatIndian(wallet?.withdrawable_balance ?? '0'), [wallet]);
   const unavailable = useMemo(
-    () => wallet?.unavailable_balance ?? wallet?.unavaliable_balance ?? '0',
+    () => formatIndian(wallet?.unavailable_balance ?? wallet?.unavaliable_balance ?? '0'),
     [wallet]
   );
 
@@ -95,7 +96,7 @@ export function WithdrawPage() {
         </div>
       </header>
 
-      <div className="px-4 pb-20 pt-2">
+      <div className="px-4 pb-20 pt-8">
         {/* Bank Account tab */}
         <div className="mb-4 flex flex-col items-center">
           <span className="text-base font-bold text-primaryYellow py-2">Bank Account</span>

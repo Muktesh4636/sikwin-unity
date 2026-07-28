@@ -56,14 +56,34 @@ fun CasinoGamesScreen(
             imageRes = R.drawable.card_gundu_ata
         ),
         CasinoPromoCard(
-            title = "Rangu",
-            route = "colour_game",
-            imageRes = R.drawable.card_rangu
+            title = "Stock Market",
+            route = "trading",
+            imageRes = R.drawable.card_stock_market
+        ),
+        CasinoPromoCard(
+            title = "Auto Roulette",
+            route = "roulette",
+            imageRes = R.drawable.card_auto_roulette
+        ),
+        CasinoPromoCard(
+            title = "Chicken Road",
+            route = "chicken_road",
+            imageRes = R.drawable.card_chicken_road
+        ),
+        CasinoPromoCard(
+            title = "Chicken Road 2",
+            route = "chicken_road_2",
+            imageRes = R.drawable.card_chicken_road_2
         ),
         CasinoPromoCard(
             title = "Chit Pat",
             route = "coin",
             imageRes = R.drawable.card_chit_pat
+        ),
+        CasinoPromoCard(
+            title = "Rangu",
+            route = "colour_game",
+            imageRes = R.drawable.card_rangu
         )
     )
 

@@ -12,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.ui.screens.*
@@ -242,6 +243,7 @@ fun AppNavigation(
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastNavigationTime > navigationCooldown) {
             lastNavigationTime = currentTime
+            com.sikwin.app.utils.EventLogger.click("navigate", mapOf("route" to route))
             navController.navigate(route)
         }
     }
@@ -386,6 +388,13 @@ fun AppNavigation(
     }
 
     val startDestination = if (viewModel.loginSuccess) "home" else "login"
+
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    LaunchedEffect(currentRoute) {
+        if (!currentRoute.isNullOrBlank()) {
+            com.sikwin.app.utils.EventLogger.setScreen(currentRoute.substringBefore("?"))
+        }
+    }
     
     NavHost(navController = navController, startDestination = startDestination) {
         composable("gundu_ata_game") {
@@ -478,6 +487,7 @@ fun AppNavigation(
             HomeScreen(
                 viewModel = viewModel,
                 onGameClick = { gameId ->
+                    com.sikwin.app.utils.EventLogger.click("game_open", mapOf("game" to gameId))
                     when (gameId) {
                         "gundu_ata" -> {
                             if (!viewModel.loginSuccess) {
@@ -519,6 +529,7 @@ fun AppNavigation(
                     }
                 },
                 onNavigate = { route ->
+                    com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {
                             showAuthDialog = true
@@ -547,6 +558,46 @@ fun AppNavigation(
                             showAuthDialog = true
                         } else {
                             navController.navigate("cock_fight") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else if (route == "roulette") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("roulette") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else if (route == "trading") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("trading") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else if (route == "chicken_road") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("chicken_road") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else if (route == "chicken_road_2") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("chicken_road_2") {
                                 popUpTo("home") { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -608,6 +659,7 @@ fun AppNavigation(
                 viewModel = viewModel,
                 sessionManager = sessionManager,
                 onNavigate = { route ->
+                    com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {
                             showAuthDialog = true
@@ -654,6 +706,65 @@ fun AppNavigation(
                 }
             )
         }
+        composable("roulette") {
+            RouletteWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                onBack = {
+                    // Back closes WebView → lobby (home)
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
+        composable("trading") {
+            TradingWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
+        composable("chicken_road") {
+            ChickenRoadWebViewScreen(
+                game = ChickenRoadGame.ONE,
+                accessToken = sessionManager.fetchAuthToken(),
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
+        composable("chicken_road_2") {
+            ChickenRoadWebViewScreen(
+                game = ChickenRoadGame.TWO,
+                accessToken = sessionManager.fetchAuthToken(),
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
         composable("cock_fight") {
             CockFightScreen(onBack = { navController.popBackStack() })
         }
@@ -662,6 +773,7 @@ fun AppNavigation(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route ->
+                    com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {
                             showAuthDialog = true
@@ -691,6 +803,7 @@ fun AppNavigation(
             CasinoGamesScreen(
                 onBack = { navController.popBackStack() },
                 onSelectGame = { route ->
+                    com.sikwin.app.utils.EventLogger.click("casino_game", mapOf("game" to route))
                     when (route) {
                         "gundu_ata" -> {
                             if (!viewModel.loginSuccess) {
@@ -712,6 +825,42 @@ fun AppNavigation(
                                 showAuthDialog = true
                             } else {
                                 navController.navigate("colour_game")
+                            }
+                        }
+                        "roulette" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("roulette") {
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+                        "trading" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("trading") {
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+                        "chicken_road" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("chicken_road") {
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+                        "chicken_road_2" -> {
+                            if (!viewModel.loginSuccess) {
+                                showAuthDialog = true
+                            } else {
+                                navController.navigate("chicken_road_2") {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                         "coin" -> {
@@ -889,14 +1038,20 @@ fun AppNavigation(
             LuckyDrawScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onNavigate = { route -> navController.navigate(route) }
+                onNavigate = { route ->
+                    com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
+                    navController.navigate(route)
+                }
             )
         }
         composable("gundu_ata_live") {
             GunduAtaLiveScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onNavigate = { route -> navController.navigate(route) }
+                onNavigate = { route ->
+                    com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
+                    navController.navigate(route)
+                }
             )
         }
         composable("leaderboard") {

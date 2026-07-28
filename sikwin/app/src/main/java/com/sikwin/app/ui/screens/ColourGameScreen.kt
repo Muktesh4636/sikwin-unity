@@ -69,6 +69,7 @@ import com.sikwin.app.data.models.ColourBetHistoryItem
 import com.sikwin.app.data.models.ColourPublicResultItem
 import com.sikwin.app.data.models.ColourRoundResultResponse
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.MoneyFormat
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -311,7 +312,7 @@ fun ColourGameScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text("₹", color = GoldTitle, fontWeight = FontWeight.Bold)
-                            Text(balance, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text(MoneyFormat.format(balance), color = Color.White, fontWeight = FontWeight.Medium, fontSize = 14.sp)
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)

@@ -30,6 +30,22 @@ class MainActivity : AppCompatActivity() {
 
         sessionManager = SessionManager(this)
         RetrofitClient.init(sessionManager)
+        com.sikwin.app.utils.EventLogger.init(this, sessionManager)
+
+        // Capture uncaught crashes so we can fix them from the backend.
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                com.sikwin.app.utils.EventLogger.error(
+                    name = "uncaught_exception",
+                    message = throwable.message ?: throwable.javaClass.name,
+                    throwable = throwable,
+                    props = mapOf("thread" to (thread.name ?: ""))
+                )
+            } catch (_: Exception) {
+            }
+            previousHandler?.uncaughtException(thread, throwable)
+        }
 
         // Handle incoming logout request from Unity or other sources first.
         // Then (re)sync tokens according to latest session state.

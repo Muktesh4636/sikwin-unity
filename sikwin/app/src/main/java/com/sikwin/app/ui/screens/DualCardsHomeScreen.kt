@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.activity.compose.BackHandler
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
@@ -44,6 +46,7 @@ fun DualCardsHomeScreen(
 ) {
     var showLoginPopup by remember { mutableStateOf(false) }
     var showGunduAtaChoiceDialog by remember { mutableStateOf(false) }
+    var showSideMenu by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     if (showGunduAtaChoiceDialog) {
@@ -85,6 +88,10 @@ fun DualCardsHomeScreen(
         if (!viewModel.loginSuccess) showLoginPopup = true else action()
     }
 
+    BackHandler(enabled = showSideMenu) {
+        showSideMenu = false
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -106,6 +113,7 @@ fun DualCardsHomeScreen(
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = DualScreenBlack,
         bottomBar = {
@@ -128,36 +136,40 @@ fun DualCardsHomeScreen(
             DualCardsTopBar(
                 balance = viewModel.wallet?.balance ?: "0.00",
                 isLoggedIn = viewModel.loginSuccess,
-                onLeadingClick = { onNavigate("me") },
+                onLeadingClick = { showSideMenu = true },
                 onDeposit = { requireLoginOr { onNavigate("deposit") } },
                 onLogin = { onNavigate("login") }
             )
 
             SearchBar(onSearch = { searchQuery = it })
 
-            // Gundu Ata LIVE banner — only PLAY NOW opens game mode picker
-            Box(
+            // Promo banners — infinite side-scroll (360° loop)
+            HomePromoBannerCarousel(
+                banners = listOf(
+                    HomePromoBanner(
+                        imageRes = R.drawable.live_casino_banner,
+                        allowCustomLiveCasino = true,
+                        onPlayNow = { requireLoginOr { showGunduAtaChoiceDialog = true } }
+                    ),
+                    HomePromoBanner(
+                        imageRes = R.drawable.auto_roulette_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("roulette") } }
+                    )
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .aspectRatio(LIVE_CASINO_BANNER_ASPECT_RATIO)
-                    .clip(RoundedCornerShape(18.dp))
-            ) {
-                LiveCasinoBannerWithPlayNow(
-                    defaultResId = R.drawable.live_casino_banner,
-                    modifier = Modifier.fillMaxSize(),
-                    onPlayNowClick = { requireLoginOr { showGunduAtaChoiceDialog = true } }
-                )
-            }
+            )
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Circular category icons
+            // Circular category icons — horizontally scrollable as games grow
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 DualCategoryCircle(
                     label = "GA",
@@ -172,8 +184,17 @@ fun DualCardsHomeScreen(
                 DualCategoryCircle("Rangu", Icons.Default.Casino) {
                     requireLoginOr { onNavigate("colour_game") }
                 }
-                DualCategoryCircle("LIVE", Icons.Default.Videocam) {
-                    requireLoginOr { onNavigate("gundu_ata_live") }
+                DualCategoryCircle("Auto Roulette", Icons.Default.Album) {
+                    requireLoginOr { onNavigate("roulette") }
+                }
+                DualCategoryCircle("Stock Market", Icons.Default.ShowChart) {
+                    requireLoginOr { onNavigate("trading") }
+                }
+                DualCategoryCircle("Chicken Road", Icons.Default.Pets) {
+                    requireLoginOr { onNavigate("chicken_road") }
+                }
+                DualCategoryCircle("Chicken Road 2", Icons.Default.Egg) {
+                    requireLoginOr { onNavigate("chicken_road_2") }
                 }
                 DualCategoryCircle("Chit Pat", Icons.Default.MonetizationOn) {
                     requireLoginOr { onNavigate("coin") }
@@ -224,6 +245,15 @@ fun DualCardsHomeScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
         }
+    }
+
+    SideMenuOverlay(
+        open = showSideMenu,
+        onClose = { showSideMenu = false },
+        onNavigate = onNavigate,
+        onPlayGunduAta = { showGunduAtaChoiceDialog = true },
+        requireLoginOr = { action -> requireLoginOr(action) }
+    )
     }
 }
 

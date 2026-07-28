@@ -360,6 +360,7 @@
     <string name="cock_fight_open_in_browser">Open in browser (WebGL)</string>
 
     <!-- Cricket (in-app; route id remains ipl) -->
+    <string name="cricket_game_loading">Loading Cricket…</string>
     <string name="game_cricket">Cricket</string>
     <string name="banner_cricket_title">CRICKET</string>
     <string name="banner_cricket_subtitle">Live odds &amp; markets — bet on matches anytime!</string>

@@ -194,13 +194,22 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
 
     private fun handleException(e: Exception): String {
         android.util.Log.e("GunduAtaViewModel", "Exception: ${e.message}", e)
-        return when (e) {
+        val msg = when (e) {
             is java.net.UnknownHostException -> "No internet connection. Please check your network."
             is java.net.SocketTimeoutException -> "Connection timed out. Please try again."
             is java.net.ConnectException -> "Unable to connect to server. Please try again later."
             is retrofit2.HttpException -> "Server error. Please try again later."
             else -> "An unexpected error occurred. Please try again."
         }
+        try {
+            com.sikwin.app.utils.EventLogger.error(
+                name = "viewmodel_exception",
+                message = msg,
+                throwable = e
+            )
+        } catch (_: Exception) {
+        }
+        return msg
     }
 
     private fun logoutIfUnauthorized(code: Int) {
@@ -266,6 +275,35 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
     /** Bookmark for GET /api/cricket/changes/?bn=N */
     var cricketChangesBn by mutableStateOf(0L)
     var cricketChangesError by mutableStateOf<String?>(null)
+    /** True while initial matches/upcoming/scores are being prefetched on open. */
+    var isCricketPrefetching by mutableStateOf(false)
+
+    private var cricketPrefetchJob: Job? = null
+
+    /** Call when entering Cricket; [stopCricketSession] when leaving. */
+    fun startCricketSession() {
+        cricketPrefetchJob?.cancel()
+        isCricketPrefetching = true
+        fetchWallet()
+        cricketPrefetchJob = viewModelScope.launch {
+            try {
+                coroutineScope {
+                    launch { cricketFetchMatchesOnce() }
+                    launch { cricketFetchUpcomingOnce() }
+                    launch { cricketFetchScoresOnce() }
+                }
+            } finally {
+                isCricketPrefetching = false
+            }
+        }
+    }
+
+    fun stopCricketSession() {
+        cricketPrefetchJob?.cancel()
+        cricketPrefetchJob = null
+        isCricketPrefetching = false
+        clearCricketMatchSelection()
+    }
 
     /** Fetch match list. */
     suspend fun cricketFetchMatchesOnce(): Boolean {

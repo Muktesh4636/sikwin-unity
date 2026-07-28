@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.BlackBackground
 import com.sikwin.app.ui.theme.TextWhite
+import com.sikwin.app.utils.MoneyFormat
 
 val DualGoldLight = Color(0xFFFFE082)
 val DualGoldMid = Color(0xFFFFD54F)
@@ -96,13 +97,13 @@ fun DualCardsTopBar(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "₹$balance",
+                    text = MoneyFormat.formatRupee(balance),
                     color = TextWhite,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 110.dp)
+                    modifier = Modifier.widthIn(max = 140.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Box(

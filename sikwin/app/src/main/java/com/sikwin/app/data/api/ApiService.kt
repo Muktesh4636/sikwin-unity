@@ -146,6 +146,10 @@ interface ApiService {
     @GET("support/contacts/")
     suspend fun getSupportContacts(@Query("package") packageName: String): Response<SupportContacts>
 
+    /** APK click / error telemetry — auth optional. */
+    @POST("client-events/")
+    suspend fun postClientEvent(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Map<String, Any>>
+
     @POST("whitelabel/lead/")
     suspend fun submitWhitelabelLead(@Body data: Map<String, String>): Response<Map<String, Any>>
 
