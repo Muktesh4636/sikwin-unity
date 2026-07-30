@@ -33,6 +33,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.CasinoPrefetcher
 import com.sikwin.app.utils.MoneyFormat
 
 /**
@@ -45,10 +46,18 @@ fun HeroHomeScreen(
     onGameClick: (String) -> Unit,
     onNavigate: (String) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showLoginPopup by remember { mutableStateOf(false) }
     var showGunduAtaChoiceDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf("hot") }
     var searchQuery by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        CasinoPrefetcher.warm(context)
+    }
+    LaunchedEffect(viewModel.loginSuccess) {
+        if (viewModel.loginSuccess) CasinoPrefetcher.warm(context)
+    }
 
     if (showGunduAtaChoiceDialog) {
         GunduAtaChoiceDialog(
@@ -86,7 +95,12 @@ fun HeroHomeScreen(
     }
 
     fun requireLoginOr(action: () -> Unit) {
-        if (!viewModel.loginSuccess) showLoginPopup = true else action()
+        if (!viewModel.loginSuccess) {
+            showLoginPopup = true
+        } else {
+            CasinoPrefetcher.warm(context)
+            action()
+        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -222,6 +236,14 @@ fun HeroHomeScreen(
                 ) {
                     selectedCategory = "chicken_road_2"
                     requireLoginOr { onNavigate("chicken_road_2") }
+                }
+                HeroCategoryChip(
+                    label = "Vortex",
+                    icon = Icons.Default.BlurOn,
+                    selected = selectedCategory == "vortex"
+                ) {
+                    selectedCategory = "vortex"
+                    requireLoginOr { onNavigate("vortex") }
                 }
                 HeroCategoryChip(
                     label = "Chit Pat",

@@ -256,6 +256,14 @@ fun SideMenuOverlay(
                     }
                 )
                 SideMenuItem(
+                    icon = Icons.Default.BlurOn,
+                    label = "Vortex",
+                    onClick = {
+                        onClose()
+                        requireLoginOr { onNavigate("vortex") }
+                    }
+                )
+                SideMenuItem(
                     label = "Gundu Ata",
                     highlight = true,
                     customIcon = {

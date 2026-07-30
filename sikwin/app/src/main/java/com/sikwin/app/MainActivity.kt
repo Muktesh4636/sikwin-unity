@@ -32,6 +32,9 @@ class MainActivity : AppCompatActivity() {
         RetrofitClient.init(sessionManager)
         com.sikwin.app.utils.EventLogger.init(this, sessionManager)
 
+        // Prefetch Casino lobby as soon as the APK opens (before user taps Casino).
+        com.sikwin.app.utils.CasinoPrefetcher.warm(this, sessionManager.fetchAuthToken())
+
         // Capture uncaught crashes so we can fix them from the backend.
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->

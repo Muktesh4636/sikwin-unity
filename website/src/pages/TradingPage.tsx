@@ -5,6 +5,7 @@ import { useLoginSignupModal } from '../context/LoginSignupModalContext';
 import { BackArrow } from '../components/BackArrow';
 import { InternetIssueBar } from '../components/InternetIssueBar';
 import { apiWallet } from '../api/endpoints';
+import { prefetchCasinoPage } from '../utils/prefetchGameAssets';
 
 const TRADING_URL = 'https://gunduata.tech/trading/';
 const TRADING_API = 'https://gunduata.tech/api/trading';
@@ -42,6 +43,10 @@ export function TradingPage() {
       /* ignore */
     }
   }, [token]);
+
+  useEffect(() => {
+    prefetchCasinoPage();
+  }, []);
 
   useEffect(() => {
     if (!token) return;

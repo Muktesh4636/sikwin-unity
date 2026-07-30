@@ -1,5 +1,5 @@
 type InternetIssueBarProps = {
-  onRetry: () -> void;
+  onRetry: () => void;
   message?: string;
 };
 

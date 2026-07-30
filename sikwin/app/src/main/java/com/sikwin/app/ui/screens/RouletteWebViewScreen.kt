@@ -89,7 +89,11 @@ fun RouletteWebViewScreen(
     onBack: () -> Unit,
     onRequireLogin: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     BackHandler(onBack = onBack)
+    LaunchedEffect(Unit) {
+        com.sikwin.app.utils.CasinoPrefetcher.warm(context)
+    }
 
     Column(
         modifier = Modifier

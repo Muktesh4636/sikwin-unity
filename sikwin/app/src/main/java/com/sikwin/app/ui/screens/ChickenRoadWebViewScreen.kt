@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,11 +52,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.FrameLayout
 import com.sikwin.app.R
 import com.sikwin.app.data.api.RetrofitClient
 import com.sikwin.app.ui.theme.PrimaryYellow
 import com.sikwin.app.ui.theme.TextGrey
 import com.sikwin.app.ui.theme.TextWhite
+import com.sikwin.app.utils.CasinoPrefetcher
 import com.sikwin.app.utils.Constants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -73,7 +76,8 @@ enum class ChickenRoadGame(
     val title: String,
     val gameUrl: String,
     val pathHint: String,
-    val loadingImageRes: Int
+    val loadingImageRes: Int?,
+    val showNativeTitle: Boolean = true
 ) {
     ONE(
         "Chicken Road",
@@ -86,12 +90,26 @@ enum class ChickenRoadGame(
         Constants.CHICKEN_ROAD_2_URL,
         "/chicken-road-2",
         R.drawable.chicken_road_2_loading
+    ),
+    VORTEX(
+        "Vortex",
+        Constants.VORTEX_URL,
+        "/vortex",
+        null
+    ),
+    CASINO(
+        title = "Casino Games",
+        gameUrl = Constants.CASINO_URL,
+        pathHint = "/casino",
+        loadingImageRes = null,
+        showNativeTitle = false
     )
 }
 
 /**
- * Chicken Road / Chicken Road 2 — real Gundu wallet.
+ * Chicken Road / Chicken Road 2 / Vortex / Casino — real Gundu wallet.
  * Same pattern as Auto Roulette & Stock Market: WebView + JWT in `?token=`.
+ * Opening any of these also warms the Casino lobby cache for faster Casino tab loads.
  */
 @Composable
 fun ChickenRoadWebViewScreen(
@@ -100,24 +118,40 @@ fun ChickenRoadWebViewScreen(
     onBack: () -> Unit,
     onRequireLogin: () -> Unit
 ) {
-    BackHandler(onBack = onBack)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val leaveCasino = remember(onBack) {
+        {
+            CasinoPrefetcher.prepareLeave()
+            onBack()
+        }
+    }
+    BackHandler(onBack = {
+        if (game == ChickenRoadGame.CASINO) leaveCasino()
+        else onBack()
+    })
+
+    LaunchedEffect(Unit) {
+        CasinoPrefetcher.warm(context, accessToken)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(ChickenRoadBg)
-            .statusBarsPadding()
+            .then(if (game.showNativeTitle) Modifier.statusBarsPadding() else Modifier)
     ) {
-        Text(
-            game.title,
-            color = PrimaryYellow,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 8.dp)
-        )
+        if (game.showNativeTitle) {
+            Text(
+                game.title,
+                color = PrimaryYellow,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 8.dp)
+            )
+        }
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 accessToken.isNullOrBlank() -> {
@@ -131,13 +165,102 @@ fun ChickenRoadWebViewScreen(
                     )
                 }
                 else -> {
-                    ChickenRoadWebView(
-                        game = game,
-                        accessToken = accessToken,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (game == ChickenRoadGame.CASINO) {
+                        CasinoPreloadedWebView(
+                            accessToken = accessToken,
+                            onBack = leaveCasino,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        ChickenRoadWebView(
+                            game = game,
+                            accessToken = accessToken,
+                            onBack = onBack,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun CasinoPreloadedWebView(
+    accessToken: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var ready by remember { mutableStateOf(CasinoPrefetcher.isReady(accessToken)) }
+    var progress by remember { mutableFloatStateOf(if (ready) 1f else 0.15f) }
+
+    // Ensure warm started (no-op if already loading / ready)
+    LaunchedEffect(accessToken) {
+        CasinoPrefetcher.warm(context, accessToken)
+    }
+
+    DisposableEffect(accessToken) {
+        val listener: (Boolean) -> Unit = { isReady ->
+            ready = isReady || CasinoPrefetcher.isReady(accessToken)
+            if (ready) progress = 1f
+        }
+        CasinoPrefetcher.addReadyListener(listener)
+        onDispose {
+            CasinoPrefetcher.removeReadyListener(listener)
+            CasinoPrefetcher.detach()
+        }
+    }
+
+    // Soft progress only while waiting for the already-started preload
+    LaunchedEffect(ready) {
+        if (ready) {
+            progress = 1f
+            return@LaunchedEffect
+        }
+        while (!ready) {
+            if (progress < 0.9f) progress = (progress + 0.04f).coerceAtMost(0.9f)
+            delay(100)
+            ready = CasinoPrefetcher.isReady(accessToken)
+        }
+        progress = 1f
+    }
+
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { ctx ->
+                FrameLayout(ctx).also { frame ->
+                    val already = CasinoPrefetcher.attach(
+                        parent = frame,
+                        token = accessToken,
+                        onBack = onBack,
+                        onOpenGame = { _, _ -> }
+                    )
+                    ready = already || CasinoPrefetcher.isReady(accessToken)
+                    if (ready) progress = 1f
+                }
+            },
+            update = { frame ->
+                if (frame.childCount == 0) {
+                    CasinoPrefetcher.attach(
+                        parent = frame,
+                        token = accessToken,
+                        onBack = onBack,
+                        onOpenGame = { _, _ -> }
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        if (!ready) {
+            ChickenRoadLoadingOverlay(
+                title = "Casino Games",
+                loadingImageRes = null,
+                progress = progress,
+                status = "Opening Casino…"
+            )
         }
     }
 }
@@ -192,12 +315,14 @@ private fun ChickenRoadLoginRequired(
 private fun ChickenRoadWebView(
     game: ChickenRoadGame,
     accessToken: String,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var pageReady by remember { mutableStateOf(false) }
     var gameReady by remember { mutableStateOf(false) }
     var prefetchDone by remember { mutableStateOf(false) }
     var networkError by remember { mutableStateOf(false) }
+    var initialLoadDone by remember { mutableStateOf(false) }
     var retryToken by remember { mutableIntStateOf(0) }
     var progress by remember { mutableFloatStateOf(0.02f) }
     var statusText by remember { mutableStateOf("Preparing ${game.title}…") }
@@ -221,6 +346,7 @@ private fun ChickenRoadWebView(
         pageReady = false
         gameReady = false
         prefetchDone = false
+        initialLoadDone = false
         progress = 0.02f
         statusText = "Fetching game…"
         val ok = prefetchChickenRoadBackend(game.gameUrl) { p, label ->
@@ -247,10 +373,15 @@ private fun ChickenRoadWebView(
         }
         progress = 1f
         statusText = "Ready"
+        initialLoadDone = true
         delay(200)
     }
 
-    val showLoader = !networkError && !(prefetchDone && pageReady && gameReady && progress >= 0.99f)
+    // Casino: after lobby is ready, keep WebView visible when opening inner games
+    val showLoader =
+        !networkError &&
+            !initialLoadDone &&
+            !(prefetchDone && pageReady && gameReady && progress >= 0.99f)
 
     Box(modifier = modifier) {
         key(retryToken) {
@@ -284,6 +415,24 @@ private fun ChickenRoadWebView(
                             onGameReady = { scope.launch { gameReady = true } }
                         )
                         addJavascriptInterface(bridge, "GunduChicken")
+
+                        // Casino lobby page calls window.AndroidBridge.goBack / openGame
+                        if (game == ChickenRoadGame.CASINO) {
+                            val webViewRef = this
+                            addJavascriptInterface(
+                                CasinoAndroidBridge(
+                                    onBack = { scope.launch { onBack() } },
+                                    onOpenGame = { _, url ->
+                                        scope.launch {
+                                            webViewRef.post {
+                                                webViewRef.loadUrl(url)
+                                            }
+                                        }
+                                    }
+                                ),
+                                "AndroidBridge"
+                            )
+                        }
 
                         webChromeClient = object : WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -393,6 +542,21 @@ private class ChickenRoadJsBridge(
     }
 }
 
+private class CasinoAndroidBridge(
+    private val onBack: () -> Unit,
+    private val onOpenGame: (String, String) -> Unit
+) {
+    @JavascriptInterface
+    fun goBack() {
+        onBack()
+    }
+
+    @JavascriptInterface
+    fun openGame(id: String, url: String) {
+        onOpenGame(id, url)
+    }
+}
+
 private const val CHICKEN_READY_POLL_JS = """
 (function(){
   function ready(){ try { GunduChicken.onReady(); } catch(e) {} }
@@ -414,7 +578,7 @@ private const val CHICKEN_READY_POLL_JS = """
 @Composable
 private fun ChickenRoadLoadingOverlay(
     title: String,
-    loadingImageRes: Int,
+    loadingImageRes: Int?,
     progress: Float,
     status: String
 ) {
@@ -434,16 +598,27 @@ private fun ChickenRoadLoadingOverlay(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
         ) {
-            Image(
-                painter = painterResource(id = loadingImageRes),
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(340.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            )
+            if (loadingImageRes != null) {
+                Image(
+                    painter = painterResource(id = loadingImageRes),
+                    contentDescription = title,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(340.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            } else {
+                Text(
+                    title.uppercase(),
+                    color = PrimaryYellow,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.5.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
             Spacer(modifier = Modifier.height(12.dp))
             Text(status, color = TextGrey, fontSize = 14.sp, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(18.dp))

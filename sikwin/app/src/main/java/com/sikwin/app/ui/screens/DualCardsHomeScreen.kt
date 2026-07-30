@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.activity.compose.BackHandler
+import com.sikwin.app.utils.CasinoPrefetcher
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
@@ -44,10 +45,19 @@ fun DualCardsHomeScreen(
     onGameClick: (String) -> Unit,
     onNavigate: (String) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showLoginPopup by remember { mutableStateOf(false) }
     var showGunduAtaChoiceDialog by remember { mutableStateOf(false) }
     var showSideMenu by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+
+    // Prefetch casino lobby as soon as home opens (no Casino click needed)
+    LaunchedEffect(Unit) {
+        CasinoPrefetcher.warm(context)
+    }
+    LaunchedEffect(viewModel.loginSuccess) {
+        if (viewModel.loginSuccess) CasinoPrefetcher.warm(context)
+    }
 
     if (showGunduAtaChoiceDialog) {
         GunduAtaChoiceDialog(
@@ -85,7 +95,12 @@ fun DualCardsHomeScreen(
     }
 
     fun requireLoginOr(action: () -> Unit) {
-        if (!viewModel.loginSuccess) showLoginPopup = true else action()
+        if (!viewModel.loginSuccess) {
+            showLoginPopup = true
+        } else {
+            CasinoPrefetcher.warm(context)
+            action()
+        }
     }
 
     BackHandler(enabled = showSideMenu) {
@@ -195,6 +210,9 @@ fun DualCardsHomeScreen(
                 }
                 DualCategoryCircle("Chicken Road 2", Icons.Default.Egg) {
                     requireLoginOr { onNavigate("chicken_road_2") }
+                }
+                DualCategoryCircle("Vortex", Icons.Default.BlurOn) {
+                    requireLoginOr { onNavigate("vortex") }
                 }
                 DualCategoryCircle("Chit Pat", Icons.Default.MonetizationOn) {
                     requireLoginOr { onNavigate("coin") }

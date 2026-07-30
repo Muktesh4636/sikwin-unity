@@ -5,7 +5,7 @@ import { apiWallet, type Wallet } from '../api/endpoints';
 import { useTranslations } from '../context/LocaleContext';
 import { useLoginSignupModal } from '../context/LoginSignupModalContext';
 import { GAME_PAGE_HREF } from '../config';
-import { prefetchGameAssets } from '../utils/prefetchGameAssets';
+import { prefetchGameAssets, prefetchCasinoPage } from '../utils/prefetchGameAssets';
 import { formatIndian } from '../utils/formatMoney';
 import { SideMenu } from '../components/SideMenu';
 
@@ -381,6 +381,10 @@ export function HomePage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [showDownloadApk, setShowDownloadApk] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    prefetchCasinoPage();
+  }, []);
 
   useEffect(() => {
     let alive = true;

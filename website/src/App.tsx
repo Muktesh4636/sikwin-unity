@@ -30,7 +30,7 @@ import { GunduAtaGamePage } from './pages/GunduAtaGamePage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { RoulettePage } from './pages/RoulettePage';
 import { TradingPage } from './pages/TradingPage';
-import { ChickenRoadPage } from './pages/ChickenRoadPage';
+import { ChickenRoadPage, JwtWebGamePage } from './pages/ChickenRoadPage';
 import { MaintenanceGate } from './maintenance/MaintenanceGate';
 import { isAdminUrlPath } from './utils/adminPath';
 
@@ -76,6 +76,7 @@ function AppRoutes() {
         <Route path="/trading" element={<TradingPage />} />
         <Route path="/chicken-road" element={<ChickenRoadPage variant={1} />} />
         <Route path="/chicken-road-2" element={<ChickenRoadPage variant={2} />} />
+        <Route path="/vortex" element={<JwtWebGamePage gameId="vortex" />} />
         {/* Do not send /admin to HomePage — that looked like a redirect away from Django admin */}
         <Route path="/admin/*" element={null} />
         <Route path="*" element={<HomePage />} />

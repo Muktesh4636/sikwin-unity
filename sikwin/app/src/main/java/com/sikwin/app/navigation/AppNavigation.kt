@@ -18,6 +18,7 @@ import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.ui.screens.*
 import com.sikwin.app.ui.screens.AffiliateScreen
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.CasinoPrefetcher
 import androidx.compose.runtime.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -55,6 +56,11 @@ fun AppNavigation(
     val context = LocalContext.current
     val activity = context as? Activity
     var showAuthDialog by remember { mutableStateOf(false) }
+
+    // Prefetch Casino with JWT as soon as session is known / changes
+    LaunchedEffect(viewModel.loginSuccess) {
+        CasinoPrefetcher.warm(context, sessionManager.fetchAuthToken())
+    }
 
     // When app goes to background, set flag so support popup shows on next home visit (after reopen)
     DisposableEffect(Unit) {
@@ -290,6 +296,7 @@ fun AppNavigation(
     }
 
     fun executeGameLaunch(liveMode: Boolean = false) {
+        CasinoPrefetcher.warm(context)
         val now = System.currentTimeMillis()
         if (now - lastGameLaunchTime < gameLaunchCooldown) return
         lastGameLaunchTime = now
@@ -487,6 +494,7 @@ fun AppNavigation(
             HomeScreen(
                 viewModel = viewModel,
                 onGameClick = { gameId ->
+                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("game_open", mapOf("game" to gameId))
                     when (gameId) {
                         "gundu_ata" -> {
@@ -529,6 +537,7 @@ fun AppNavigation(
                     }
                 },
                 onNavigate = { route ->
+                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {
@@ -603,6 +612,16 @@ fun AppNavigation(
                                 restoreState = true
                             }
                         }
+                    } else if (route == "vortex") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("vortex") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     } else if (route == "ipl") {
                         navController.navigate("ipl") {
                             popUpTo("home") { saveState = true }
@@ -659,6 +678,7 @@ fun AppNavigation(
                 viewModel = viewModel,
                 sessionManager = sessionManager,
                 onNavigate = { route ->
+                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {
@@ -765,6 +785,21 @@ fun AppNavigation(
                 onRequireLogin = { showAuthDialog = true }
             )
         }
+        composable("vortex") {
+            ChickenRoadWebViewScreen(
+                game = ChickenRoadGame.VORTEX,
+                accessToken = sessionManager.fetchAuthToken(),
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
         composable("cock_fight") {
             CockFightScreen(onBack = { navController.popBackStack() })
         }
@@ -773,6 +808,7 @@ fun AppNavigation(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route ->
+                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     if (route == "gundu_ata") {
                         if (!viewModel.loginSuccess) {
@@ -800,79 +836,18 @@ fun AppNavigation(
             )
         }
         composable("casino_games") {
-            CasinoGamesScreen(
-                onBack = { navController.popBackStack() },
-                onSelectGame = { route ->
-                    com.sikwin.app.utils.EventLogger.click("casino_game", mapOf("game" to route))
-                    when (route) {
-                        "gundu_ata" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                viewModel.syncAuthToUnity()
-                                executeGameLaunch()
-                            }
+            ChickenRoadWebViewScreen(
+                game = ChickenRoadGame.CASINO,
+                accessToken = sessionManager.fetchAuthToken(),
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        "gundu_ata_live" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                navController.navigate("gundu_ata_live")
-                            }
-                        }
-                        "colour_game" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                navController.navigate("colour_game")
-                            }
-                        }
-                        "roulette" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                navController.navigate("roulette") {
-                                    launchSingleTop = true
-                                }
-                            }
-                        }
-                        "trading" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                navController.navigate("trading") {
-                                    launchSingleTop = true
-                                }
-                            }
-                        }
-                        "chicken_road" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                navController.navigate("chicken_road") {
-                                    launchSingleTop = true
-                                }
-                            }
-                        }
-                        "chicken_road_2" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                navController.navigate("chicken_road_2") {
-                                    launchSingleTop = true
-                                }
-                            }
-                        }
-                        "coin" -> {
-                            if (!viewModel.loginSuccess) {
-                                showAuthDialog = true
-                            } else {
-                                navController.navigate("coin")
-                            }
-                        }
-                        else -> navController.navigate(route)
                     }
-                }
+                },
+                onRequireLogin = { showAuthDialog = true }
             )
         }
         composable("coin") {
@@ -1039,6 +1014,7 @@ fun AppNavigation(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route ->
+                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     navController.navigate(route)
                 }
@@ -1049,6 +1025,7 @@ fun AppNavigation(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route ->
+                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     navController.navigate(route)
                 }

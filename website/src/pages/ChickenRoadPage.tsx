@@ -5,36 +5,36 @@ import { useLoginSignupModal } from '../context/LoginSignupModalContext';
 import { BackArrow } from '../components/BackArrow';
 import { InternetIssueBar } from '../components/InternetIssueBar';
 import { apiWallet } from '../api/endpoints';
+import { prefetchCasinoPage } from '../utils/prefetchGameAssets';
 
 const BG = '#0a0a0a';
 
-type ChickenRoadVariant = 1 | 2;
+type WebGameId = 'chicken-road' | 'chicken-road-2' | 'vortex';
 
-const CONFIG: Record<
-  ChickenRoadVariant,
-  { title: string; url: string; path: string }
-> = {
-  1: {
+const CONFIG: Record<WebGameId, { title: string; url: string }> = {
+  'chicken-road': {
     title: 'Chicken Road',
     url: 'https://gunduata.tech/chicken-road/',
-    path: '/chicken-road',
   },
-  2: {
+  'chicken-road-2': {
     title: 'Chicken Road 2',
     url: 'https://gunduata.tech/chicken-road-2/',
-    path: '/chicken-road-2',
+  },
+  vortex: {
+    title: 'Vortex',
+    url: 'https://gunduata.tech/vortex/',
   },
 };
 
 /**
- * Chicken Road / Chicken Road 2 — real Gundu wallet (same JWT pattern as Roulette / Trading).
+ * JWT WebView games (Chicken Road / Chicken Road 2 / Vortex) — same pattern as Roulette / Trading.
  */
-export function ChickenRoadPage({ variant }: { variant: ChickenRoadVariant }) {
+export function JwtWebGamePage({ gameId }: { gameId: WebGameId }) {
   const auth = useAuth();
   const nav = useNavigate();
   const { showLoginSignupModal } = useLoginSignupModal();
   const token = auth.accessToken;
-  const cfg = CONFIG[variant];
+  const cfg = CONFIG[gameId];
 
   const [progress, setProgress] = useState(0.02);
   const [status, setStatus] = useState(`Preparing ${cfg.title}…`);
@@ -52,6 +52,10 @@ export function ChickenRoadPage({ variant }: { variant: ChickenRoadVariant }) {
       /* ignore */
     }
   }, [token]);
+
+  useEffect(() => {
+    prefetchCasinoPage();
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -212,4 +216,9 @@ export function ChickenRoadPage({ variant }: { variant: ChickenRoadVariant }) {
       </div>
     </div>
   );
+}
+
+/** @deprecated Prefer JwtWebGamePage — kept for existing imports */
+export function ChickenRoadPage({ variant }: { variant: 1 | 2 }) {
+  return <JwtWebGamePage gameId={variant === 1 ? 'chicken-road' : 'chicken-road-2'} />;
 }

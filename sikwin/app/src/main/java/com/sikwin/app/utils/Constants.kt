@@ -23,6 +23,12 @@ object Constants {
     const val CHICKEN_ROAD_URL = "https://gunduata.tech/chicken-road/"
     const val CHICKEN_ROAD_2_URL = "https://gunduata.tech/chicken-road-2/"
 
+    /** Vortex (real wallet) — WebView + JWT. */
+    const val VORTEX_URL = "https://gunduata.tech/vortex/"
+
+    /** Casino lobby (web) — WebView + JWT. */
+    const val CASINO_URL = "https://gunduata.tech/casino/"
+
     /**
      * WebGL build hosted on your site. Opening this in the system browser (from the app) loads the game.
      * Change to your own origin when you deploy, e.g. `https://yourdomain.com/game/index.html`.

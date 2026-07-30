@@ -188,6 +188,7 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
     { key: 'trading', label: 'Stock Market', icon: <IconDice className="h-5 w-5" />, onClick: () => go('/trading', true) },
     { key: 'chicken', label: 'Chicken Road', icon: <IconDice className="h-5 w-5" />, onClick: () => go('/chicken-road', true) },
     { key: 'chicken2', label: 'Chicken Road 2', icon: <IconChitPat className="h-5 w-5" />, onClick: () => go('/chicken-road-2', true) },
+    { key: 'vortex', label: 'Vortex', icon: <IconLive className="h-5 w-5" />, onClick: () => go('/vortex', true) },
     {
       key: 'gundu',
       label: 'Gundu Ata',

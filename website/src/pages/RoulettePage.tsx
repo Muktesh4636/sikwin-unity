@@ -5,6 +5,7 @@ import { useLoginSignupModal } from '../context/LoginSignupModalContext';
 import { BackArrow } from '../components/BackArrow';
 import { InternetIssueBar } from '../components/InternetIssueBar';
 import { apiWallet } from '../api/endpoints';
+import { prefetchCasinoPage } from '../utils/prefetchGameAssets';
 
 const ROULETTE_URL = 'https://gunduata.tech/roulette/';
 const ROULETTE_API = 'https://gunduata.tech/roulette/api';
@@ -46,6 +47,10 @@ export function RoulettePage() {
       /* ignore */
     }
   }, [token]);
+
+  useEffect(() => {
+    prefetchCasinoPage();
+  }, []);
 
   useEffect(() => {
     if (!token) return;
