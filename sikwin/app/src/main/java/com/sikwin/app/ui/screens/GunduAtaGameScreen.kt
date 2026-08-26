@@ -33,6 +33,11 @@ fun GunduAtaGameScreen(
     // Unity's Java classes are obfuscated and vary between exports, so embedding a Unity view
     // directly inside Compose is brittle. We launch the stable Unity host Activity instead.
     LaunchedEffect(Unit) {
+        if (!com.sikwin.app.BuildConfig.HAS_UNITY) {
+            Log.d("GunduAtaGameScreen", "Unity temporarily disabled — skipping launch")
+            onBack()
+            return@LaunchedEffect
+        }
         Log.d("GunduAtaGameScreen", "Launching UnityPlayerGameActivity")
         sessionManager.syncAuthToUnity()
 

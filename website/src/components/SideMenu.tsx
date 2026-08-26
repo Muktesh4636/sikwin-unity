@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useLoginSignupModal } from '../context/LoginSignupModalContext';
 import { GAME_PAGE_HREF } from '../config';
-import { prefetchGameAssets } from '../utils/prefetchGameAssets';
+import { prefetchGameAssets, prefetchCasinoPage } from '../utils/prefetchGameAssets';
 
 type SideMenuProps = {
   open: boolean;
@@ -184,11 +184,21 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
 
   const items: MenuItem[] = [
     { key: 'main', label: 'Main', icon: <IconMain className="h-5 w-5" />, onClick: () => go('/') },
-    { key: 'roulette', label: 'Auto Roulette', icon: <IconLive className="h-5 w-5" />, onClick: () => go('/roulette', true) },
-    { key: 'trading', label: 'Stock Market', icon: <IconDice className="h-5 w-5" />, onClick: () => go('/trading', true) },
-    { key: 'chicken', label: 'Chicken Road', icon: <IconDice className="h-5 w-5" />, onClick: () => go('/chicken-road', true) },
-    { key: 'chicken2', label: 'Chicken Road 2', icon: <IconChitPat className="h-5 w-5" />, onClick: () => go('/chicken-road-2', true) },
-    { key: 'vortex', label: 'Vortex', icon: <IconLive className="h-5 w-5" />, onClick: () => go('/vortex', true) },
+    { key: 'roulette', label: 'Auto Roulette', icon: <IconLive className="h-5 w-5" />, onClick: () => go('/roulette') },
+    { key: 'trading', label: 'Stock Market', icon: <IconDice className="h-5 w-5" />, onClick: () => go('/trading') },
+    { key: 'chicken', label: 'Chicken Road', icon: <IconDice className="h-5 w-5" />, onClick: () => go('/chicken-road') },
+    { key: 'chicken2', label: 'Chicken Road 2', icon: <IconChitPat className="h-5 w-5" />, onClick: () => go('/chicken-road-2') },
+    { key: 'vortex', label: 'Vortex', icon: <IconLive className="h-5 w-5" />, onClick: () => go('/vortex') },
+    {
+      key: 'casino',
+      label: 'Casino',
+      icon: <img src="/ic_casino_chip.png" alt="" className="h-6 w-6 object-contain" />,
+      onClick: () => {
+        onClose();
+        prefetchCasinoPage();
+        window.location.href = '/casino/';
+      },
+    },
     {
       key: 'gundu',
       label: 'Gundu Ata',

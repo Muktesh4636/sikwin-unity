@@ -38,6 +38,7 @@ import com.sikwin.app.R
 import com.sikwin.app.data.prefs.ThemePreferences
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
+import com.sikwin.app.utils.CasinoPrefetcher
 import com.sikwin.app.utils.MoneyFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -87,9 +88,15 @@ fun GunduAtaLiveScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val context = LocalContext.current
+
     LaunchedEffect(Unit) {
         viewModel.checkSession()
         if (viewModel.loginSuccess) viewModel.fetchWallet()
+        CasinoPrefetcher.prefetchWhilePlaying(
+            context,
+            com.sikwin.app.data.api.RetrofitClient.getSessionManager()?.fetchAuthToken()
+        )
     }
 
     val walletBalance = viewModel.wallet?.balance ?: "0.00"

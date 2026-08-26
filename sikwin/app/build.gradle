@@ -23,20 +23,24 @@ android {
         gunduata {
             dimension "franchise"
             applicationId "cloud.pgms.app"
-            versionCode 71
-            versionName "1.2.71"
+            versionCode 118
+            versionName "1.2.118"
             resValue "string", "app_name", "PG Management"
             archivesBaseName = "PGManagement"
+            // TEMP false: Unity/Gundu Ata game binaries excluded from APK. Set true when restoring :unityLibrary.
+            buildConfigField "boolean", "HAS_UNITY", "false"
         }
         sai {
             dimension "franchise"
             applicationId "com.sai.gunduata"
             resValue "string", "app_name", "Sai"
+            buildConfigField "boolean", "HAS_UNITY", "false"
         }
         kiran {
             dimension "franchise"
             applicationId "com.kiran.gunduata"
             resValue "string", "app_name", "Kiran"
+            buildConfigField "boolean", "HAS_UNITY", "false"
         }
     }
 
@@ -189,7 +193,9 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 
-    implementation project(':unityLibrary')
+    // TEMP: stub without Unity .so / data.unity3d (~90MB saved).
+    // Restore: implementation project(':unityLibrary')  + include ':unityLibrary' in settings.gradle
+    implementation project(':unityLibraryStub')
     // Uncomment when Unity plugins AARs are in app/libs:
     // implementation(name: 'NativeGallery', ext:'aar')
     // implementation(name: 'NativeKeyboard', ext:'aar')

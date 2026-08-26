@@ -33,7 +33,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
-import com.sikwin.app.utils.CasinoPrefetcher
 import com.sikwin.app.utils.MoneyFormat
 
 /**
@@ -52,18 +51,11 @@ fun HeroHomeScreen(
     var selectedCategory by remember { mutableStateOf("hot") }
     var searchQuery by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        CasinoPrefetcher.warm(context)
-    }
-    LaunchedEffect(viewModel.loginSuccess) {
-        if (viewModel.loginSuccess) CasinoPrefetcher.warm(context)
-    }
-
     if (showGunduAtaChoiceDialog) {
         GunduAtaChoiceDialog(
             onDismiss = { showGunduAtaChoiceDialog = false },
             onPlayLive = { onNavigate("gundu_ata_live") },
-            onPlayNormal = { onGameClick("gundu_ata") }
+            onPlayNormal = { onNavigate("gundu_ata_web") }
         )
     }
 
@@ -98,7 +90,6 @@ fun HeroHomeScreen(
         if (!viewModel.loginSuccess) {
             showLoginPopup = true
         } else {
-            CasinoPrefetcher.warm(context)
             action()
         }
     }
@@ -130,7 +121,7 @@ fun HeroHomeScreen(
             HeroBottomBar(
                 selectedTab = DualNavTab.HOME,
                 onHome = { /* already home */ },
-                onPromo = { onNavigate("affiliate") },
+                onLive = { requireLoginOr { onNavigate("sports") } },
                 onCasino = { requireLoginOr { onNavigate("casino_games") } },
                 onWallet = { requireLoginOr { onNavigate("wallet") } },
                 onProfile = { onNavigate("me") }
@@ -161,8 +152,20 @@ fun HeroHomeScreen(
                         onPlayNow = { requireLoginOr { showGunduAtaChoiceDialog = true } }
                     ),
                     HomePromoBanner(
+                        imageRes = R.drawable.cock_fight_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("cock_fight") } }
+                    ),
+                    HomePromoBanner(
                         imageRes = R.drawable.auto_roulette_banner,
                         onPlayNow = { requireLoginOr { onNavigate("roulette") } }
+                    ),
+                    HomePromoBanner(
+                        imageRes = R.drawable.referral_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("affiliate") } }
+                    ),
+                    HomePromoBanner(
+                        imageRes = R.drawable.vortex_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("vortex") } }
                     )
                 ),
                 modifier = Modifier
@@ -195,7 +198,23 @@ fun HeroHomeScreen(
                     selected = selectedCategory == "cricket"
                 ) {
                     selectedCategory = "cricket"
-                    requireLoginOr { onNavigate("ipl") }
+                    requireLoginOr { onNavigate("sports?sport=cricket") }
+                }
+                HeroCategoryChip(
+                    label = "Soccer",
+                    icon = Icons.Default.SportsSoccer,
+                    selected = selectedCategory == "soccer"
+                ) {
+                    selectedCategory = "soccer"
+                    requireLoginOr { onNavigate("sports?sport=soccer") }
+                }
+                HeroCategoryChip(
+                    label = "Tennis",
+                    icon = Icons.Default.SportsTennis,
+                    selected = selectedCategory == "tennis"
+                ) {
+                    selectedCategory = "tennis"
+                    requireLoginOr { onNavigate("sports?sport=tennis") }
                 }
                 HeroCategoryChip(
                     label = "COLOUR",
@@ -446,7 +465,7 @@ private fun HeroCategoryChip(
 fun HeroBottomBar(
     selectedTab: DualNavTab = DualNavTab.HOME,
     onHome: () -> Unit,
-    onPromo: () -> Unit,
+    onLive: () -> Unit,
     onCasino: () -> Unit,
     onWallet: () -> Unit,
     onProfile: () -> Unit
@@ -466,7 +485,7 @@ fun HeroBottomBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             HeroNavItem("HOME", Icons.Default.Home, selectedTab == DualNavTab.HOME, onHome)
-            HeroNavItem("PROMO", Icons.Default.CardGiftcard, selectedTab == DualNavTab.PROMO, onPromo)
+            HeroNavItem("LIVE", Icons.Default.Bolt, selectedTab == DualNavTab.LIVE, onLive)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.offset(y = (-8).dp)

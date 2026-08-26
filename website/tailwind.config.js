@@ -5,16 +5,16 @@ export default {
     extend: {
       colors: {
         // Match APK themes.xml primary_yellow and Wallet/WithdrawalAccount screens
-        appBg: '#121212',
+        appBg: '#000000', // Dual Cards home (APK default)
         surface: '#1E1E1E',
-        card: '#252525',
-        bottomNav: '#1A1A1A',
+        card: '#0D0D0D',
+        bottomNav: '#0A0A0A',
         border: '#333333',
         textWhite: '#FFFFFF',
         textGrey: '#BDBDBD',
-        primaryYellow: '#DAA520', // APK golden (themes.xml primary_yellow)
-        goldCard: '#E6B84D',     // APK gold card background (WalletScreen, WithdrawalAccountScreen)
-        goldCardDark: '#C48B22', // APK bank card gradient end
+        primaryYellow: '#FFD54F', // Dual Cards gold mid
+        goldCard: '#E6B84D',
+        goldCardDark: '#C9A227',
         success: '#4CAF50',
         error: '#F44336',
       },

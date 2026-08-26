@@ -287,7 +287,7 @@ fun SideMenuOverlay(
                     label = "Cricket",
                     onClick = {
                         onClose()
-                        requireLoginOr { onNavigate("ipl") }
+                        requireLoginOr { onNavigate("sports?sport=cricket") }
                     }
                 )
                 SideMenuItem(

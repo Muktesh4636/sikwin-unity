@@ -10,6 +10,9 @@ export function SignupPage() {
   const auth = useAuth();
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get('next') || '';
+  const safeNext =
+    nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
@@ -61,7 +64,7 @@ export function SignupPage() {
       if (referralCode.trim()) data.referral_code = referralCode.trim();
       const resp = await apiRegister(data);
       auth.setSession(resp.data);
-      nav('/', { replace: true });
+      nav(safeNext, { replace: true });
     } catch (e: any) {
       const msg = e?.response?.data?.detail || e?.response?.data?.message || 'Sign-up failed. Please try again.';
       setError(String(msg));

@@ -54,6 +54,15 @@ interface ApiService {
     @POST("auth/deposits/initiate/")
     suspend fun initiateDeposit(@Body data: Map<String, String>): Response<PaybitraDepositResponse>
 
+    @GET("auth/deposits/mode/")
+    suspend fun getDepositMode(): Response<DepositModeResponse>
+
+    @POST("auth/deposits/auto/initiate/")
+    suspend fun initiateAutoDeposit(@Body data: Map<String, @JvmSuppressWildcards Any>): Response<PaybitraDepositResponse>
+
+    @GET("auth/deposits/auto/status/{sessionId}/")
+    suspend fun getAutoDepositStatus(@Path("sessionId") sessionId: String): Response<PaybitraDepositResponse>
+
     @Multipart
     @POST("auth/deposits/upload-proof/")
     suspend fun uploadDepositProof(
@@ -63,6 +72,14 @@ interface ApiService {
 
     @POST("auth/deposits/submit-utr/")
     suspend fun submitUtr(@Body data: Map<String, String>): Response<DepositRequest>
+
+    /** UPI app returned SUCCESS — credit/verify with UTR (same pipeline as companion sync). */
+    @POST("auth/deposits/upi-callback/")
+    suspend fun upiDepositCallback(@Body data: Map<String, String>): Response<UpiCallbackResponse>
+
+    /** Alias path some backends expose as /api/deposits/upi-callback/ */
+    @POST("deposits/upi-callback/")
+    suspend fun upiDepositCallbackAlt(@Body data: Map<String, String>): Response<UpiCallbackResponse>
 
     @POST("auth/withdraws/initiate/")
     suspend fun initiateWithdraw(@Body data: Map<String, String>): Response<WithdrawRequest>

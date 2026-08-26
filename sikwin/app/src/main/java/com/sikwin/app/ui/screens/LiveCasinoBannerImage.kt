@@ -39,7 +39,8 @@ import com.sikwin.app.data.prefs.BannerPreferences
 import com.sikwin.app.ui.theme.PrimaryYellow
 import com.sikwin.app.ui.theme.TextGrey
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /** Matches default `live_casino_banner.png` (854 x 450). */
 const val LIVE_CASINO_BANNER_ASPECT_RATIO = 854f / 450f
@@ -69,11 +70,24 @@ fun HomePromoBannerCarousel(
         pageCount = { virtualCount }
     )
 
+    // Auto-scroll must survive user swipes: animateScrollToPage cancels the caller
+    // coroutine when interrupted — run animation in a child job so the loop continues.
     LaunchedEffect(pageCount, autoScrollMs) {
-        while (true) {
-            yield()
+        while (isActive) {
             delay(autoScrollMs)
-            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+            if (!isActive) break
+            if (pagerState.isScrollInProgress) continue
+            val next = pagerState.currentPage + 1
+            if (next >= pagerState.pageCount) {
+                // Near end of virtual range — snap back to the middle band
+                val mid = virtualCount / 2
+                pagerState.scrollToPage(mid + (pagerState.currentPage % pageCount))
+                continue
+            }
+            val anim = launch {
+                pagerState.animateScrollToPage(next)
+            }
+            anim.join()
         }
     }
 

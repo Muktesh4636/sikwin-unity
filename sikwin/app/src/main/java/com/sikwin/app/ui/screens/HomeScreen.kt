@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import androidx.compose.ui.unit.DpOffset
@@ -75,6 +76,15 @@ fun HomeScreen(
     onNavigate: (String) -> Unit
 ) {
     val context = LocalContext.current
+
+    // Quiet casino lobby prefetch as soon as home is shown (logged in)
+    LaunchedEffect(viewModel.loginSuccess) {
+        if (viewModel.loginSuccess) {
+            val token = com.sikwin.app.data.api.RetrofitClient.getSessionManager()?.fetchAuthToken()
+            com.sikwin.app.utils.CasinoPrefetcher.prefetchOnHome(context, token)
+        }
+    }
+
     val appTheme = remember {
         com.sikwin.app.data.prefs.ThemePreferences(context).getAppTheme()
     }
@@ -107,7 +117,7 @@ fun HomeScreen(
         GunduAtaChoiceDialog(
             onDismiss = { showGunduAtaChoiceDialog = false },
             onPlayLive = { onNavigate("gundu_ata_live") },
-            onPlayNormal = { onGameClick("gundu_ata") }
+            onPlayNormal = { onNavigate("gundu_ata_web") }
         )
     }
     
@@ -560,10 +570,18 @@ fun PromotionalBanners(
     }
 
     LaunchedEffect(Unit) {
-        while (true) {
-            yield()
+        while (isActive) {
             delay(4000)
-            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+            if (!isActive) break
+            if (pagerState.isScrollInProgress) continue
+            val next = pagerState.currentPage + 1
+            if (next >= pagerState.pageCount) {
+                pagerState.scrollToPage(virtualCount / 2 + (pagerState.currentPage % pageCount))
+                continue
+            }
+            // Child job so a swipe-cancel doesn't kill auto-scroll forever
+            val anim = launch { pagerState.animateScrollToPage(next) }
+            anim.join()
         }
     }
 
@@ -582,7 +600,7 @@ fun PromotionalBanners(
                 1 -> BannerData("REFER & EARN", "Earn up to ₹1 Lakh!", "INVITE", listOf(Color(0xFF455A64), Color(0xFF263238)), { handleBannerClickRequireLogin("affiliate") })
                 2 -> BannerData("MEGA SPIN", "Deposit ₹2000 or more to spin the wheel!", "SPIN NOW", listOf(Color(0xFF4A148C), Color(0xFF880E4F)), { handleBannerClickRequireLogin("lucky_draw") })
                 3 -> BannerData("USDT SPECIAL ₮", "Get 5% EXTRA CASHBACK on all USDT deposits!", "DEPOSIT NOW", listOf(Color(0xFF00897B), Color(0xFF004D40)), { handleBannerClick("deposit?method=USDT") })
-                4 -> BannerData(stringResource(R.string.banner_cricket_title), stringResource(R.string.banner_cricket_subtitle), "BET NOW", listOf(Color(0xFF0D47A1), Color(0xFF1A237E)), { handleBannerClick("ipl") })
+                4 -> BannerData(stringResource(R.string.banner_cricket_title), stringResource(R.string.banner_cricket_subtitle), "BET NOW", listOf(Color(0xFF0D47A1), Color(0xFF1A237E)), { handleBannerClick("sports?sport=cricket") })
                 else -> BannerData("FRANCHISE", "Get Gundu Ata franchise at 50% off — Get in touch today!", "LEARN MORE", listOf(Color(0xFF795548), Color(0xFF5D4037)), { handleBannerClick("white_label_account") })
             }
 
@@ -654,7 +672,7 @@ private fun homeScreenGames(): List<GameItem> = listOf(
     GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)),
     GameItem("COLOUR GAME", "colour_game", Color(0xFF1A1A2E)),
     GameItem("HEAD & TAILS", "coin", Color(0xFFB8860B)),
-    GameItem("CRICKET", "ipl", Color(0xFF0D47A1))
+    GameItem("CRICKET", "sports?sport=cricket", Color(0xFF0D47A1))
 )
 
 private fun launchHomeGame(
@@ -665,7 +683,7 @@ private fun launchHomeGame(
     onRequireLogin: () -> Unit
 ) {
     when (gameId) {
-        "ipl", "coin" -> onNavigate(gameId)
+        "ipl", "coin", "sports?sport=cricket", "sports?sport=soccer", "sports?sport=tennis", "sports" -> onNavigate(gameId)
         "gundu_ata" -> {
             if (!loginSuccess) onRequireLogin()
             else onGameClick(gameId)
@@ -691,7 +709,7 @@ fun QuickGamesRow(
         QuickEntry("colour_game", "Colour Game"),
         QuickEntry("gundu_ata", "Gundu Ata"),
         QuickEntry("coin", "Head & Tails"),
-        QuickEntry("ipl", cricketLabel)
+        QuickEntry("sports?sport=cricket", cricketLabel)
     )
 
     Row(
@@ -720,17 +738,18 @@ fun QuickGamesRow(
                         .size(62.dp)
                         .clip(CircleShape)
                         .background(
-                            when (entry.id) {
-                                "ipl" -> Brush.linearGradient(listOf(Color(0xFF0D47A1), Color(0xFF1A237E)))
-                                "gundu_ata" -> Brush.linearGradient(listOf(Color(0xFF0A1628), Color(0xFF1565C0)))
-                                "coin" -> Brush.linearGradient(listOf(Color(0xFF3D2B00), Color(0xFFB8860B)))
+                            when {
+                                entry.id == "ipl" || entry.id.startsWith("sports") ->
+                                    Brush.linearGradient(listOf(Color(0xFF0D47A1), Color(0xFF1A237E)))
+                                entry.id == "gundu_ata" -> Brush.linearGradient(listOf(Color(0xFF0A1628), Color(0xFF1565C0)))
+                                entry.id == "coin" -> Brush.linearGradient(listOf(Color(0xFF3D2B00), Color(0xFFB8860B)))
                                 else -> Brush.linearGradient(listOf(Color(0xFF0A0A0A), Color(0xFF1A1A1A)))
                             }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    when (entry.id) {
-                        "ipl" -> {
+                    when {
+                        entry.id == "ipl" || entry.id.startsWith("sports") -> {
                             // Cricket bat + T20 badge
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 if (iplIconRes != null) {
@@ -746,7 +765,7 @@ fun QuickGamesRow(
                                 Text("🏏", fontSize = 10.sp)
                             }
                         }
-                        "gundu_ata" -> {
+                        entry.id == "gundu_ata" -> {
                             if (gunduIconRes != null) {
                                 Image(
                                     painter = painterResource(id = gunduIconRes),
@@ -758,7 +777,7 @@ fun QuickGamesRow(
                                 Text("🎲", fontSize = 22.sp)
                             }
                         }
-                        "coin" -> {
+                        entry.id == "coin" -> {
                             // Gold coin split H | T
                             Box(
                                 modifier = Modifier
@@ -790,7 +809,7 @@ fun QuickGamesRow(
                                 }
                             }
                         }
-                        "colour_game" -> {
+                        entry.id == "colour_game" -> {
                             // Three colour circles matching the game buttons
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -942,7 +961,7 @@ fun HotGamesGrid(
         GunduAtaChoiceDialog(
             onDismiss = { showGunduAtaDialog = false },
             onPlayLive = { onNavigate("gundu_ata_live") },
-            onPlayNormal = { onGameClick("gundu_ata") }
+            onPlayNormal = { onNavigate("gundu_ata_web") }
         )
     }
 
@@ -1470,9 +1489,9 @@ fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit, cardAspect
                     .background(game.color),
                 contentAlignment = Alignment.Center
             ) {
-                when (game.id) {
-                    "gundu_ata" -> VideoPlayer(videoResId = R.raw.gundu_ata_video, modifier = Modifier.fillMaxWidth().fillMaxHeight(0.82f))
-                    "colour_game" -> {
+                when {
+                    game.id == "gundu_ata" -> VideoPlayer(videoResId = R.raw.gundu_ata_video, modifier = Modifier.fillMaxWidth().fillMaxHeight(0.82f))
+                    game.id == "colour_game" -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1506,7 +1525,7 @@ fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit, cardAspect
                             }
                         }
                     }
-                    "coin" -> {
+                    game.id == "coin" -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1525,7 +1544,7 @@ fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit, cardAspect
                             )
                         }
                     }
-                    "ipl" -> {
+                    game.id == "ipl" || game.id.startsWith("sports") -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1548,7 +1567,7 @@ fun GameCard(game: GameItem, modifier: Modifier, onClick: () -> Unit, cardAspect
                             }
                         }
                     }
-                    "cock_fight" -> {
+                    game.id == "cock_fight" -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1682,7 +1701,7 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
         GunduAtaChoiceDialog(
             onDismiss = { showGunduAtaDialog = false },
             onPlayLive = { onNavigate("gundu_ata_live") },
-            onPlayNormal = { onNavigate("gundu_ata") }
+            onPlayNormal = { onNavigate("gundu_ata_web") }
         )
     }
 

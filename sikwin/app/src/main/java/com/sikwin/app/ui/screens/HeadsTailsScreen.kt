@@ -91,6 +91,8 @@ import com.sikwin.app.ui.theme.TextGrey
 import com.sikwin.app.ui.theme.TextWhite
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import com.sikwin.app.utils.MoneyFormat
+import com.sikwin.app.data.api.RetrofitClient
+import com.sikwin.app.utils.CasinoPrefetcher
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -194,11 +196,14 @@ fun HeadsTailsScreen(
     onNavigate: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val resources = LocalContext.current.resources
+    val context = LocalContext.current
+    val resources = context.resources
     val username = viewModel.userProfile?.username ?: "You"
 
     LaunchedEffect(Unit) {
         viewModel.fetchWallet()
+        val token = RetrofitClient.getSessionManager()?.fetchAuthToken()
+        CasinoPrefetcher.prefetchWhilePlaying(context, token)
     }
 
     var amountText by remember { mutableStateOf("50") }

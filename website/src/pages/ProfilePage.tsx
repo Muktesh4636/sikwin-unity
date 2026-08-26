@@ -13,26 +13,37 @@ function RefreshIcon({ className }: { className?: string }) {
   );
 }
 
+function downloadApk() {
+  const url = `/GunduAta.apk?t=${Date.now()}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'GunduAta.apk';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function MenuItem({
   icon,
   label,
   to,
+  onClick,
   highlighted = false,
   noBorderBelow = false,
 }: {
   icon: React.ReactNode;
   label: string;
-  to: string;
+  to?: string;
+  onClick?: () => void;
   highlighted?: boolean;
   noBorderBelow?: boolean;
 }) {
-  return (
-    <Link
-      to={to}
-      className={`flex w-full items-center gap-4 rounded-none border-b border-border px-4 py-3 last:border-b-0 ${
-        noBorderBelow ? 'border-b-0' : ''
-      } ${highlighted ? 'bg-primaryYellow/15' : 'bg-surface'}`}
-    >
+  const className = `flex w-full items-center gap-4 rounded-none border-b border-border px-4 py-3 last:border-b-0 ${
+    noBorderBelow ? 'border-b-0' : ''
+  } ${highlighted ? 'bg-primaryYellow/15' : 'bg-surface'}`;
+  const body = (
+    <>
       <span className={`[&>svg]:h-7 [&>svg]:w-7 [&>img]:h-7 [&>img]:w-7 shrink-0 ${highlighted ? 'text-primaryYellow' : 'text-textGrey [&>img]:grayscale [&>img]:opacity-80'}`}>{icon}</span>
       <span className={`min-w-0 flex-1 text-base font-medium ${highlighted ? 'text-primaryYellow' : 'text-textWhite'}`}>{label}</span>
       <span className={`shrink-0 ${highlighted ? 'text-primaryYellow' : 'text-textGrey'}`}>
@@ -40,6 +51,18 @@ function MenuItem({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </span>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${className} text-left`}>
+        {body}
+      </button>
+    );
+  }
+  return (
+    <Link to={to || '/'} className={className}>
+      {body}
     </Link>
   );
 }
@@ -154,6 +177,14 @@ function BookIcon() {
   return (
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  );
+}
+
+function DownloadApkIcon() {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
   );
 }
@@ -297,6 +328,13 @@ export function ProfilePage() {
           <MenuItem icon={<BusinessIcon />} label={t('become_partner')} to="/partner" highlighted />
           <MenuItem icon={<DiceNavIcon />} label={t('dice_results')} to="/dice-results" />
           <MenuItem icon={<BookIcon />} label={t('game_guidelines')} to="/game-guidelines" />
+          <MenuItem
+            icon={<DownloadApkIcon />}
+            label={t('download_apk')}
+            onClick={downloadApk}
+            highlighted
+            noBorderBelow
+          />
         </div>
 
         {/* Logout (APK: 48dp height, 8dp radius) */}

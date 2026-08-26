@@ -38,7 +38,7 @@ fun DepositScreen(
     onNavigateToWithdraw: () -> Unit,
     onNavigateToPayment: (String, String) -> Unit
 ) {
-    var amount by remember { mutableStateOf(if (initialMethod == "USDT") "500" else "200") }
+    var amount by remember { mutableStateOf(if (initialMethod == "USDT") "1" else "1") }
     var selectedMethod by remember { mutableStateOf(if (initialMethod == "USDT") "USDT" else "UPI") } // "Bank", "UPI", or "USDT"
     var selectedOption by remember { mutableStateOf(if (initialMethod == "USDT") "usdt_trc20" else "upi") }
     
@@ -47,8 +47,8 @@ fun DepositScreen(
     var hasBeenFocused by remember { mutableStateOf(false) }
 
     val usdtExchangeRate = 95
-    val usdtMinDeposit = 500
-    val normalMinDeposit = 200
+    val usdtMinDeposit = 1
+    val normalMinDeposit = 1
     val usdtBonusPercent = 0.05
 
     val currentMinDeposit = if (selectedMethod == "USDT") usdtMinDeposit else normalMinDeposit

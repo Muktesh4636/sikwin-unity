@@ -14,4 +14,8 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Sikwin"
 include ':app'
-include ':unityLibrary'
+// TEMP: Unity (~90MB) removed from APK. Real module kept on disk at unityLibrary/.
+// To restore Gundu Ata Unity: uncomment the next line, comment the stub line,
+// and switch app/build.gradle dependency back to :unityLibrary (see unityLibraryStub/RESTORE_UNITY.md).
+// include ':unityLibrary'
+include ':unityLibraryStub'

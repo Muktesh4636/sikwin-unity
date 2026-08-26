@@ -38,7 +38,7 @@ val DualGoldBrush = Brush.verticalGradient(listOf(DualGoldLight, DualGoldMid, Du
 val DualScreenBlack = Color(0xFF000000)
 val DualCardDark = Color(0xFF0D0D0D)
 
-enum class DualNavTab { HOME, PROMO, CASINO, WALLET, PROFILE, NONE }
+enum class DualNavTab { HOME, LIVE, CASINO, WALLET, PROFILE, NONE }
 
 @Composable
 fun DualCardsTopBar(
@@ -128,7 +128,7 @@ fun DualCardsTopBar(
 fun DualCardsBottomBar(
     selectedTab: DualNavTab = DualNavTab.HOME,
     onHome: () -> Unit,
-    onPromo: () -> Unit,
+    onLive: () -> Unit,
     onCasino: () -> Unit,
     onWallet: () -> Unit,
     onProfile: () -> Unit
@@ -144,7 +144,7 @@ fun DualCardsBottomBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         DualNavItem("HOME", Icons.Default.Home, selectedTab == DualNavTab.HOME, onHome)
-        DualNavItem("PROMO", Icons.Default.CardGiftcard, selectedTab == DualNavTab.PROMO, onPromo)
+        DualNavItem("LIVE", Icons.Default.Bolt, selectedTab == DualNavTab.LIVE, onLive)
         DualCasinoNavItem(selected = selectedTab == DualNavTab.CASINO, onClick = onCasino)
         DualNavItem("WALLET", Icons.Default.AccountBalanceWallet, selectedTab == DualNavTab.WALLET, onWallet)
         DualNavItem("PROFILE", Icons.Default.Person, selectedTab == DualNavTab.PROFILE, onProfile)

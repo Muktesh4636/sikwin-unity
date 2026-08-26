@@ -18,7 +18,6 @@ import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.ui.screens.*
 import com.sikwin.app.ui.screens.AffiliateScreen
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
-import com.sikwin.app.utils.CasinoPrefetcher
 import androidx.compose.runtime.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -42,6 +41,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.sikwin.app.utils.Constants
+import com.sikwin.app.utils.CasinoPrefetcher
 import com.unity3d.player.UnityTokenHolder
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -56,11 +56,6 @@ fun AppNavigation(
     val context = LocalContext.current
     val activity = context as? Activity
     var showAuthDialog by remember { mutableStateOf(false) }
-
-    // Prefetch Casino with JWT as soon as session is known / changes
-    LaunchedEffect(viewModel.loginSuccess) {
-        CasinoPrefetcher.warm(context, sessionManager.fetchAuthToken())
-    }
 
     // When app goes to background, set flag so support popup shows on next home visit (after reopen)
     DisposableEffect(Unit) {
@@ -114,6 +109,7 @@ fun AppNavigation(
     }
 
     // If logged out, force user to auth flow (no wallet/balance UI for guests).
+    // If logged in, quietly prefetch Casino so the tab opens instantly.
     LaunchedEffect(viewModel.loginSuccess) {
         if (!viewModel.loginSuccess) {
             // Ensure graph is set before popping.
@@ -127,6 +123,8 @@ fun AppNavigation(
                 // Fallback: just navigate; worst case user can back out.
                 navController.navigate("login") { launchSingleTop = true }
             }
+        } else {
+            CasinoPrefetcher.prefetchOnHome(context, sessionManager.fetchAuthToken())
         }
     }
 
@@ -296,7 +294,15 @@ fun AppNavigation(
     }
 
     fun executeGameLaunch(liveMode: Boolean = false) {
-        CasinoPrefetcher.warm(context)
+        // TEMP: Unity binaries removed from APK — keep Live + WebView games.
+        if (!com.sikwin.app.BuildConfig.HAS_UNITY) {
+            Toast.makeText(
+                context,
+                "Gundu Ata Unity is temporarily unavailable. Try Live or Casino games.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - lastGameLaunchTime < gameLaunchCooldown) return
         lastGameLaunchTime = now
@@ -494,15 +500,17 @@ fun AppNavigation(
             HomeScreen(
                 viewModel = viewModel,
                 onGameClick = { gameId ->
-                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("game_open", mapOf("game" to gameId))
                     when (gameId) {
-                        "gundu_ata" -> {
+                        "gundu_ata", "gundu_ata_web" -> {
                             if (!viewModel.loginSuccess) {
                                 showAuthDialog = true
                             } else {
-                                viewModel.syncAuthToUnity()
-                                executeGameLaunch(liveMode = false)
+                                navController.navigate("gundu_ata_web") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         }
                         "gundu_ata_live" -> {
@@ -537,14 +545,16 @@ fun AppNavigation(
                     }
                 },
                 onNavigate = { route ->
-                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
-                    if (route == "gundu_ata") {
+                    if (route == "gundu_ata" || route == "gundu_ata_web") {
                         if (!viewModel.loginSuccess) {
                             showAuthDialog = true
                         } else {
-                            viewModel.syncAuthToUnity()
-                            executeGameLaunch(liveMode = false)
+                            navController.navigate("gundu_ata_web") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     } else if (route == "gundu_ata_live") {
                         navController.navigate("gundu_ata_live") {
@@ -592,6 +602,36 @@ fun AppNavigation(
                                 restoreState = true
                             }
                         }
+                    } else if (route == "sports" || route.startsWith("sports?")) {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate(route) {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else if (route == "soccer") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("sports?sport=soccer") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else if (route == "tennis") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("sports?sport=tennis") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     } else if (route == "chicken_road") {
                         if (!viewModel.loginSuccess) {
                             showAuthDialog = true
@@ -622,11 +662,15 @@ fun AppNavigation(
                                 restoreState = true
                             }
                         }
-                    } else if (route == "ipl") {
-                        navController.navigate("ipl") {
-                            popUpTo("home") { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                    } else if (route == "ipl" || route == "cricket") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            navController.navigate("sports?sport=cricket") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     } else if (route == "coin") {
                         navController.navigate("coin") {
@@ -678,14 +722,14 @@ fun AppNavigation(
                 viewModel = viewModel,
                 sessionManager = sessionManager,
                 onNavigate = { route ->
-                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
-                    if (route == "gundu_ata") {
+                    if (route == "gundu_ata" || route == "gundu_ata_web") {
                         if (!viewModel.loginSuccess) {
                             showAuthDialog = true
                         } else {
-                            viewModel.syncAuthToUnity()
-                            executeGameLaunch(liveMode = false)
+                            navController.navigate("gundu_ata_web") {
+                                launchSingleTop = true
+                            }
                         }
                     } else if (route == "gundu_ata_live") {
                         navController.navigate("gundu_ata_live") {
@@ -730,8 +774,7 @@ fun AppNavigation(
             RouletteWebViewScreen(
                 accessToken = sessionManager.fetchAuthToken(),
                 onBack = {
-                    // Back closes WebView → lobby (home)
-                    if (!navController.popBackStack("home", inclusive = false)) {
+                    if (!navController.popBackStack()) {
                         navController.navigate("home") {
                             launchSingleTop = true
                             restoreState = true
@@ -745,7 +788,7 @@ fun AppNavigation(
             TradingWebViewScreen(
                 accessToken = sessionManager.fetchAuthToken(),
                 onBack = {
-                    if (!navController.popBackStack("home", inclusive = false)) {
+                    if (!navController.popBackStack()) {
                         navController.navigate("home") {
                             launchSingleTop = true
                             restoreState = true
@@ -760,7 +803,7 @@ fun AppNavigation(
                 game = ChickenRoadGame.ONE,
                 accessToken = sessionManager.fetchAuthToken(),
                 onBack = {
-                    if (!navController.popBackStack("home", inclusive = false)) {
+                    if (!navController.popBackStack()) {
                         navController.navigate("home") {
                             launchSingleTop = true
                             restoreState = true
@@ -775,7 +818,7 @@ fun AppNavigation(
                 game = ChickenRoadGame.TWO,
                 accessToken = sessionManager.fetchAuthToken(),
                 onBack = {
-                    if (!navController.popBackStack("home", inclusive = false)) {
+                    if (!navController.popBackStack()) {
                         navController.navigate("home") {
                             launchSingleTop = true
                             restoreState = true
@@ -790,7 +833,23 @@ fun AppNavigation(
                 game = ChickenRoadGame.VORTEX,
                 accessToken = sessionManager.fetchAuthToken(),
                 onBack = {
-                    if (!navController.popBackStack("home", inclusive = false)) {
+                    if (!navController.popBackStack()) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
+        composable("casino_web_game") {
+            CasinoSiteGameScreen(
+                title = CasinoPrefetcher.pendingWebGameTitle ?: "Game",
+                gameUrl = CasinoPrefetcher.pendingWebGameUrl ?: Constants.CASINO_URL,
+                accessToken = sessionManager.fetchAuthToken(),
+                onBack = {
+                    if (!navController.popBackStack()) {
                         navController.navigate("home") {
                             launchSingleTop = true
                             restoreState = true
@@ -803,36 +862,68 @@ fun AppNavigation(
         composable("cock_fight") {
             CockFightScreen(onBack = { navController.popBackStack() })
         }
-        composable("ipl") {
-            IplScreen(
-                viewModel = viewModel,
-                onBack = { navController.popBackStack() },
-                onNavigate = { route ->
-                    CasinoPrefetcher.warm(context)
-                    com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
-                    if (route == "gundu_ata") {
-                        if (!viewModel.loginSuccess) {
-                            showAuthDialog = true
-                        } else {
-                            viewModel.syncAuthToUnity()
-                            executeGameLaunch()
-                        }
-                    } else if (route == "home") {
-                        if (!navController.popBackStack("home", inclusive = false)) {
-                            navController.navigate("home") {
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    } else if (route == "login") {
-                        navController.navigate("login") {
-                            popUpTo("home") { inclusive = false }
+        composable("sports") {
+            SportsWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                refreshToken = sessionManager.fetchRefreshToken(),
+                sport = null,
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
                             launchSingleTop = true
+                            restoreState = true
                         }
-                    } else {
-                        navController.navigate(route)
                     }
-                }
+                },
+                onCasino = {
+                    navController.navigate("casino_games") {
+                        launchSingleTop = true
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
+        composable("sports?sport={sport}") { backStackEntry ->
+            SportsWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                refreshToken = sessionManager.fetchRefreshToken(),
+                sport = backStackEntry.arguments?.getString("sport"),
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onCasino = {
+                    navController.navigate("casino_games") {
+                        launchSingleTop = true
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
+        // Native cricket UI temporarily removed — open Sports WebView instead.
+        composable("ipl") {
+            SportsWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                refreshToken = sessionManager.fetchRefreshToken(),
+                sport = "cricket",
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onCasino = {
+                    navController.navigate("casino_games") {
+                        launchSingleTop = true
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
             )
         }
         composable("casino_games") {
@@ -847,7 +938,13 @@ fun AppNavigation(
                         }
                     }
                 },
-                onRequireLogin = { showAuthDialog = true }
+                onRequireLogin = { showAuthDialog = true },
+                onOpenNativeGame = { route ->
+                    // Chit Pat → coin, Rangu → colour_game (Kotlin screens, not WebView)
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                }
             )
         }
         composable("coin") {
@@ -856,12 +953,13 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() },
                 onNavigate = { route ->
                     when {
-                        route == "gundu_ata" -> {
+                        route == "gundu_ata" || route == "gundu_ata_web" -> {
                             if (!viewModel.loginSuccess) {
                                 showAuthDialog = true
                             } else {
-                                viewModel.syncAuthToUnity()
-                                executeGameLaunch()
+                                navController.navigate("gundu_ata_web") {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                         route == "home" -> {
@@ -985,10 +1083,19 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() }
             )
         }
+        // Native cricket betting history UI temporarily removed.
         composable("cricket_betting_record") {
-            CricketBettingHistoryScreen(
-                viewModel = viewModel,
-                onBack = { navController.popBackStack() }
+            SportsWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                refreshToken = sessionManager.fetchRefreshToken(),
+                sport = "cricket",
+                onBack = { navController.popBackStack() },
+                onCasino = {
+                    navController.navigate("casino_games") {
+                        launchSingleTop = true
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
             )
         }
         composable("personal_info") {
@@ -1014,10 +1121,24 @@ fun AppNavigation(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route ->
-                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     navController.navigate(route)
                 }
+            )
+        }
+        composable("gundu_ata_web") {
+            GunduAtaWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                refreshToken = sessionManager.fetchRefreshToken(),
+                onBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
             )
         }
         composable("gundu_ata_live") {
@@ -1025,7 +1146,6 @@ fun AppNavigation(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route ->
-                    CasinoPrefetcher.warm(context)
                     com.sikwin.app.utils.EventLogger.click("nav", mapOf("route" to route))
                     navController.navigate(route)
                 }

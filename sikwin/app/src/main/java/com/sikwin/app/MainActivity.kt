@@ -32,8 +32,17 @@ class MainActivity : AppCompatActivity() {
         RetrofitClient.init(sessionManager)
         com.sikwin.app.utils.EventLogger.init(this, sessionManager)
 
-        // Prefetch Casino lobby as soon as the APK opens (before user taps Casino).
-        com.sikwin.app.utils.CasinoPrefetcher.warm(this, sessionManager.fetchAuthToken())
+        // Drop any parked game WebViews + HTTP cache so reopen shows latest casino/sports/etc.
+        try {
+            com.sikwin.app.utils.CasinoPrefetcher.clear()
+            com.sikwin.app.utils.SportsPrefetcher.clear()
+            com.sikwin.app.utils.GunduAtaPrefetcher.clear()
+            android.webkit.WebView(this).apply {
+                clearCache(true)
+                destroy()
+            }
+        } catch (_: Exception) {
+        }
 
         // Capture uncaught crashes so we can fix them from the backend.
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -60,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         // CRITICAL: When the app is relaunched from recents swipe-kill, in-memory holders are empty.
         // Sync tokens into Unity-readable prefs + static holder again so the next Unity launch works.
         sessionManager.syncAuthToUnity()
-        
+
         setContent {
             GunduAtaTheme {
                 Surface(

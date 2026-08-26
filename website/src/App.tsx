@@ -32,6 +32,7 @@ import { RoulettePage } from './pages/RoulettePage';
 import { TradingPage } from './pages/TradingPage';
 import { ChickenRoadPage, JwtWebGamePage } from './pages/ChickenRoadPage';
 import { MaintenanceGate } from './maintenance/MaintenanceGate';
+import { ApkDownloadPrompt } from './components/ApkDownloadPrompt';
 import { isAdminUrlPath } from './utils/adminPath';
 
 function AppRoutes() {
@@ -82,13 +83,14 @@ function AppRoutes() {
         <Route path="*" element={<HomePage />} />
       </Routes>
       {!hideNav && <BottomNav />}
+      {!hideNav && <ApkDownloadPrompt />}
     </>
   );
 }
 
 /**
  * WebGL app: home page at / and game at /game/index.html.
- * Bottom nav matches APK: Home, GUNDU ATA, Me.
+ * Bottom nav matches APK Dual Cards theme: HOME / PROMO / CASINO / WALLET / PROFILE.
  */
 function App() {
   return (

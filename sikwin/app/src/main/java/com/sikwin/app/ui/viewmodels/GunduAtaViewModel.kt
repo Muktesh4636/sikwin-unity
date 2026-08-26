@@ -1431,17 +1431,42 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
             errorMessage = null
             paybitraDeposit = null
             try {
-                val response = RetrofitClient.apiService.initiateDeposit(
-                    mapOf("amount" to amount, "method" to method)
-                )
-                if (response.isSuccessful) {
-                    paybitraDeposit = response.body()
-                } else {
-                    logoutIfUnauthorized(response.code())
-                    val msg = parseError(response.errorBody()?.string())
-                        .ifEmpty { "Could not start deposit. Please try again." }
-                    errorMessage = msg
-                    onError?.invoke(msg)
+                // Prefer automatic deposit (unique amount + callback_token) when enabled.
+                var usedAuto = false
+                try {
+                    val modeResp = RetrofitClient.apiService.getDepositMode()
+                    if (modeResp.isSuccessful && modeResp.body()?.automatic == true) {
+                        val autoResp = RetrofitClient.apiService.initiateAutoDeposit(
+                            mapOf("amount" to (amount.toIntOrNull() ?: amount))
+                        )
+                        if (autoResp.isSuccessful) {
+                            paybitraDeposit = autoResp.body()
+                            usedAuto = true
+                            android.util.Log.d(
+                                "GunduAtaViewModel",
+                                "auto deposit initiate ok session=${paybitraDeposit?.sessionKey()} tokenPresent=${!paybitraDeposit?.callback_token.isNullOrBlank()}"
+                            )
+                        } else if (autoResp.code() != 400) {
+                            logoutIfUnauthorized(autoResp.code())
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("GunduAtaViewModel", "deposit mode/auto initiate: ${e.message}")
+                }
+
+                if (!usedAuto) {
+                    val response = RetrofitClient.apiService.initiateDeposit(
+                        mapOf("amount" to amount, "method" to method)
+                    )
+                    if (response.isSuccessful) {
+                        paybitraDeposit = response.body()
+                    } else {
+                        logoutIfUnauthorized(response.code())
+                        val msg = parseError(response.errorBody()?.string())
+                            .ifEmpty { "Could not start deposit. Please try again." }
+                        errorMessage = msg
+                        onError?.invoke(msg)
+                    }
                 }
             } catch (e: Exception) {
                 val msg = handleException(e)
@@ -1455,6 +1480,165 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
 
     fun clearPaybitraDeposit() {
         paybitraDeposit = null
+        depositPollingActive = false
+    }
+
+    private var depositPollingActive = false
+
+    /** SUCCESS from UPI app — POST session_id + utr + txn_id + callback_token. */
+    fun submitUpiCallback(
+        sessionId: String,
+        utr: String,
+        txnId: String,
+        status: String,
+        onSuccess: () -> Unit,
+        onError: ((String) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            try {
+                val session = paybitraDeposit
+                val payload = mutableMapOf(
+                    "session_id" to sessionId,
+                    "utr" to utr,
+                    "txn_id" to txnId,
+                    "status" to status
+                )
+                // Required by backend auto-deposit callback (survives JWT expiry in PhonePe)
+                session?.callback_token?.takeIf { it.isNotBlank() }?.let {
+                    payload["callback_token"] = it
+                }
+                session?.payAmount()?.takeIf { it.isNotBlank() }?.let { payload["amount"] = it }
+                session?.paybitra_order_id?.takeIf { it.isNotBlank() }?.let {
+                    payload["paybitra_order_id"] = it
+                }
+                session?.code?.let { payload["paybitra_code"] = it }
+
+                android.util.Log.d(
+                    "GunduAtaViewModel",
+                    "upi-callback POST session_id=$sessionId utr=$utr txn_id=$txnId callback_token=${!payload["callback_token"].isNullOrBlank()}"
+                )
+
+                var response = RetrofitClient.apiService.upiDepositCallback(payload)
+                if (response.code() == 404) {
+                    response = RetrofitClient.apiService.upiDepositCallbackAlt(payload)
+                }
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    clearPaybitraDeposit()
+                    fetchWallet()
+                    fetchDeposits()
+                    onSuccess()
+                    android.util.Log.d(
+                        "GunduAtaViewModel",
+                        "upi-callback ok credited=${body?.credited} status=${body?.status}"
+                    )
+                } else {
+                    logoutIfUnauthorized(response.code())
+                    if (!utr.isBlank()) {
+                        val utrPayload = mutableMapOf(
+                            "amount" to (session?.payAmount() ?: ""),
+                            "utr" to utr,
+                            "paybitra_order_id" to sessionId
+                        )
+                        session?.callback_token?.takeIf { it.isNotBlank() }?.let {
+                            utrPayload["callback_token"] = it
+                        }
+                        session?.code?.let { utrPayload["paybitra_code"] = it }
+                        val utrResp = RetrofitClient.apiService.submitUtr(utrPayload)
+                        if (utrResp.isSuccessful) {
+                            clearPaybitraDeposit()
+                            fetchWallet()
+                            fetchDeposits()
+                            onSuccess()
+                            return@launch
+                        }
+                    }
+                    val msg = parseError(response.errorBody()?.string())
+                        .ifEmpty { "Could not confirm payment. Please wait or upload screenshot." }
+                    errorMessage = msg
+                    onError?.invoke(msg)
+                }
+            } catch (e: Exception) {
+                val msg = handleException(e)
+                errorMessage = msg
+                onError?.invoke(msg)
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    /** Poll deposit list until matching session is APPROVED (SUBMITTED / unknown UPI result). */
+    fun startDepositStatusPolling(
+        sessionId: String,
+        amount: String,
+        onApproved: () -> Unit,
+        onTimeout: (() -> Unit)? = null
+    ) {
+        if (depositPollingActive) return
+        depositPollingActive = true
+        viewModelScope.launch {
+            val deadline = System.currentTimeMillis() + 10 * 60_000L
+            try {
+                while (depositPollingActive && System.currentTimeMillis() < deadline) {
+                    delay(4000)
+                    try {
+                        // Prefer auto-deposit session status when we have a numeric session id
+                        if (sessionId.toIntOrNull() != null) {
+                            val auto = RetrofitClient.apiService.getAutoDepositStatus(sessionId)
+                            if (auto.isSuccessful) {
+                                val st = (auto.body()?.status ?: "").uppercase()
+                                if (st in setOf("CREDITED", "APPROVED", "SUCCESS", "COMPLETED")) {
+                                    depositPollingActive = false
+                                    clearPaybitraDeposit()
+                                    fetchWallet()
+                                    fetchDeposits()
+                                    onApproved()
+                                    return@launch
+                                }
+                            }
+                        }
+                        val response = RetrofitClient.apiService.getMyDeposits()
+                        if (response.isSuccessful) {
+                            val list = response.body().orEmpty()
+                            depositRequests = list
+                            val hit = list.firstOrNull { d ->
+                                val ref = (d.payment_reference ?: "") + (d.payment_link ?: "")
+                                val status = d.status.uppercase()
+                                val amtOk = d.amount.replace(",", "").toDoubleOrNull()
+                                    ?.let { kotlin.math.abs(it - (amount.toDoubleOrNull() ?: -1.0)) < 0.01 } == true
+                                val sessionOk = sessionId.isNotBlank() && ref.contains(sessionId, ignoreCase = true)
+                                status in setOf("APPROVED", "SUCCESS", "CREDITED", "COMPLETED") && (sessionOk || amtOk)
+                            }
+                            if (hit != null) {
+                                depositPollingActive = false
+                                clearPaybitraDeposit()
+                                fetchWallet()
+                                onApproved()
+                                return@launch
+                            }
+                        } else {
+                            logoutIfUnauthorized(response.code())
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("GunduAtaViewModel", "deposit poll: ${e.message}")
+                    }
+                }
+                if (depositPollingActive) {
+                    depositPollingActive = false
+                    onTimeout?.invoke()
+                }
+            } catch (e: Exception) {
+                depositPollingActive = false
+                android.util.Log.e("GunduAtaViewModel", "deposit polling failed", e)
+            }
+        }
+    }
+
+    fun stopDepositStatusPolling() {
+        depositPollingActive = false
     }
 
     fun fetchBankDetails() {
@@ -1616,7 +1800,15 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
             try {
                 val payload = mutableMapOf("amount" to amount, "utr" to utr)
                 paybitraDeposit?.let { session ->
-                    payload["paybitra_order_id"] = session.paybitra_order_id
+                    session.paybitra_order_id?.takeIf { it.isNotBlank() }?.let {
+                        payload["paybitra_order_id"] = it
+                    }
+                    session.sessionKey().takeIf { it.isNotBlank() }?.let {
+                        payload["session_id"] = it
+                    }
+                    session.callback_token?.takeIf { it.isNotBlank() }?.let {
+                        payload["callback_token"] = it
+                    }
                     session.code?.let { payload["paybitra_code"] = it }
                 }
                 val response = RetrofitClient.apiService.submitUtr(payload)

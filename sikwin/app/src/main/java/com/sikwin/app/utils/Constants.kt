@@ -29,9 +29,16 @@ object Constants {
     /** Casino lobby (web) — WebView + JWT. */
     const val CASINO_URL = "https://gunduata.tech/casino/"
 
+    /** Sports hub (Cricket / Football / Tennis) — WebView + JWT like roulette/trading. */
+    const val SPORTS_URL = "https://gunduata.tech/sports/"
+
     /**
-     * WebGL build hosted on your site. Opening this in the system browser (from the app) loads the game.
-     * Change to your own origin when you deploy, e.g. `https://yourdomain.com/game/index.html`.
+     * Gundu Ata virtual (web) — in-app WebView + JWT.
      */
-    const val WEBGL_GAME_URL = "https://gunduata.tech/game/index.html"
+    const val GUNDU_ATA_WEB_URL = "https://gunduata.tech/game/index.html"
+
+    /**
+     * WebGL build hosted on your site (alias of [GUNDU_ATA_WEB_URL]).
+     */
+    const val WEBGL_GAME_URL = GUNDU_ATA_WEB_URL
 }

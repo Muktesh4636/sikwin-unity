@@ -64,6 +64,8 @@ import com.sikwin.app.ui.theme.PrimaryYellow
 import com.sikwin.app.ui.theme.TextGrey
 import com.sikwin.app.ui.theme.TextWhite
 import com.sikwin.app.utils.Constants
+import com.sikwin.app.utils.CasinoPrefetcher
+import com.sikwin.app.utils.NetworkUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -91,43 +93,32 @@ fun RouletteWebViewScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     BackHandler(onBack = onBack)
-    LaunchedEffect(Unit) {
-        com.sikwin.app.utils.CasinoPrefetcher.warm(context)
+
+    LaunchedEffect(accessToken) {
+        CasinoPrefetcher.prefetchWhilePlaying(context, accessToken)
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(RouletteBg)
             .statusBarsPadding()
     ) {
-        Text(
-            "Auto Roulette",
-            color = PrimaryYellow,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 8.dp)
-        )
-        Box(modifier = Modifier.fillMaxSize()) {
-            when {
-                accessToken.isNullOrBlank() -> {
-                    LoginRequiredPanel(
-                        onLogin = {
-                            onBack()
-                            onRequireLogin()
-                        },
-                        onBack = onBack
-                    )
-                }
-                else -> {
-                    RouletteWebView(
-                        accessToken = accessToken,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+        when {
+            accessToken.isNullOrBlank() -> {
+                LoginRequiredPanel(
+                    onLogin = {
+                        onBack()
+                        onRequireLogin()
+                    },
+                    onBack = onBack
+                )
+            }
+            else -> {
+                RouletteWebView(
+                    accessToken = accessToken,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
@@ -188,6 +179,7 @@ private fun RouletteWebView(
     var progress by remember { mutableFloatStateOf(0.02f) }
     var statusText by remember { mutableStateOf("Preparing Auto Roulette…") }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val injectJs = remember(accessToken) { buildTokenInjectJs(accessToken) }
     val startUrl = remember(accessToken) {
@@ -199,7 +191,7 @@ private fun RouletteWebView(
 
     fun markNetworkError() {
         networkError = true
-        statusText = "Internet issue"
+        statusText = "No internet connection"
     }
 
     // Prefetch HTML/CSS/JS + Three.js + real wallet while loader is visible.
@@ -210,6 +202,10 @@ private fun RouletteWebView(
         prefetchDone = false
         progress = 0.02f
         statusText = "Fetching game…"
+        if (!NetworkUtils.isOnline(context)) {
+            markNetworkError()
+            return@LaunchedEffect
+        }
         val ok = prefetchRouletteBackend { p, label ->
             if (!networkError) {
                 progress = p.coerceIn(0.02f, 0.92f)
@@ -222,10 +218,15 @@ private fun RouletteWebView(
         }
         prefetchDone = true
         statusText = "Opening table…"
-        val deadline = System.currentTimeMillis() + 25_000L
+        val start = System.currentTimeMillis()
         while (!pageReady || !gameReady) {
             if (networkError) return@LaunchedEffect
-            if (System.currentTimeMillis() > deadline) {
+            val elapsed = System.currentTimeMillis() - start
+            if (!NetworkUtils.isOnline(context) && elapsed >= NetworkUtils.OFFLINE_UI_MS) {
+                markNetworkError()
+                return@LaunchedEffect
+            }
+            if (elapsed > NetworkUtils.LOAD_TIMEOUT_MS) {
                 markNetworkError()
                 return@LaunchedEffect
             }
@@ -237,7 +238,7 @@ private fun RouletteWebView(
         delay(220)
     }
 
-    val showLoader = !networkError && !(prefetchDone && pageReady && gameReady && progress >= 0.99f)
+    val showLoader = !networkError && (!pageReady || !gameReady)
 
     Box(modifier = modifier) {
         key(retryToken) {
@@ -294,6 +295,11 @@ private fun RouletteWebView(
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
+                                if (com.sikwin.app.utils.WebViewOffline.isChromeErrorUrl(url)) {
+                                    com.sikwin.app.utils.WebViewOffline.hideChromeErrorPage(view)
+                                    scope.launch { markNetworkError() }
+                                    return
+                                }
                                 view?.evaluateJavascript(injectJs, null)
                                 view?.evaluateJavascript(GAME_READY_POLL_JS, null)
                                 pageReady = true
@@ -308,7 +314,8 @@ private fun RouletteWebView(
                                 request: WebResourceRequest?,
                                 error: WebResourceError?
                             ) {
-                                if (request?.isForMainFrame == true) {
+                                if (com.sikwin.app.utils.WebViewOffline.isMainFrameError(request)) {
+                                    com.sikwin.app.utils.WebViewOffline.hideChromeErrorPage(view)
                                     scope.launch { markNetworkError() }
                                 }
                             }
@@ -320,7 +327,10 @@ private fun RouletteWebView(
                                 description: String?,
                                 failingUrl: String?
                             ) {
-                                if (failingUrl != null && failingUrl.contains("/roulette")) {
+                                if (failingUrl != null &&
+                                    (failingUrl.contains("/roulette") || failingUrl.contains("gunduata.tech"))
+                                ) {
+                                    com.sikwin.app.utils.WebViewOffline.hideChromeErrorPage(view)
                                     scope.launch { markNetworkError() }
                                 }
                             }
@@ -345,20 +355,10 @@ private fun RouletteWebView(
         }
 
         if (networkError) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(RouletteBg)
-            ) {
-                RouletteBallLoadingOverlay(
-                    progress = progress.coerceAtMost(0.35f),
-                    status = "Internet issue"
-                )
-                GameInternetIssueBar(
-                    onRetry = { retryToken += 1 },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                )
-            }
+            NoInternetConnectionOverlay(
+                onRetry = { retryToken += 1 },
+                background = RouletteBg
+            )
         }
     }
 }
@@ -578,7 +578,7 @@ private suspend fun prefetchRouletteBackend(
     onProgress: (Float, String) -> Unit
 ): Boolean = withContext(Dispatchers.IO) {
     val client = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(NetworkUtils.PREFETCH_CONNECT_SEC, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()

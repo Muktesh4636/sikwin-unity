@@ -24,10 +24,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
@@ -59,6 +61,7 @@ import com.sikwin.app.ui.theme.PrimaryYellow
 import com.sikwin.app.ui.theme.TextGrey
 import com.sikwin.app.ui.theme.TextWhite
 import com.sikwin.app.utils.CasinoPrefetcher
+import com.sikwin.app.utils.NetworkUtils
 import com.sikwin.app.utils.Constants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -76,8 +79,7 @@ enum class ChickenRoadGame(
     val title: String,
     val gameUrl: String,
     val pathHint: String,
-    val loadingImageRes: Int?,
-    val showNativeTitle: Boolean = true
+    val loadingImageRes: Int?
 ) {
     ONE(
         "Chicken Road",
@@ -101,8 +103,7 @@ enum class ChickenRoadGame(
         title = "Casino Games",
         gameUrl = Constants.CASINO_URL,
         pathHint = "/casino",
-        loadingImageRes = null,
-        showNativeTitle = false
+        loadingImageRes = null
     )
 }
 
@@ -116,7 +117,9 @@ fun ChickenRoadWebViewScreen(
     game: ChickenRoadGame,
     accessToken: String?,
     onBack: () -> Unit,
-    onRequireLogin: () -> Unit
+    onRequireLogin: () -> Unit,
+    /** Casino lobby: chit-pat / rangu → native Compose routes (`coin`, `colour_game`). */
+    onOpenNativeGame: (route: String) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val leaveCasino = remember(onBack) {
@@ -126,60 +129,98 @@ fun ChickenRoadWebViewScreen(
         }
     }
     BackHandler(onBack = {
-        if (game == ChickenRoadGame.CASINO) leaveCasino()
-        else onBack()
+        if (game == ChickenRoadGame.CASINO) {
+            // Game → casino lobby; lobby → home
+            CasinoPrefetcher.handleBack { leaveCasino() }
+        } else {
+            onBack()
+        }
     })
 
-    LaunchedEffect(Unit) {
-        CasinoPrefetcher.warm(context, accessToken)
+    LaunchedEffect(game, accessToken) {
+        if (game != ChickenRoadGame.CASINO) {
+            // Prefetch casino lobby while playing so Casino opens instantly next
+            CasinoPrefetcher.prefetchWhilePlaying(context, accessToken)
+        }
+        // Casino screen: attach() loads / shows parked lobby — do not warm() here
+        // (warm was calling onPause and freezing the visible page)
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(ChickenRoadBg)
-            .then(if (game.showNativeTitle) Modifier.statusBarsPadding() else Modifier)
     ) {
-        if (game.showNativeTitle) {
-            Text(
-                game.title,
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 8.dp)
-            )
-        }
-        Box(modifier = Modifier.fillMaxSize()) {
-            when {
-                accessToken.isNullOrBlank() -> {
-                    ChickenRoadLoginRequired(
-                        title = game.title,
-                        onLogin = {
-                            onBack()
-                            onRequireLogin()
-                        },
-                        onBack = onBack
+        when {
+            accessToken.isNullOrBlank() -> {
+                ChickenRoadLoginRequired(
+                    title = game.title,
+                    onLogin = {
+                        onBack()
+                        onRequireLogin()
+                    },
+                    onBack = onBack
+                )
+            }
+            else -> {
+                if (game == ChickenRoadGame.CASINO) {
+                    CasinoPreloadedWebView(
+                        accessToken = accessToken,
+                        onBack = leaveCasino,
+                        onOpenNativeGame = onOpenNativeGame,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    ChickenRoadWebView(
+                        game = game,
+                        accessToken = accessToken,
+                        onBack = onBack,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
-                else -> {
-                    if (game == ChickenRoadGame.CASINO) {
-                        CasinoPreloadedWebView(
-                            accessToken = accessToken,
-                            onBack = leaveCasino,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        ChickenRoadWebView(
-                            game = game,
-                            accessToken = accessToken,
-                            onBack = onBack,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CasinoSiteGameScreen(
+    title: String,
+    gameUrl: String,
+    accessToken: String?,
+    onBack: () -> Unit,
+    onRequireLogin: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    BackHandler(onBack = onBack)
+    LaunchedEffect(accessToken) {
+        CasinoPrefetcher.prefetchWhilePlaying(context, accessToken)
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ChickenRoadBg)
+    ) {
+        when {
+            accessToken.isNullOrBlank() -> {
+                ChickenRoadLoginRequired(
+                    title = title,
+                    onLogin = {
+                        onBack()
+                        onRequireLogin()
+                    },
+                    onBack = onBack
+                )
+            }
+            else -> {
+                ChickenRoadWebView(
+                    game = ChickenRoadGame.VORTEX,
+                    accessToken = accessToken,
+                    onBack = onBack,
+                    modifier = Modifier.fillMaxSize(),
+                    gameUrlOverride = gameUrl,
+                    titleOverride = title
+                )
             }
         }
     }
@@ -190,44 +231,57 @@ fun ChickenRoadWebViewScreen(
 private fun CasinoPreloadedWebView(
     accessToken: String,
     onBack: () -> Unit,
+    onOpenNativeGame: (route: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var ready by remember { mutableStateOf(CasinoPrefetcher.isReady(accessToken)) }
-    var progress by remember { mutableFloatStateOf(if (ready) 1f else 0.15f) }
+    var networkError by remember { mutableStateOf(CasinoPrefetcher.hasNetworkError()) }
 
-    // Ensure warm started (no-op if already loading / ready)
-    LaunchedEffect(accessToken) {
-        CasinoPrefetcher.warm(context, accessToken)
-    }
+    // Do not call warm() here — attach() loads if needed.
+    // warm() from home/login already prefetched; a second warm was pausing the visible WebView.
 
     DisposableEffect(accessToken) {
-        val listener: (Boolean) -> Unit = { isReady ->
-            ready = isReady || CasinoPrefetcher.isReady(accessToken)
-            if (ready) progress = 1f
+        val readyListener: (Boolean) -> Unit = { isReady ->
+            ready = CasinoPrefetcher.isReady(accessToken)
+            if (!isReady && CasinoPrefetcher.hasNetworkError()) {
+                networkError = true
+            }
         }
-        CasinoPrefetcher.addReadyListener(listener)
+        val errorListener: (Boolean) -> Unit = { networkError = it }
+        CasinoPrefetcher.addReadyListener(readyListener)
+        CasinoPrefetcher.addNetworkErrorListener(errorListener)
+        ready = CasinoPrefetcher.isReady(accessToken)
+        networkError = CasinoPrefetcher.hasNetworkError()
         onDispose {
-            CasinoPrefetcher.removeReadyListener(listener)
+            CasinoPrefetcher.removeReadyListener(readyListener)
+            CasinoPrefetcher.removeNetworkErrorListener(errorListener)
             CasinoPrefetcher.detach()
         }
     }
 
-    // Soft progress only while waiting for the already-started preload
-    LaunchedEffect(ready) {
-        if (ready) {
-            progress = 1f
+    LaunchedEffect(accessToken, networkError) {
+        if (networkError) return@LaunchedEffect
+        if (!NetworkUtils.isOnline(context)) {
+            networkError = true
             return@LaunchedEffect
         }
-        while (!ready) {
-            if (progress < 0.9f) progress = (progress + 0.04f).coerceAtMost(0.9f)
-            delay(100)
-            ready = CasinoPrefetcher.isReady(accessToken)
+        val ok = NetworkUtils.awaitReadyOrOffline(
+            context = context,
+            isReady = { CasinoPrefetcher.isReady(accessToken) },
+            hasError = { CasinoPrefetcher.hasNetworkError() }
+        )
+        if (!ok) {
+            networkError = true
+        } else {
+            ready = true
         }
-        progress = 1f
     }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier.background(ChickenRoadBg),
+        contentAlignment = Alignment.Center
+    ) {
         AndroidView(
             factory = { ctx ->
                 FrameLayout(ctx).also { frame ->
@@ -235,10 +289,16 @@ private fun CasinoPreloadedWebView(
                         parent = frame,
                         token = accessToken,
                         onBack = onBack,
-                        onOpenGame = { _, _ -> }
+                        onOpenGame = { id, urlOrRoute ->
+                            val native = CasinoPrefetcher.nativeRouteFor(id, urlOrRoute)
+                                ?: if (urlOrRoute == "coin" || urlOrRoute == "colour_game") urlOrRoute else null
+                            if (native != null) {
+                                onOpenNativeGame(native)
+                            }
+                        }
                     )
                     ready = already || CasinoPrefetcher.isReady(accessToken)
-                    if (ready) progress = 1f
+                    networkError = CasinoPrefetcher.hasNetworkError()
                 }
             },
             update = { frame ->
@@ -247,19 +307,41 @@ private fun CasinoPreloadedWebView(
                         parent = frame,
                         token = accessToken,
                         onBack = onBack,
-                        onOpenGame = { _, _ -> }
+                        onOpenGame = { id, urlOrRoute ->
+                            val native = CasinoPrefetcher.nativeRouteFor(id, urlOrRoute)
+                                ?: if (urlOrRoute == "coin" || urlOrRoute == "colour_game") urlOrRoute else null
+                            if (native != null) {
+                                onOpenNativeGame(native)
+                            }
+                        }
                     )
                 }
+                ready = CasinoPrefetcher.isReady(accessToken)
+                networkError = CasinoPrefetcher.hasNetworkError()
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        if (!ready) {
-            ChickenRoadLoadingOverlay(
-                title = "Casino Games",
-                loadingImageRes = null,
-                progress = progress,
-                status = "Opening Casino…"
+        if (!ready && !networkError) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(
+                    color = PrimaryYellow,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(44.dp)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    if (CasinoPrefetcher.hasOpenInnerGame()) "Loading game…" else "Loading Casino…",
+                    color = TextGrey,
+                    fontSize = 14.sp
+                )
+            }
+        }
+
+        if (networkError) {
+            NoInternetConnectionOverlay(
+                onRetry = { CasinoPrefetcher.retry(accessToken) },
+                background = ChickenRoadBg
             )
         }
     }
@@ -316,7 +398,9 @@ private fun ChickenRoadWebView(
     game: ChickenRoadGame,
     accessToken: String,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gameUrlOverride: String? = null,
+    titleOverride: String? = null
 ) {
     var pageReady by remember { mutableStateOf(false) }
     var gameReady by remember { mutableStateOf(false) }
@@ -325,23 +409,28 @@ private fun ChickenRoadWebView(
     var initialLoadDone by remember { mutableStateOf(false) }
     var retryToken by remember { mutableIntStateOf(0) }
     var progress by remember { mutableFloatStateOf(0.02f) }
-    var statusText by remember { mutableStateOf("Preparing ${game.title}…") }
+    var statusText by remember { mutableStateOf("Preparing ${titleOverride ?: game.title}…") }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val playUrl = gameUrlOverride ?: game.gameUrl
+    val playTitle = titleOverride ?: game.title
 
     val injectJs = remember(accessToken) { buildChickenRoadTokenInjectJs(accessToken) }
-    val startUrl = remember(accessToken, game.gameUrl) {
-        Uri.parse(game.gameUrl).buildUpon()
-            .appendQueryParameter("token", accessToken)
-            .build()
-            .toString()
+    val startUrl = remember(accessToken, playUrl) {
+        val parsed = Uri.parse(playUrl)
+        if (parsed.getQueryParameter("token").isNullOrBlank()) {
+            parsed.buildUpon().appendQueryParameter("token", accessToken).build().toString()
+        } else {
+            playUrl
+        }
     }
 
     fun markNetworkError() {
         networkError = true
-        statusText = "Internet issue"
+        statusText = "No internet connection"
     }
 
-    LaunchedEffect(accessToken, game.gameUrl, retryToken) {
+    LaunchedEffect(accessToken, playUrl, retryToken) {
         networkError = false
         pageReady = false
         gameReady = false
@@ -349,7 +438,11 @@ private fun ChickenRoadWebView(
         initialLoadDone = false
         progress = 0.02f
         statusText = "Fetching game…"
-        val ok = prefetchChickenRoadBackend(game.gameUrl) { p, label ->
+        if (!NetworkUtils.isOnline(context)) {
+            markNetworkError()
+            return@LaunchedEffect
+        }
+        val ok = prefetchChickenRoadBackend(playUrl) { p, label ->
             if (!networkError) {
                 progress = p.coerceIn(0.02f, 0.92f)
                 statusText = label
@@ -360,11 +453,16 @@ private fun ChickenRoadWebView(
             return@LaunchedEffect
         }
         prefetchDone = true
-        statusText = "Opening ${game.title}…"
-        val deadline = System.currentTimeMillis() + 25_000L
+        statusText = "Opening $playTitle…"
+        val start = System.currentTimeMillis()
         while (!pageReady || !gameReady) {
             if (networkError) return@LaunchedEffect
-            if (System.currentTimeMillis() > deadline) {
+            val elapsed = System.currentTimeMillis() - start
+            if (!NetworkUtils.isOnline(context) && elapsed >= NetworkUtils.OFFLINE_UI_MS) {
+                markNetworkError()
+                return@LaunchedEffect
+            }
+            if (elapsed > NetworkUtils.LOAD_TIMEOUT_MS) {
                 markNetworkError()
                 return@LaunchedEffect
             }
@@ -377,11 +475,8 @@ private fun ChickenRoadWebView(
         delay(200)
     }
 
-    // Casino: after lobby is ready, keep WebView visible when opening inner games
-    val showLoader =
-        !networkError &&
-            !initialLoadDone &&
-            !(prefetchDone && pageReady && gameReady && progress >= 0.99f)
+    // Keep loader until page + game JS are ready (not only first prefetch pass).
+    val showLoader = !networkError && (!pageReady || !gameReady || !initialLoadDone)
 
     Box(modifier = modifier) {
         key(retryToken) {
@@ -422,10 +517,11 @@ private fun ChickenRoadWebView(
                             addJavascriptInterface(
                                 CasinoAndroidBridge(
                                     onBack = { scope.launch { onBack() } },
-                                    onOpenGame = { _, url ->
+                                    onOpenGame = { id, url ->
                                         scope.launch {
-                                            webViewRef.post {
-                                                webViewRef.loadUrl(url)
+                                            // Prefer CasinoPrefetcher path for lobby; here only load web games
+                                            if (CasinoPrefetcher.nativeRouteFor(id, url) == null) {
+                                                webViewRef.post { webViewRef.loadUrl(url) }
                                             }
                                         }
                                     }
@@ -458,6 +554,11 @@ private fun ChickenRoadWebView(
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
+                                if (com.sikwin.app.utils.WebViewOffline.isChromeErrorUrl(url)) {
+                                    com.sikwin.app.utils.WebViewOffline.hideChromeErrorPage(view)
+                                    scope.launch { markNetworkError() }
+                                    return
+                                }
                                 view?.evaluateJavascript(injectJs, null)
                                 view?.evaluateJavascript(CHICKEN_READY_POLL_JS, null)
                                 pageReady = true
@@ -472,7 +573,8 @@ private fun ChickenRoadWebView(
                                 request: WebResourceRequest?,
                                 error: WebResourceError?
                             ) {
-                                if (request?.isForMainFrame == true) {
+                                if (com.sikwin.app.utils.WebViewOffline.isMainFrameError(request)) {
+                                    com.sikwin.app.utils.WebViewOffline.hideChromeErrorPage(view)
                                     scope.launch { markNetworkError() }
                                 }
                             }
@@ -484,7 +586,10 @@ private fun ChickenRoadWebView(
                                 description: String?,
                                 failingUrl: String?
                             ) {
-                                if (failingUrl != null && failingUrl.contains(game.pathHint)) {
+                                if (failingUrl != null &&
+                                    (failingUrl.contains(game.pathHint) || failingUrl.contains("gunduata.tech"))
+                                ) {
+                                    com.sikwin.app.utils.WebViewOffline.hideChromeErrorPage(view)
                                     scope.launch { markNetworkError() }
                                 }
                             }
@@ -503,30 +608,18 @@ private fun ChickenRoadWebView(
 
         if (showLoader) {
             ChickenRoadLoadingOverlay(
-                title = game.title,
-                loadingImageRes = game.loadingImageRes,
+                title = playTitle,
+                loadingImageRes = if (gameUrlOverride != null) null else game.loadingImageRes,
                 progress = progress,
                 status = statusText
             )
         }
 
         if (networkError) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(ChickenRoadBg)
-            ) {
-                ChickenRoadLoadingOverlay(
-                    title = game.title,
-                    loadingImageRes = game.loadingImageRes,
-                    progress = progress.coerceAtMost(0.35f),
-                    status = "Internet issue"
-                )
-                GameInternetIssueBar(
-                    onRetry = { retryToken += 1 },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                )
-            }
+            NoInternetConnectionOverlay(
+                onRetry = { retryToken += 1 },
+                background = ChickenRoadBg
+            )
         }
     }
 }
@@ -662,7 +755,7 @@ private suspend fun prefetchChickenRoadBackend(
     onProgress: (Float, String) -> Unit
 ): Boolean = withContext(Dispatchers.IO) {
     val client = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(NetworkUtils.PREFETCH_CONNECT_SEC, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()

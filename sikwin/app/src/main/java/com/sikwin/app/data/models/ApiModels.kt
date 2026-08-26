@@ -62,7 +62,9 @@ data class DepositRequest(
     val status: String,
     val screenshot_url: String?,
     val admin_note: String?,
-    val created_at: String
+    val created_at: String,
+    val payment_link: String? = null,
+    val payment_reference: String? = null
 )
 
 data class WithdrawRequest(
@@ -100,17 +102,51 @@ data class PaymentMethod(
 )
 
 data class PaybitraDepositResponse(
-    val amount: String,
+    val amount: String? = null,
     val currency: String = "INR",
-    val upi_id: String,
+    val upi_id: String? = null,
     val acc_holder_name: String? = null,
     val code: String? = null,
-    val upi_uri: String,
-    val paybitra_order_id: String,
+    val upi_uri: String? = null,
+    val paybitra_order_id: String? = null,
+    /** Auto-deposit session id (number or string from backend). */
+    val session_id: Any? = null,
+    /** From auto/initiate — send back on UPI SUCCESS callback (survives JWT expiry). */
+    val callback_token: String? = null,
+    val unique_amount: String? = null,
+    val requested_amount: Any? = null,
+    val status: String? = null,
     val payin_id: String? = null,
     val expires_at: String? = null,
     val pay_in_url: String? = null,
     val message: String? = null
+) {
+    fun sessionKey(): String {
+        val sid = session_id?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+        if (!sid.isNullOrBlank()) return sid
+        return paybitra_order_id?.takeIf { it.isNotBlank() }.orEmpty()
+    }
+
+    fun payAmount(): String =
+        unique_amount?.takeIf { it.isNotBlank() }
+            ?: amount?.takeIf { it.isNotBlank() }
+            ?: ""
+
+    fun upiPayUriOrNull(): String? = upi_uri?.takeIf { it.isNotBlank() }
+}
+
+data class DepositModeResponse(
+    val mode: String? = null,
+    val automatic: Boolean? = null
+)
+
+data class UpiCallbackResponse(
+    val ok: Boolean? = null,
+    val credited: String? = null,
+    val status: String? = null,
+    val message: String? = null,
+    val error: String? = null,
+    val detail: String? = null
 )
 
 data class ReferralData(

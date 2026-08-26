@@ -70,6 +70,8 @@ import com.sikwin.app.data.models.ColourPublicResultItem
 import com.sikwin.app.data.models.ColourRoundResultResponse
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import com.sikwin.app.utils.MoneyFormat
+import com.sikwin.app.data.api.RetrofitClient
+import com.sikwin.app.utils.CasinoPrefetcher
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -120,6 +122,11 @@ fun ColourGameScreen(
     var soundEnabled by remember { mutableStateOf(true) }
     // Stay on the loading UI until the first backend prefetch completes (avoids empty flash).
     var showLaunchLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val token = RetrofitClient.getSessionManager()?.fetchAuthToken()
+        CasinoPrefetcher.prefetchWhilePlaying(context, token)
+    }
 
     val round = viewModel.colourRound
     val timerSec = viewModel.colourDisplayTimerSeconds.coerceAtLeast(0)

@@ -1,130 +1,144 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { useTranslations } from '../context/LocaleContext';
 import { useLoginSignupModal } from '../context/LoginSignupModalContext';
-import { GAME_PAGE_HREF } from '../config';
-import { prefetchGameAssets } from '../utils/prefetchGameAssets';
+import { prefetchCasinoPage } from '../utils/prefetchGameAssets';
+
+/** Dual Cards bottom bar — matches APK DualCardsBottomBar */
+const GOLD_MID = '#FFD54F';
+const GOLD_DEEP = '#C9A227';
 
 function HomeIcon({ active }: { active: boolean }) {
   return (
-    <svg
-      className="h-5 w-5"
-      fill={active ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-      />
+    <svg className="h-7 w-7" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'currentColor'}>
+      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
     </svg>
   );
 }
 
-function DiceIcon({ active }: { active: boolean }) {
+function BoltIcon() {
   return (
-    <img
-      src="/dice_3d.png"
-      alt=""
-      className={`h-6 w-6 object-contain brightness-0 invert ${active ? 'opacity-100' : 'opacity-60'}`}
-    />
+    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.02-.05.04-.1.07-.14L13 3h1l-1 7h3.5c.49 0 .56.33.47.67l-.04.13L11 21z" />
+    </svg>
   );
 }
 
-/** Me icon — same as Kotlin APK Icons.Default.AccountCircle (circle with person inside) */
-function MeIcon({ active }: { active: boolean }) {
+function WalletIcon() {
   return (
-    <svg
-      className={`h-5 w-5 ${active ? 'opacity-100' : 'opacity-60'}`}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-    >
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
+    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 7.28V5c0-1.1-.9-2-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-2.28A2 2 0 0022 15V9c0-.74-.4-1.39-1-1.72zM20 9v6h-7V9h7zM5 19V5h14v2h-6c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h6v2H5z" />
+      <circle cx="16" cy="12" r="1.5" />
     </svg>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+    </svg>
+  );
+}
+
+function NavItem({
+  label,
+  active,
+  onClick,
+  to,
+  icon,
+}: {
+  label: string;
+  active: boolean;
+  onClick?: () => void;
+  to?: string;
+  icon: React.ReactNode;
+}) {
+  const color = active ? GOLD_MID : `${GOLD_DEEP}B3`;
+  const className =
+    'flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 text-[11px] font-bold';
+  const style = { color };
+  const content = (
+    <>
+      {icon}
+      <span>{label}</span>
+    </>
+  );
+  if (to) {
+    return (
+      <NavLink to={to} className={className} style={style}>
+        {content}
+      </NavLink>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={className} style={style}>
+      {content}
+    </button>
   );
 }
 
 export function BottomNav() {
-  const t = useTranslations();
   const auth = useAuth();
+  const nav = useNavigate();
   const { showLoginSignupModal } = useLoginSignupModal();
   const loggedIn = !!auth.user;
   const location = useLocation();
-  const isMeActive = location.pathname === '/me';
-  const handlePlayClick = () => {
-    if (loggedIn) {
-      prefetchGameAssets();
-      window.setTimeout(() => {
-        window.location.href = GAME_PAGE_HREF;
-      }, 200);
-    }
-    else showLoginSignupModal();
+  const path = location.pathname;
+
+  const requireAuth = (action: () => void) => {
+    if (!loggedIn) showLoginSignupModal();
+    else action();
   };
-  const handleMeClick = (e: React.MouseEvent) => {
-    if (!loggedIn) {
-      e.preventDefault();
-      showLoginSignupModal();
-    }
+
+  const openCasino = () => {
+    prefetchCasinoPage();
+    window.location.href = '/casino/';
   };
+
+  const isHome = path === '/';
+  const isLive = path === '/coming-soon' || path.startsWith('/sports');
+  const isWallet = path === '/wallet' || path === '/deposit' || path === '/withdraw';
+  const isProfile = path === '/me' || path.startsWith('/personal') || path === '/security';
+
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-[9999] mx-auto w-full max-w-[460px] border-t border-[#2a2a2a] bg-[#121212]"
+      className="fixed bottom-0 left-0 right-0 z-[9999] mx-auto flex h-[78px] w-full max-w-[460px] items-center justify-evenly bg-[#0A0A0A] px-1"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="grid grid-cols-3 px-2 py-2">
-        <NavLink
-          to="/"
-          className={({ isActive }) =>
-            'flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold ' +
-            (isActive ? 'text-[#FFCC00]' : 'text-[#BDBDBD]')
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <HomeIcon active={isActive} />
-              <span>{t('home')}</span>
-            </>
-          )}
-        </NavLink>
-        <button
-          type="button"
-          onClick={handlePlayClick}
-          className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold text-[#BDBDBD]"
-        >
-          <DiceIcon active={false} />
-          <span>GUNDU ATA</span>
-        </button>
-        {loggedIn ? (
-          <NavLink
-            to="/me"
-            className={({ isActive }) =>
-              'flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold ' +
-              (isActive ? 'text-[#FFCC00]' : 'text-[#BDBDBD]')
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <MeIcon active={isActive} />
-                <span>{t('me')}</span>
-              </>
-            )}
-          </NavLink>
-        ) : (
-          <button
-            type="button"
-            onClick={handleMeClick}
-            className={
-              'flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold ' +
-              (isMeActive ? 'text-[#FFCC00]' : 'text-[#BDBDBD]')
-            }
-          >
-            <MeIcon active={isMeActive} />
-            <span>{t('me')}</span>
-          </button>
-        )}
-      </div>
+      <NavItem label="HOME" active={isHome} to="/" icon={<HomeIcon active={isHome} />} />
+      <NavItem
+        label="LIVE"
+        active={isLive}
+        onClick={() => requireAuth(() => nav('/coming-soon'))}
+        icon={<BoltIcon />}
+      />
+
+      <button
+        type="button"
+        onClick={openCasino}
+        className="flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 text-[11px] font-bold"
+        style={{ color: GOLD_MID }}
+        aria-label="Casino"
+      >
+        <img src="/ic_casino_chip.png" alt="" className="h-[34px] w-[34px] object-contain" />
+        <span>CASINO</span>
+      </button>
+
+      <NavItem
+        label="WALLET"
+        active={isWallet}
+        onClick={() => requireAuth(() => nav('/wallet'))}
+        icon={<WalletIcon />}
+      />
+      <NavItem
+        label="PROFILE"
+        active={isProfile}
+        onClick={() => {
+          if (!loggedIn) showLoginSignupModal();
+          else nav('/me');
+        }}
+        icon={<ProfileIcon />}
+      />
     </nav>
   );
 }

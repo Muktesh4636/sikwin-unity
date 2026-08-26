@@ -17,6 +17,8 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 import android.net.Uri
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.app.Activity
 import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -66,7 +68,7 @@ fun PaymentScreen(
     
     val usdtExchangeRate = 95
     val usdtBonusPercent = 0.05
-    val paybitraMinAmount = 500
+    val paybitraMinAmount = 1
     
     val isUsdt = paymentMethod.contains("USDT", ignoreCase = true)
     val isBank = paymentMethod.contains("BANK", ignoreCase = true)
@@ -90,8 +92,18 @@ fun PaymentScreen(
     } else {
         staticUpiMethod?.upi_id
     }
-    val activeUpiUri = if (usePaybitra) paybitraSession?.upi_uri else null
-    val qrBitmap = remember(activeUpiUri, usePaybitra) {
+    val payExactAmount = if (usePaybitra) {
+        paybitraSession?.payAmount()?.takeIf { it.isNotBlank() } ?: amount
+    } else amount
+    val activeUpiUri = if (usePaybitra) {
+        paybitraSession?.upiPayUriOrNull() ?: run {
+            val upi = activeUpiId ?: return@run null
+            val name = paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+            val note = "Deposit%20%23${paybitraSession?.sessionKey().orEmpty()}"
+            "upi://pay?pa=$upi&pn=${Uri.encode(name)}&am=$payExactAmount&cu=INR&tn=$note"
+        }
+    } else null
+    val qrBitmap = remember(activeUpiUri, usePaybitra, payExactAmount) {
         if (usePaybitra) activeUpiUri?.let { generateQrBitmap(it) } else null
     }
     
@@ -118,9 +130,102 @@ fun PaymentScreen(
     }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Force QR UI when no UPI app can handle the intent
+    var forceQrFallback by remember { mutableStateOf(false) }
+    var upiStatusMessage by remember { mutableStateOf<String?>(null) }
+
+    fun beginPollingAfterUpi() {
+        val session = viewModel.paybitraDeposit ?: return
+        val sessionId = session.sessionKey()
+        upiStatusMessage = "Payment processing… please wait"
+        Toast.makeText(context, "Payment processing… please wait", Toast.LENGTH_SHORT).show()
+        viewModel.startDepositStatusPolling(
+            sessionId = sessionId,
+            amount = session.payAmount().ifBlank { amount },
+            onApproved = {
+                upiStatusMessage = "Payment successful"
+                Toast.makeText(context, "Deposit credited successfully", Toast.LENGTH_LONG).show()
+                onSubmitSuccess()
+            },
+            onTimeout = {
+                upiStatusMessage = "Still waiting for payment confirmation. You can upload a screenshot."
+            }
+        )
+    }
+
+    val upiPayLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        val status = (
+            data?.getStringExtra("Status")
+                ?: data?.getStringExtra("status")
+                ?: data?.getStringExtra("response")
+                ?: ""
+        ).trim()
+        val utr = (
+            data?.getStringExtra("ApprovalRefNo")
+                ?: data?.getStringExtra("approvalRefNo")
+                ?: data?.getStringExtra("txnRef")
+                ?: data?.getStringExtra("UTR")
+                ?: ""
+        ).trim()
+        val txnId = (
+            data?.getStringExtra("txnId")
+                ?: data?.getStringExtra("TxnId")
+                ?: data?.getStringExtra("transactionId")
+                ?: ""
+        ).trim()
+
+        android.util.Log.d(
+            "PaymentScreen",
+            "UPI result code=${result.resultCode} status=$status utr=$utr txnId=$txnId extras=${data?.extras?.keySet()}"
+        )
+
+        val sessionId = viewModel.paybitraDeposit?.sessionKey().orEmpty()
+        when (status.uppercase()) {
+            "SUCCESS" -> {
+                if (sessionId.isNotBlank() && utr.isNotBlank()) {
+                    viewModel.submitUpiCallback(
+                        sessionId = sessionId,
+                        utr = utr,
+                        txnId = txnId,
+                        status = "SUCCESS",
+                        onSuccess = {
+                            Toast.makeText(context, "Payment successful", Toast.LENGTH_LONG).show()
+                            onSubmitSuccess()
+                        },
+                        onError = { msg ->
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            beginPollingAfterUpi()
+                        }
+                    )
+                } else {
+                    // Some apps return SUCCESS without UTR — poll
+                    beginPollingAfterUpi()
+                }
+            }
+            "FAILURE", "FAILED" -> {
+                upiStatusMessage = "Payment failed. Try again."
+                Toast.makeText(context, "Payment failed. Try again.", Toast.LENGTH_LONG).show()
+            }
+            "SUBMITTED" -> beginPollingAfterUpi()
+            else -> {
+                // Unknown / cancelled / empty — poll if we have a session, else ignore
+                if (result.resultCode == Activity.RESULT_OK || status.isNotBlank() || sessionId.isNotBlank()) {
+                    beginPollingAfterUpi()
+                }
+            }
+        }
+    }
     
     // Timer state: 10 minutes = 600 seconds
     var timeLeftSeconds by remember { mutableIntStateOf(600) }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.stopDepositStatusPolling() }
+    }
 
     LaunchedEffect(timeLeftSeconds) {
         if (timeLeftSeconds > 0) {
@@ -156,57 +261,84 @@ fun PaymentScreen(
         }
     }
 
+    fun buildUpiPayUri(specificUpiId: String?): Uri {
+        val session = viewModel.paybitraDeposit
+        // Prefer backend-provided upi:// URI (unique amount + note already set)
+        session?.upiPayUriOrNull()?.let { return Uri.parse(it) }
+
+        val upiId = specificUpiId ?: activeUpiId ?: ""
+        val payeeName = if (usePaybitra) {
+            session?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+        } else {
+            staticUpiMethod?.account_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+        }
+        val sessionKey = session?.sessionKey().orEmpty()
+        val am = if (usePaybitra) payExactAmount else amount
+        val transactionNote = if (usePaybitra) {
+            session?.code?.takeIf { it.isNotBlank() }
+                ?: if (sessionKey.isNotBlank()) "Deposit #$sessionKey" else "Wallet Topup"
+        } else {
+            "Wallet Topup"
+        }
+        val raw = "upi://pay?pa=$upiId&pn=${Uri.encode(payeeName)}&am=$am&cu=INR&tn=${Uri.encode(transactionNote)}"
+        return Uri.parse(raw)
+    }
+
+    fun hasUpiApps(intent: Intent): Boolean {
+        return try {
+            context.packageManager
+                .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                .isNotEmpty()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun openUpiApp(packageName: String?, specificUpiId: String?) {
         val upiId = specificUpiId ?: activeUpiId
-        
-        if (upiId.isNullOrBlank()) {
+        if (upiId.isNullOrBlank() && activeUpiUri.isNullOrBlank()) {
             Toast.makeText(context, "No UPI ID available for payment", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val payeeName = if (usePaybitra) {
-            paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
-        } else {
-            staticUpiMethod?.account_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+        val upiUri = buildUpiPayUri(specificUpiId)
+        android.util.Log.d("PaymentScreen", "Opening UPI — package=$packageName uri=$upiUri")
+
+        val intent = Intent(Intent.ACTION_VIEW, upiUri)
+        if (!packageName.isNullOrBlank()) {
+            intent.setPackage(packageName)
         }
-        val transactionNote = if (usePaybitra) {
-            paybitraSession?.code?.takeIf { it.isNotBlank() } ?: "Wallet Topup"
-        } else {
-            "Wallet Topup"
+
+        // No UPI app → keep / show QR fallback
+        if (!hasUpiApps(intent) && (packageName.isNullOrBlank() || !hasUpiApps(Intent(Intent.ACTION_VIEW, upiUri)))) {
+            forceQrFallback = true
+            upiStatusMessage = "No UPI app installed — scan the QR code to pay"
+            Toast.makeText(
+                context,
+                "No UPI app found. Please scan the QR code, or install PhonePe / GPay / Paytm / BHIM.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
         }
-        val upiUri = activeUpiUri ?: "upi://pay?pa=$upiId&pn=$payeeName&am=$amount&cu=INR&tn=$transactionNote"
-        
-        // Debug logging
-        android.util.Log.d("PaymentScreen", "Opening UPI app - Package: $packageName, UPI URI: $upiUri")
-        
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
-        
-        if (packageName != null) {
-            val packageManager = context.packageManager
-            try {
-                // Check if the specific app is installed
-                packageManager.getPackageInfo(packageName, 0)
-                // App is installed, open it
-                intent.setPackage(packageName)
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                // Specific app not installed: fall back to UPI chooser so user can pay with any UPI app
-                android.util.Log.d("PaymentScreen", "App $packageName not installed, opening UPI chooser")
+
+        forceQrFallback = false
+        try {
+            // Do NOT use FLAG_ACTIVITY_NEW_TASK — we need a result back
+            if (!packageName.isNullOrBlank()) {
                 try {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(Intent.createChooser(intent, "Pay with UPI"))
-                } catch (e2: Exception) {
-                    Toast.makeText(context, "No UPI app found. Please install a UPI app (e.g. PhonePe, Paytm, Google Pay, BHIM).", Toast.LENGTH_LONG).show()
+                    context.packageManager.getPackageInfo(packageName, 0)
+                    upiPayLauncher.launch(intent)
+                    return
+                } catch (_: Exception) {
+                    // fall through to chooser without package
                 }
             }
-        } else {
-            // No specific package, let system choose
-            try {
-                context.startActivity(Intent.createChooser(intent, "Pay with"))
-            } catch (e: Exception) {
-                Toast.makeText(context, "No UPI app found. Please install a UPI app.", Toast.LENGTH_SHORT).show()
-            }
+            val chooser = Intent.createChooser(Intent(Intent.ACTION_VIEW, upiUri), "Pay with UPI")
+            upiPayLauncher.launch(chooser)
+        } catch (e: Exception) {
+            android.util.Log.e("PaymentScreen", "UPI launch failed", e)
+            forceQrFallback = true
+            Toast.makeText(context, "Could not open UPI app. Please scan the QR code.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -341,12 +473,23 @@ fun PaymentScreen(
                 fontSize = 18.sp
             )
             Text(
-                "₹$amount",
+                "₹$payExactAmount",
                 color = Color(0xFF0022AA), // Deep blue for amount
                 fontSize = 36.sp,
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
+            if (usePaybitra && paybitraSession?.unique_amount != null &&
+                payExactAmount != amount
+            ) {
+                Text(
+                    "Pay exactly this amount (requested ₹$amount)",
+                    color = Color(0xFFB71C1C),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+            }
 
             if (isUsdt) {
                 Surface(
@@ -367,11 +510,23 @@ fun PaymentScreen(
             }
 
             Text(
-                if (isUsdt) "Please transfer USDT to the address below" else "Please fill in UTR after successful payment",
+                if (isUsdt) "Please transfer USDT to the address below"
+                else if (forceQrFallback) "No UPI app found — scan the QR code to pay"
+                else "Tap PhonePe / GPay / Paytm to pay. Scan QR if needed.",
                 color = Color.Black,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
+            if (!upiStatusMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    upiStatusMessage!!,
+                    color = Color(0xFF3F51B5),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+            }
             if (isUpiDeposit && usePaybitra && viewModel.paybitraLoading) {
                 Spacer(modifier = Modifier.height(24.dp))
                 CircularProgressIndicator(color = Color(0xFF3F51B5))
@@ -383,8 +538,8 @@ fun PaymentScreen(
                 )
             } else {
             Text(
-                "Use Mobile Scan QR To Pay",
-                color = Color.Black,
+                if (forceQrFallback) "Scan QR To Pay (no UPI app)" else "Use Mobile Scan QR To Pay",
+                color = if (forceQrFallback) Color(0xFFB71C1C) else Color.Black,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)

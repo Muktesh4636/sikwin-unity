@@ -12,7 +12,13 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const inviteRef = getRefParam(searchParams);
   const signupHref = withRefQuery('/signup', inviteRef);
-  const from = useMemo(() => (loc.state as any)?.from?.toString() || '/', [loc.state]);
+  const nextParam = searchParams.get('next') || '';
+  const safeNext =
+    nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '';
+  const from = useMemo(
+    () => safeNext || (loc.state as any)?.from?.toString() || '/',
+    [loc.state, safeNext]
+  );
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

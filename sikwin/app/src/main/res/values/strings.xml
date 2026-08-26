@@ -358,6 +358,10 @@
     <string name="cock_fight_title">COCK FIGHT</string>
     <string name="cock_fight_coming_soon">Desi arena — full game coming soon.</string>
     <string name="cock_fight_open_in_browser">Open in browser (WebGL)</string>
+    <string name="soccer_title">SOCCER</string>
+    <string name="soccer_coming_soon">Full game coming soon.</string>
+    <string name="tennis_title">TENNIS</string>
+    <string name="tennis_coming_soon">Full game coming soon.</string>
 
     <!-- Cricket (in-app; route id remains ipl) -->
     <string name="cricket_game_loading">Loading Cricket…</string>

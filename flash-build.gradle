@@ -1,0 +1,5 @@
+gradle.projectsLoaded {
+    rootProject.allprojects { project ->
+        project.buildDir = new File('/tmp/sikwin-builds', project.name)
+    }
+}

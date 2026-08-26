@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.activity.compose.BackHandler
-import com.sikwin.app.utils.CasinoPrefetcher
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
@@ -51,19 +50,11 @@ fun DualCardsHomeScreen(
     var showSideMenu by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // Prefetch casino lobby as soon as home opens (no Casino click needed)
-    LaunchedEffect(Unit) {
-        CasinoPrefetcher.warm(context)
-    }
-    LaunchedEffect(viewModel.loginSuccess) {
-        if (viewModel.loginSuccess) CasinoPrefetcher.warm(context)
-    }
-
     if (showGunduAtaChoiceDialog) {
         GunduAtaChoiceDialog(
             onDismiss = { showGunduAtaChoiceDialog = false },
             onPlayLive = { onNavigate("gundu_ata_live") },
-            onPlayNormal = { onGameClick("gundu_ata") }
+            onPlayNormal = { onNavigate("gundu_ata_web") }
         )
     }
 
@@ -98,7 +89,6 @@ fun DualCardsHomeScreen(
         if (!viewModel.loginSuccess) {
             showLoginPopup = true
         } else {
-            CasinoPrefetcher.warm(context)
             action()
         }
     }
@@ -135,7 +125,7 @@ fun DualCardsHomeScreen(
             DualCardsBottomBar(
                 selectedTab = DualNavTab.HOME,
                 onHome = { },
-                onPromo = { onNavigate("affiliate") },
+                onLive = { requireLoginOr { onNavigate("sports") } },
                 onCasino = { requireLoginOr { onNavigate("casino_games") } },
                 onWallet = { requireLoginOr { onNavigate("wallet") } },
                 onProfile = { onNavigate("me") }
@@ -167,8 +157,20 @@ fun DualCardsHomeScreen(
                         onPlayNow = { requireLoginOr { showGunduAtaChoiceDialog = true } }
                     ),
                     HomePromoBanner(
+                        imageRes = R.drawable.cock_fight_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("cock_fight") } }
+                    ),
+                    HomePromoBanner(
                         imageRes = R.drawable.auto_roulette_banner,
                         onPlayNow = { requireLoginOr { onNavigate("roulette") } }
+                    ),
+                    HomePromoBanner(
+                        imageRes = R.drawable.referral_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("affiliate") } }
+                    ),
+                    HomePromoBanner(
+                        imageRes = R.drawable.vortex_banner,
+                        onPlayNow = { requireLoginOr { onNavigate("vortex") } }
                     )
                 ),
                 modifier = Modifier
@@ -194,7 +196,13 @@ fun DualCardsHomeScreen(
                     requireLoginOr { showGunduAtaChoiceDialog = true }
                 }
                 DualCategoryCircle("CRICKET", Icons.Default.SportsCricket) {
-                    requireLoginOr { onNavigate("ipl") }
+                    requireLoginOr { onNavigate("sports?sport=cricket") }
+                }
+                DualCategoryCircle("Soccer", Icons.Default.SportsSoccer) {
+                    requireLoginOr { onNavigate("sports?sport=soccer") }
+                }
+                DualCategoryCircle("Tennis", Icons.Default.SportsTennis) {
+                    requireLoginOr { onNavigate("sports?sport=tennis") }
                 }
                 DualCategoryCircle("Rangu", Icons.Default.Casino) {
                     requireLoginOr { onNavigate("colour_game") }
@@ -221,22 +229,23 @@ fun DualCardsHomeScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Dual game cards
+            // Left: Gundu Ata video | Right: Cock Fight + Roulette stacked images
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp)
+                    .height(260.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // First video → Gundu Ata Live
+                // Left → Gundu Ata Live (unchanged)
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(260.dp)
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(16.dp))
                         .background(DualCardDark)
                         .border(1.dp, DualGoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-                        .clickable { requireLoginOr { onNavigate("gundu_ata_live") } }
+                        .clickable { requireLoginOr { onNavigate("gundu_ata_web") } }
                 ) {
                     VideoPlayer(
                         videoResId = R.raw.gundu_ata_video,
@@ -244,19 +253,24 @@ fun DualCardsHomeScreen(
                     )
                 }
 
-                // Second video → Unity virtual Gundu Ata
-                Box(
+                // Right → Cock Fight video (top) + Roulette image (bottom)
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .height(260.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF0B3D2E))
-                        .border(1.dp, DualGoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-                        .clickable { requireLoginOr { onGameClick("gundu_ata") } }
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    VideoPlayer(
-                        videoResId = R.raw.gundu_ata_video,
-                        modifier = Modifier.fillMaxSize()
+                    DualHomeGameVideoCard(
+                        videoResId = R.raw.cock_fight,
+                        label = "COCK FIGHT",
+                        modifier = Modifier.weight(1f),
+                        onClick = { requireLoginOr { onNavigate("cock_fight") } }
+                    )
+                    DualHomeGameImageCard(
+                        imageRes = R.drawable.card_roulette_home,
+                        label = "ROULETTE",
+                        modifier = Modifier.weight(1f),
+                        onClick = { requireLoginOr { onNavigate("roulette") } }
                     )
                 }
             }
@@ -272,6 +286,90 @@ fun DualCardsHomeScreen(
         onPlayGunduAta = { showGunduAtaChoiceDialog = true },
         requireLoginOr = { action -> requireLoginOr(action) }
     )
+    }
+}
+
+@Composable
+private fun DualHomeGameVideoCard(
+    videoResId: Int,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(DualCardDark)
+            .border(1.dp, DualGoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+    ) {
+        VideoPlayer(
+            videoResId = videoResId,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))
+                    )
+                )
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = label,
+                color = DualGoldMid,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DualHomeGameImageCard(
+    imageRes: Int,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(DualCardDark)
+            .border(1.dp, DualGoldDeep.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Image(
+            painter = painterResource(imageRes),
+            contentDescription = label,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))
+                    )
+                )
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = label,
+                color = DualGoldMid,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
     }
 }
 

@@ -106,9 +106,10 @@ import java.util.TimeZone
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
-import androidx.compose.material.icons.filled.CardGiftcard
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -417,10 +418,17 @@ fun IplScreen(
         bottomBar = {
             CricketBottomNavBar(
                 onHome = { onNavigate("home") },
-                onPromotions = { onNavigate("affiliate") },
+                onLive = {
+                    if (!viewModel.loginSuccess) onNavigate("login")
+                    else onNavigate("sports")
+                },
                 onCasino = {
                     if (!viewModel.loginSuccess) onNavigate("login")
                     else onNavigate("casino_games")
+                },
+                onWallet = {
+                    if (!viewModel.loginSuccess) onNavigate("login")
+                    else onNavigate("wallet")
                 },
                 onProfile = {
                     if (!viewModel.loginSuccess) onNavigate("login")
@@ -800,12 +808,12 @@ private val BetstrikeLeagueTitle = Color(0xFFE8EEF2)
 @Composable
 private fun CricketBottomNavBar(
     onHome: () -> Unit,
-    onPromotions: () -> Unit,
+    onLive: () -> Unit,
     onCasino: () -> Unit,
+    onWallet: () -> Unit,
     onProfile: () -> Unit
 ) {
-    // Same gold yellow as DualCards home bottom nav
-    val activeGold = DualGoldMid
+    // Match DualCards home bottom nav: HOME | LIVE | CASINO | WALLET | PROFILE
     val idleGold = DualGoldDeep.copy(alpha = 0.7f)
 
     Box(
@@ -823,34 +831,9 @@ private fun CricketBottomNavBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             CricketBottomNavItem("HOME", Icons.Filled.Home, idleGold, onClick = onHome)
-            CricketBottomNavItem("PROMOTIONS", Icons.Filled.CardGiftcard, idleGold, onClick = onPromotions)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .offset(y = (-8).dp)
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(DualGoldDeep.copy(alpha = 0.25f))
-                        .border(BorderStroke(1.5.dp, activeGold), CircleShape)
-                        .clickable(onClick = { /* already on cricket */ }),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.SportsCricket,
-                        contentDescription = "Cricket",
-                        tint = activeGold,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-                Text(
-                    text = "CRICKET",
-                    color = activeGold,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.offset(y = (-4).dp)
-                )
-            }
-            CricketBottomNavItem("CASINO", Icons.Filled.Casino, idleGold, onClick = onCasino)
+            CricketBottomNavItem("LIVE", Icons.Filled.Bolt, idleGold, onClick = onLive)
+            DualCasinoNavItem(selected = false, onClick = onCasino)
+            CricketBottomNavItem("WALLET", Icons.Filled.AccountBalanceWallet, idleGold, onClick = onWallet)
             CricketBottomNavItem("PROFILE", Icons.Filled.Person, idleGold, onClick = onProfile)
         }
     }

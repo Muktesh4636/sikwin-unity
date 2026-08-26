@@ -79,7 +79,7 @@ private fun ClassicProfileScreen(
             DualCardsBottomBar(
                 selectedTab = DualNavTab.PROFILE,
                 onHome = { onNavigate("home") },
-                onPromo = { onNavigate("affiliate") },
+                onLive = { onNavigate("sports") },
                 onCasino = { onNavigate("casino_games") },
                 onWallet = { onNavigate("wallet") },
                 onProfile = { }
