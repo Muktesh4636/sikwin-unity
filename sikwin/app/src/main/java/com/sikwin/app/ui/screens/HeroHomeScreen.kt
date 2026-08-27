@@ -314,7 +314,7 @@ fun HeroHomeScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "GUNDU ATA",
+                        "PRIDE",
                         color = PrimaryYellow,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Black,
@@ -373,7 +373,7 @@ private fun HeroTopBar(
     ) {
         Image(
             painter = painterResource(id = R.drawable.gundu_ata_logo_gold),
-            contentDescription = "Gundu Ata",
+            contentDescription = "Pride",
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .weight(1f)

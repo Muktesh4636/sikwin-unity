@@ -1,6 +1,8 @@
 package com.sikwin.app.ui.screens
 
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -36,65 +39,47 @@ fun SecurityScreen(
     
     var showEmailDialog by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
+    val colors = rememberAppScreenColors()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
     ) {
-        // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = TextWhite,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Text(
-                "Security",
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
+        AppSubScreenHeader(title = "Security", colors = colors, onBack = onBack)
 
-        // Security Items
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surface)
+                .border(1.dp, colors.border, RoundedCornerShape(12.dp))
         ) {
             SecurityItem(
                 label = "Email",
                 value = user?.email ?: "",
                 onClick = { showEmailDialog = true },
-                showArrow = true
+                showArrow = true,
+                colors = colors
             )
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = colors.border, thickness = 0.5.dp)
 
             SecurityItem(
                 label = "Password",
                 action = "Change",
                 onClick = { showPasswordDialog = true },
-                showArrow = true
+                showArrow = true,
+                colors = colors
             )
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = colors.border, thickness = 0.5.dp)
 
             SecurityItem(
                 label = "Real name",
                 value = user?.username ?: "",
                 onClick = { /* Username cannot be changed */ },
-                showArrow = false
+                showArrow = false,
+                colors = colors
             )
         }
     }
@@ -336,19 +321,20 @@ fun SecurityItem(
     action: String? = null,
     value: String? = null,
     showArrow: Boolean = true,
+    colors: AppScreenColors = rememberAppScreenColors(),
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = showArrow || action != null) { onClick() }
-            .padding(vertical = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 20.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
-            color = TextGrey,
+            color = colors.text,
             fontSize = 16.sp
         )
         
@@ -359,13 +345,13 @@ fun SecurityItem(
             if (value != null && value.isNotEmpty()) {
                 Text(
                     text = value,
-                    color = TextGrey,
+                    color = colors.textMuted,
                     fontSize = 14.sp
                 )
             } else if (action != null) {
                 Text(
                     text = action,
-                    color = TextGrey,
+                    color = colors.textMuted,
                     fontSize = 14.sp
                 )
             }
@@ -374,7 +360,7 @@ fun SecurityItem(
                 Icon(
                     Icons.Default.ArrowForward,
                     contentDescription = null,
-                    tint = TextGrey,
+                    tint = colors.textMuted,
                     modifier = Modifier.size(20.dp)
                 )
             }

@@ -1,6 +1,7 @@
 package com.sikwin.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,16 +25,18 @@ import com.sikwin.app.ui.theme.*
 fun GameGuidelinesScreen(
     onBack: () -> Unit
 ) {
+    val colors = rememberAppScreenColors()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
     ) {
         TopAppBar(
             title = {
                 Text(
                     stringResource(R.string.game_guidelines_title),
-                    color = TextWhite,
+                    color = colors.text,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
@@ -43,12 +46,12 @@ fun GameGuidelinesScreen(
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = TextWhite
+                        tint = PrimaryYellow
                     )
                 }
             },
             colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                containerColor = BlackBackground
+                containerColor = colors.background
             )
         )
         
@@ -62,7 +65,8 @@ fun GameGuidelinesScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                color = SurfaceColor
+                color = colors.surface,
+                border = colors.listItemBorder
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
@@ -90,7 +94,7 @@ fun GameGuidelinesScreen(
                     
                     Text(
                         stringResource(R.string.how_to_play),
-                        color = TextWhite,
+                        color = colors.text,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -99,7 +103,7 @@ fun GameGuidelinesScreen(
                     
                     Text(
                         stringResource(R.string.learn_rules),
-                        color = TextGrey,
+                        color = colors.textMuted,
                         fontSize = 14.sp
                     )
                 }
@@ -253,6 +257,7 @@ fun GuidelineSection(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val colors = rememberAppScreenColors()
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -269,7 +274,7 @@ fun GuidelineSection(
             
             Text(
                 title,
-                color = TextWhite,
+                color = colors.text,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -287,18 +292,19 @@ fun GuidelineItem(
     title: String,
     description: String
 ) {
+    val colors = rememberAppScreenColors()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        color = SurfaceColor
+        color = colors.surface,
+        border = colors.listItemBorder
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // Number Badge
             Surface(
                 modifier = Modifier.size(32.dp),
                 shape = RoundedCornerShape(8.dp),
@@ -322,7 +328,7 @@ fun GuidelineItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
-                    color = TextWhite,
+                    color = colors.text,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -331,7 +337,7 @@ fun GuidelineItem(
                 
                 Text(
                     description,
-                    color = TextGrey,
+                    color = colors.textMuted,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
                 )

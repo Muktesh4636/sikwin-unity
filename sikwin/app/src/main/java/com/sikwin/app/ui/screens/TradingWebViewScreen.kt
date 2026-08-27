@@ -74,7 +74,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 private val TradingBg = Color(0xFF0B1220)
 
 /**
- * Stock Market / trading — real Gundu wallet only.
+ * Stock Market / trading — real Pride wallet only.
  * Same pattern as Auto Roulette: WebView + JWT in `?token=` + localStorage.
  */
 @Composable
@@ -133,7 +133,7 @@ private fun TradingLoginRequired(onLogin: () -> Unit, onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                "Stock Market uses your real Gundu wallet.\nPlease sign in to continue.",
+                "Stock Market uses your real Pride wallet.\nPlease sign in to continue.",
                 color = TextGrey,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center

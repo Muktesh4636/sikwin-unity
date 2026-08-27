@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
+import com.sikwin.app.ui.theme.AppSubScreenHeader
+import com.sikwin.app.ui.theme.rememberAppScreenColors
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import com.sikwin.app.utils.MoneyFormat
 import kotlinx.coroutines.launch
@@ -39,38 +41,18 @@ fun WalletScreen(
     }
 
     val balance = viewModel.wallet?.balance ?: "0.00"
+    val colors = rememberAppScreenColors()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A1A)) // Dark background like in image
-            .statusBarsPadding()
+            .background(colors.background)
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack, 
-                    contentDescription = "Back", 
-                    tint = Color(0xFFDAA520), // Golden color for back arrow
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Text(
-                stringResource(R.string.my_wallet),
-                color = Color(0xFFDAA520), // Golden color for title
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.width(48.dp)) // To balance the back button
-        }
+        AppSubScreenHeader(
+            title = stringResource(R.string.my_wallet),
+            colors = colors,
+            onBack = onBack
+        )
 
         Column(
             modifier = Modifier
@@ -154,6 +136,7 @@ fun WalletScreen(
                 title = stringResource(R.string.main_wallet),
                 amount = balance,
                 icon = Icons.Default.AccountBalanceWallet,
+                colors = colors,
                 actions = {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -162,15 +145,17 @@ fun WalletScreen(
                         WalletActionButton(
                             text = stringResource(R.string.withdrawal),
                             icon = Icons.Default.VerticalAlignBottom,
+                            textColor = colors.text,
                             onClick = onNavigateToWithdraw
                         )
-                        Divider(
+                        VerticalDivider(
                             modifier = Modifier.height(24.dp).width(1.dp),
-                            color = Color.LightGray
+                            color = colors.border
                         )
                         WalletActionButton(
                             text = stringResource(R.string.deposit),
                             icon = Icons.Default.VerticalAlignTop,
+                            textColor = colors.text,
                             onClick = onNavigateToDeposit
                         )
                     }
@@ -187,13 +172,21 @@ fun WalletCard(
     title: String,
     amount: String,
     icon: ImageVector,
+    colors: AppScreenColors,
     actions: @Composable () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp)),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0)) // Light grey/white card
+            .clip(RoundedCornerShape(24.dp))
+            .then(
+                if (colors.listItemBorder != null) {
+                    Modifier.border(colors.listItemBorder!!, RoundedCornerShape(24.dp))
+                } else Modifier
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (colors.isWhite) colors.surface else Color(0xFFF0F0F0)
+        )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Subtle wave/line pattern simulation
@@ -209,14 +202,14 @@ fun WalletCard(
                 ) {
                     Text(
                         title,
-                        color = Color.Black,
+                        color = colors.text,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Icon(
                         icon,
                         contentDescription = null,
-                        tint = Color.DarkGray,
+                        tint = colors.textMuted,
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -225,13 +218,13 @@ fun WalletCard(
                 
                 Text(
                     MoneyFormat.formatRupee(amount),
-                    color = Color.Black,
+                    color = colors.text,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = Color.LightGray, thickness = 0.5.dp)
+                HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                 
                 actions()
             }
@@ -243,6 +236,7 @@ fun WalletCard(
 fun WalletActionButton(
     text: String,
     icon: ImageVector,
+    textColor: Color = Color.Black,
     onClick: () -> Unit
 ) {
     Row(
@@ -255,13 +249,13 @@ fun WalletActionButton(
         Icon(
             icon,
             contentDescription = null,
-            tint = Color.Black,
+            tint = textColor,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text,
-            color = Color.Black,
+            color = textColor,
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium
         )

@@ -89,6 +89,14 @@ fun HomeScreen(
         com.sikwin.app.data.prefs.ThemePreferences(context).getAppTheme()
     }
     when (appTheme) {
+        com.sikwin.app.data.prefs.ThemePreferences.THEME_WHITE -> {
+            WhiteHomeScreen(
+                viewModel = viewModel,
+                onGameClick = onGameClick,
+                onNavigate = onNavigate
+            )
+            return
+        }
         com.sikwin.app.data.prefs.ThemePreferences.THEME_HERO -> {
             HeroHomeScreen(
                 viewModel = viewModel,
@@ -383,7 +391,7 @@ fun HomeTopBar(
             Spacer(modifier = Modifier.width(4.dp))
             
             Text(
-                text = "GUNDU ATA",
+                text = "PRIDE",
                 style = androidx.compose.ui.text.TextStyle(
                     brush = textShimmerBrush,
                     fontSize = 22.sp,
@@ -601,7 +609,7 @@ fun PromotionalBanners(
                 2 -> BannerData("MEGA SPIN", "Deposit ₹2000 or more to spin the wheel!", "SPIN NOW", listOf(Color(0xFF4A148C), Color(0xFF880E4F)), { handleBannerClickRequireLogin("lucky_draw") })
                 3 -> BannerData("USDT SPECIAL ₮", "Get 5% EXTRA CASHBACK on all USDT deposits!", "DEPOSIT NOW", listOf(Color(0xFF00897B), Color(0xFF004D40)), { handleBannerClick("deposit?method=USDT") })
                 4 -> BannerData(stringResource(R.string.banner_cricket_title), stringResource(R.string.banner_cricket_subtitle), "BET NOW", listOf(Color(0xFF0D47A1), Color(0xFF1A237E)), { handleBannerClick("sports?sport=cricket") })
-                else -> BannerData("FRANCHISE", "Get Gundu Ata franchise at 50% off — Get in touch today!", "LEARN MORE", listOf(Color(0xFF795548), Color(0xFF5D4037)), { handleBannerClick("white_label_account") })
+                else -> BannerData("FRANCHISE", "Get Pride franchise at 50% off — Get in touch today!", "LEARN MORE", listOf(Color(0xFF795548), Color(0xFF5D4037)), { handleBannerClick("white_label_account") })
             }
 
             Box(
@@ -669,7 +677,7 @@ fun SectionHeader(title: String) {
 // ─── Quick-launch game icons row ─────────────────────────────────────────────
 
 private fun homeScreenGames(): List<GameItem> = listOf(
-    GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0)),
+    GameItem("PRIDE", "gundu_ata", Color(0xFF1565C0)),
     GameItem("COLOUR GAME", "colour_game", Color(0xFF1A1A2E)),
     GameItem("HEAD & TAILS", "coin", Color(0xFFB8860B)),
     GameItem("CRICKET", "sports?sport=cricket", Color(0xFF0D47A1))
@@ -707,7 +715,7 @@ fun QuickGamesRow(
     data class QuickEntry(val id: String, val label: String)
     val entries = listOf(
         QuickEntry("colour_game", "Colour Game"),
-        QuickEntry("gundu_ata", "Gundu Ata"),
+        QuickEntry("gundu_ata", "Pride"),
         QuickEntry("coin", "Head & Tails"),
         QuickEntry("sports?sport=cricket", cricketLabel)
     )
@@ -850,7 +858,7 @@ fun HotGamesGrid(
     onRequireLogin: () -> Unit
 ) {
     val games = listOf(
-        GameItem("GUNDU ATA", "gundu_ata", Color(0xFF1565C0))
+        GameItem("PRIDE", "gundu_ata", Color(0xFF1565C0))
     )
     val context = LocalContext.current
     
@@ -1372,7 +1380,7 @@ fun GunduAtaChoiceDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    "Gundu Ata",
+                                    "Pride",
                                     color = TextWhite,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
@@ -1438,7 +1446,7 @@ fun GunduAtaChoiceDialog(
                         Spacer(Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Gundu Ata",
+                                "Pride",
                                 color = TextWhite,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
@@ -1738,7 +1746,7 @@ fun HomeBottomNavigation(currentRoute: String, viewModel: GunduAtaViewModel, onN
     ) {
         val allNavItems = listOf(
             BottomNavItem("Home", "home", Icons.Default.Home),
-            BottomNavItem("GUNDU ATA", "gundu_ata", Icons.Default.Casino),
+            BottomNavItem("PRIDE", "gundu_ata", Icons.Default.Casino),
             BottomNavItem("Me", "me", Icons.Default.AccountCircle)
         )
         val items = allNavItems

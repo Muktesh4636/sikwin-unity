@@ -14,3 +14,26 @@ buildscript {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+// macOS flash drives create AppleDouble "._*" files that break AAPT.
+subprojects { sub ->
+    sub.tasks.configureEach { task ->
+        def name = task.name
+        if (name.contains("parse") && name.contains("LocalResources") ||
+            name.contains("merge") && name.contains("Resources") ||
+            name.contains("process") && name.contains("Resources") ||
+            name.contains("package") && name.contains("Resources")
+        ) {
+            task.doFirst {
+                def buildDir = file(sub.buildDir)
+                if (buildDir.exists()) {
+                    buildDir.eachFileRecurse { f ->
+                        if (f.name.startsWith("._")) {
+                            f.delete()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -108,7 +108,7 @@ enum class ChickenRoadGame(
 }
 
 /**
- * Chicken Road / Chicken Road 2 / Vortex / Casino — real Gundu wallet.
+ * Chicken Road / Chicken Road 2 / Vortex / Casino — real Pride wallet.
  * Same pattern as Auto Roulette & Stock Market: WebView + JWT in `?token=`.
  * Opening any of these also warms the Casino lobby cache for faster Casino tab loads.
  */
@@ -369,7 +369,7 @@ private fun ChickenRoadLoginRequired(
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                "$title uses your real Gundu wallet.\nPlease sign in to continue.",
+                "$title uses your real Pride wallet.\nPlease sign in to continue.",
                 color = TextGrey,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center

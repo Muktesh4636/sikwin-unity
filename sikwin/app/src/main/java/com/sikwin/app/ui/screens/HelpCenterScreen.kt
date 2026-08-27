@@ -125,34 +125,17 @@ fun HelpCenterScreen(
         }
     }
     fun displayTelegram(): String = telegramHandle?.let { if (it.all { c -> c.isDigit() }) "+$it" else "@$it" } ?: "—"
+    val colors = rememberAppScreenColors()
     
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
     ) {
-        // Top App Bar
-        TopAppBar(
-            title = {
-                Text(
-                    stringResource(R.string.help_center_title),
-                    color = TextWhite,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = TextWhite
-                    )
-                }
-            },
-            colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                containerColor = BlackBackground
-            )
+        AppSubScreenHeader(
+            title = stringResource(R.string.help_center_title),
+            colors = colors,
+            onBack = onBack
         )
         
         Column(
@@ -168,7 +151,7 @@ fun HelpCenterScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                color = SurfaceColor
+                color = colors.surface
             ) {
                 Column(
                     modifier = Modifier.padding(32.dp),
@@ -197,7 +180,7 @@ fun HelpCenterScreen(
                     
                     Text(
                         stringResource(R.string.need_help),
-                        color = TextWhite,
+                        color = colors.text,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -206,7 +189,7 @@ fun HelpCenterScreen(
                     
                     Text(
                         stringResource(R.string.contact_support),
-                        color = TextGrey,
+                        color = colors.textMuted,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center,
                         lineHeight = 20.sp
@@ -222,7 +205,7 @@ fun HelpCenterScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                     color = PrimaryYellow,
-                    trackColor = SurfaceColor
+                    trackColor = colors.surface
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -268,7 +251,7 @@ fun HelpCenterScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = SurfaceColor
+                color = colors.surface
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp)
@@ -285,7 +268,7 @@ fun HelpCenterScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             stringResource(R.string.support_hours),
-                            color = TextWhite,
+                            color = colors.text,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -295,7 +278,7 @@ fun HelpCenterScreen(
                     
                     Text(
                         stringResource(R.string.support_hours_desc),
-                        color = TextGrey,
+                        color = colors.textMuted,
                         fontSize = 14.sp,
                         lineHeight = 20.sp
                     )

@@ -13,7 +13,7 @@ class UnityPlayerGameActivity : Activity() {
         super.onCreate(savedInstanceState)
         Toast.makeText(
             this,
-            "Gundu Ata Unity is temporarily unavailable. Use Live or other games.",
+            "Pride Unity is temporarily unavailable. Use Live or other games.",
             Toast.LENGTH_LONG
         ).show()
         finish()

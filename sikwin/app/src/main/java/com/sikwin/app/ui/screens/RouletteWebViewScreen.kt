@@ -82,7 +82,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 private val RouletteBg = Color(0xFF0C0406)
 
 /**
- * Roulette — real Gundu wallet only (no demo / guest).
+ * Roulette — real Pride wallet only (no demo / guest).
  * Shows a ball + progress loader while prefetching assets / wallet, then reveals the WebView.
  */
 @Composable
@@ -142,7 +142,7 @@ private fun LoginRequiredPanel(onLogin: () -> Unit, onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                "Auto Roulette uses your real Gundu wallet.\nPlease sign in to continue.",
+                "Auto Roulette uses your real Pride wallet.\nPlease sign in to continue.",
                 color = TextGrey,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center

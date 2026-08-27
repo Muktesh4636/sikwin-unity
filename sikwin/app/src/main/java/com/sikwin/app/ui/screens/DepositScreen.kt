@@ -26,6 +26,8 @@ import android.widget.Toast
 import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
+import com.sikwin.app.ui.theme.AppSubScreenHeader
+import com.sikwin.app.ui.theme.rememberAppScreenColors
 
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 
@@ -71,6 +73,7 @@ fun DepositScreen(
     } else 0.0
 
     val context = LocalContext.current
+    val colors = rememberAppScreenColors()
 
     LaunchedEffect(Unit) {
         viewModel.fetchWallet()
@@ -80,8 +83,7 @@ fun DepositScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
-            .statusBarsPadding()
+            .background(colors.background)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -90,30 +92,11 @@ fun DepositScreen(
             }
             .verticalScroll(rememberScrollState())
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, null, tint = PrimaryYellow, modifier = Modifier.size(32.dp))
-            }
-            Text(
-                "Deposit",
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f).padding(end = 48.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-
+        AppSubScreenHeader(title = "Deposit", colors = colors, onBack = onBack)
 
         // Payment Method
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.payment_method), color = TextGrey, fontSize = 16.sp)
+            Text(stringResource(R.string.payment_method), color = colors.textMuted, fontSize = 16.sp)
             
             Row(modifier = Modifier.padding(vertical = 12.dp)) {
                 PaymentTab("Bank", selectedMethod == "Bank") { 
@@ -161,15 +144,18 @@ fun DepositScreen(
             }
         }
 
-        Divider(color = BorderColor, thickness = 8.dp)
+        HorizontalDivider(
+            color = if (colors.isWhite) Color(0xFFF3F4F6) else BorderColor,
+            thickness = 8.dp
+        )
 
         // Deposit Amount
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.deposit_amount), color = TextGrey, fontSize = 16.sp)
+            Text(stringResource(R.string.deposit_amount), color = colors.textMuted, fontSize = 16.sp)
             
             Text(
                 "Deposit ₹2000 or more to get a FREE MEGA SPIN!",
-                color = PrimaryYellow,
+                color = colors.accent,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -180,12 +166,12 @@ fun DepositScreen(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     color = PrimaryYellow.copy(alpha = 0.1f),
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, PrimaryYellow)
+                    border = BorderStroke(1.dp, colors.accent)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text(stringResource(R.string.usdt_deposit_info), color = PrimaryYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("• ${stringResource(R.string.exchange_rate, usdtExchangeRate.toString())}", color = TextWhite, fontSize = 13.sp)
-                        Text("• ${stringResource(R.string.min_deposit, usdtMinDeposit.toString())}", color = TextWhite, fontSize = 13.sp)
+                        Text(stringResource(R.string.usdt_deposit_info), color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("• ${stringResource(R.string.exchange_rate, usdtExchangeRate.toString())}", color = colors.text, fontSize = 13.sp)
+                        Text("• ${stringResource(R.string.min_deposit, usdtMinDeposit.toString())}", color = colors.text, fontSize = 13.sp)
                         Text("• ${stringResource(R.string.bonus_cashback)}", color = GreenSuccess, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
@@ -210,22 +196,23 @@ fun DepositScreen(
                         isAmountFocused = focusState.isFocused
                         if (focusState.isFocused) hasBeenFocused = true
                     },
-                placeholder = { Text(stringResource(R.string.enter_deposit_amount), color = TextGrey) },
-                leadingIcon = { Text("₹", color = TextGrey, fontSize = 20.sp, modifier = Modifier.padding(start = 12.dp)) },
+                placeholder = { Text(stringResource(R.string.enter_deposit_amount), color = colors.textMuted) },
+                leadingIcon = { Text("₹", color = colors.textMuted, fontSize = 20.sp, modifier = Modifier.padding(start = 12.dp)) },
                 suffix = {
                     if (selectedMethod == "USDT" && usdtAmount > 0) {
-                        Text("≈ ${String.format("%.2f", usdtAmount)} USDT", color = PrimaryYellow, fontSize = 14.sp)
+                        Text("≈ ${String.format("%.2f", usdtAmount)} USDT", color = colors.accent, fontSize = 14.sp)
                     }
                 },
                 isError = !isAmountValid && !isAmountFocused && hasBeenFocused,
-            colors = TextFieldDefaults.outlinedTextFieldColors(
-                containerColor = SurfaceColor,
-                unfocusedBorderColor = BorderColor,
-                focusedBorderColor = PrimaryYellow,
-                errorBorderColor = Color.Red,
-                focusedTextColor = TextWhite,
-                unfocusedTextColor = TextWhite
-            ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = colors.surface,
+                    unfocusedContainerColor = colors.surface,
+                    unfocusedBorderColor = colors.border,
+                    focusedBorderColor = colors.accent,
+                    errorBorderColor = Color.Red,
+                    focusedTextColor = colors.text,
+                    unfocusedTextColor = colors.text
+                ),
                 shape = RoundedCornerShape(8.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
@@ -251,7 +238,7 @@ fun DepositScreen(
             Spacer(modifier = Modifier.height(12.dp))
             
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.current_success_rate), color = TextGrey, fontSize = 14.sp)
+                Text(stringResource(R.string.current_success_rate), color = colors.textMuted, fontSize = 14.sp)
                 Surface(
                     color = GreenSuccess,
                     shape = RoundedCornerShape(4.dp)
@@ -289,7 +276,7 @@ fun DepositScreen(
             Text(stringResource(R.string.reminder), color = Color.Red, fontWeight = FontWeight.Bold)
             Text(
                 stringResource(R.string.deposit_reminder),
-                color = TextWhite,
+                color = colors.text,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
@@ -300,13 +287,14 @@ fun DepositScreen(
 
 @Composable
 fun PaymentTab(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    val colors = rememberAppScreenColors()
     Column(
         modifier = Modifier.clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = text,
-            color = if (isSelected) PrimaryYellow else TextGrey,
+            color = if (isSelected) colors.accent else colors.textMuted,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             fontSize = 16.sp
         )
@@ -315,7 +303,7 @@ fun PaymentTab(text: String, isSelected: Boolean, onClick: () -> Unit) {
                 modifier = Modifier
                     .width(40.dp)
                     .height(2.dp)
-                    .background(PrimaryYellow)
+                    .background(colors.accent)
                     .padding(top = 4.dp)
             )
         }
@@ -324,6 +312,7 @@ fun PaymentTab(text: String, isSelected: Boolean, onClick: () -> Unit) {
 
 @Composable
 fun PaymentOptionCard(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    val colors = rememberAppScreenColors()
     val iconRes = when {
         text.contains("UPI", ignoreCase = true) -> R.drawable.ic_upi
         text.contains("BANK", ignoreCase = true) -> R.drawable.ic_bank
@@ -336,10 +325,10 @@ fun PaymentOptionCard(text: String, isSelected: Boolean, onClick: () -> Unit) {
             .width(120.dp)
             .height(80.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(SurfaceColor)
+            .background(colors.surface)
             .border(
                 width = 1.dp,
-                color = if (isSelected) PrimaryYellow else BorderColor,
+                color = if (isSelected) colors.accent else colors.border,
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable { onClick() }
@@ -370,7 +359,7 @@ fun PaymentOptionCard(text: String, isSelected: Boolean, onClick: () -> Unit) {
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text, color = TextWhite, fontSize = 10.sp)
+            Text(text, color = colors.text, fontSize = 10.sp)
         }
     }
 }

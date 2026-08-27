@@ -43,9 +43,9 @@
     
     <!-- Auth -->
     <string name="sign_in_required">సైన్ ఇన్ అవసరం</string>
-    <string name="sign_in_required_message">గుండు ఆట ఆడడానికి మరియు గెలవడానికి దయచేసి సైన్ ఇన్ లేదా సైన్ అప్ చేయండి!</string>
+    <string name="sign_in_required_message">Pride ఆడడానికి మరియు గెలవడానికి దయచేసి సైన్ ఇన్ లేదా సైన్ అప్ చేయండి!</string>
     <string name="login_required">లాగిన్ అవసరం</string>
-    <string name="login_required_message">గుండు ఆట గేమ్ యాక్సెస్ చేయడానికి మరియు గెలవడానికి దయచేసి సైన్ అప్ చేయండి!</string>
+    <string name="login_required_message">Pride గేమ్ యాక్సెస్ చేయడానికి మరియు గెలవడానికి దయచేసి సైన్ అప్ చేయండి!</string>
     <string name="welcome_back">మళ్ళీ స్వాగతం</string>
     <string name="login_subtitle">లాగిన్ చేయడానికి మీ యూజర్‌నేమ్ మరియు పాస్‌వర్డ్ నమోదు చేయండి</string>
     <string name="phone_number">ఫోన్ నంబర్</string>
@@ -56,7 +56,7 @@
     <string name="save_password">త్వరిత లాగిన్ కోసం పాస్‌వర్డ్ సేవ్ చేయండి</string>
     <string name="login_with_saved_account">సేవ్ చేసిన ఖాతాతో లాగిన్ చేయండి</string>
     <string name="forgot_password">పాస్‌వర్డ్ మర్చిపోయారా</string>
-    <string name="welcome_to_gundu_ata">గుండు ఆటకు స్వాగతం</string>
+    <string name="welcome_to_gundu_ata">Prideకు స్వాగతం</string>
     <string name="enter_username">మీ యూజర్‌నేమ్ నమోదు చేయండి</string>
     <string name="enter_otp">4 అంకెల OTP నమోదు చేయండి</string>
     <string name="enter_referral_code">రిఫరల్ కోడ్ నమోదు చేయండి</string>
@@ -161,7 +161,7 @@
     <string name="add_bank_account_button">బ్యాంక్ ఖాతా నంబర్ జోడించండి</string>
     <string name="not_default">డిఫాల్ట్ కాదు</string>
     <string name="game_guidelines_title">గేమ్ మార్గదర్శకాలు</string>
-    <string name="how_to_play">గుండు ఆట ఎలా ఆడాలి</string>
+    <string name="how_to_play">Pride ఎలా ఆడాలి</string>
     <string name="learn_rules">గెలవడానికి నియమాలు మరియు వ్యూహాలు నేర్చుకోండి!</string>
     <string name="help_center_title">సహాయ కేంద్రం</string>
     <string name="need_help">సహాయం కావాలా?</string>
@@ -196,7 +196,7 @@
     <!-- Game Guidelines -->
     <string name="game_rules">గేమ్ నియమాలు</string>
     <string name="dice_game_basics">డైస్ గేమ్ బేసిక్స్</string>
-    <string name="dice_game_basics_desc">గుండు ఆట ఒక డైస్ గేమ్, ఇక్కడ 6 డైస్లు రోల్ చేయబడతాయి. మీరు కనిపించే 1-6 సంఖ్యలపై బెట్ చేయండి.</string>
+    <string name="dice_game_basics_desc">Pride ఒక డైస్ గేమ్, ఇక్కడ 6 డైస్లు రోల్ చేయబడతాయి. మీరు కనిపించే 1-6 సంఖ్యలపై బెట్ చేయండి.</string>
     <string name="winning_conditions">గెలుపు షరతులు</string>
     <string name="winning_conditions_desc">2 లేదా అంతకంటే ఎక్కువ సార్లు కనిపించే ఏ సంఖ్యైనా గెలుపు. మీ లాభం = బెట్ × ఫ్రీక్వెన్సీ (ఉదా: సంఖ్య 3 సార్లు కనిపిస్తే, లాభం 3× మీ బెట్).</string>
     <string name="payout_calculation">చెల్లింపు గణన</string>

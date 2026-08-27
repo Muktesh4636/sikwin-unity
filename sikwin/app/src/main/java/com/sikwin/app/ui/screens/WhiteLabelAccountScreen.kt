@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
+import com.sikwin.app.ui.theme.AppSubScreenHeader
+import com.sikwin.app.ui.theme.rememberAppScreenColors
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +36,7 @@ fun WhiteLabelAccountScreen(
     var message by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var validationErrorResId by remember { mutableStateOf<Int?>(null) }
+    val colors = rememberAppScreenColors()
 
     LaunchedEffect(Unit) {
         viewModel.errorMessage = null
@@ -62,7 +65,7 @@ fun WhiteLabelAccountScreen(
             title = {
                 Text(
                     stringResource(R.string.white_label_success_title),
-                    color = TextWhite,
+                    color = colors.text,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -70,11 +73,11 @@ fun WhiteLabelAccountScreen(
             text = {
                 Text(
                     stringResource(R.string.white_label_success_message),
-                    color = TextGrey,
+                    color = colors.textMuted,
                     fontSize = 14.sp
                 )
             },
-            containerColor = SurfaceColor,
+            containerColor = colors.surface,
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -82,7 +85,7 @@ fun WhiteLabelAccountScreen(
                         onBack()
                     }
                 ) {
-                    Text(stringResource(R.string.ok), color = PrimaryYellow)
+                    Text(stringResource(R.string.ok), color = colors.accent)
                 }
             }
         )
@@ -91,40 +94,20 @@ fun WhiteLabelAccountScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
             .verticalScroll(rememberScrollState())
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = PrimaryYellow,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Text(
-                stringResource(R.string.white_label_account_title),
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.width(48.dp))
-        }
+        AppSubScreenHeader(
+            title = stringResource(R.string.white_label_account_title),
+            colors = colors,
+            onBack = onBack
+        )
 
-        // Subtitle with 50% discount
         Text(
             stringResource(R.string.white_label_account_subtitle),
-            color = TextGrey,
+            color = colors.textMuted,
             fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
@@ -139,6 +122,7 @@ fun WhiteLabelAccountScreen(
                 value = name,
                 onValueChange = { name = it; validationErrorResId = null },
                 placeholder = stringResource(R.string.white_label_name_placeholder),
+                colors = colors,
                 singleLine = true
             )
             WhiteLabelField(
@@ -146,6 +130,7 @@ fun WhiteLabelAccountScreen(
                 value = phone,
                 onValueChange = { phone = it; validationErrorResId = null },
                 placeholder = stringResource(R.string.white_label_phone_placeholder),
+                colors = colors,
                 keyboardType = KeyboardType.Phone,
                 singleLine = true
             )
@@ -154,6 +139,7 @@ fun WhiteLabelAccountScreen(
                 value = message,
                 onValueChange = { message = it },
                 placeholder = stringResource(R.string.white_label_message_placeholder),
+                colors = colors,
                 singleLine = false
             )
 
@@ -219,31 +205,34 @@ private fun WhiteLabelField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    colors: AppScreenColors,
     keyboardType: KeyboardType = KeyboardType.Text,
     singleLine: Boolean = true
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             label,
-            color = PrimaryYellow,
+            color = colors.text,
             fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(placeholder, color = TextGrey, fontSize = 14.sp) },
+            placeholder = { Text(placeholder, color = colors.textMuted, fontSize = 14.sp) },
             singleLine = singleLine,
             maxLines = if (singleLine) 1 else 4,
-            colors = TextFieldDefaults.outlinedTextFieldColors(
-                containerColor = SurfaceColor,
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = PrimaryYellow,
-                focusedTextColor = TextWhite,
-                unfocusedTextColor = TextWhite
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = colors.surface,
+                unfocusedContainerColor = colors.surface,
+                unfocusedBorderColor = colors.border,
+                focusedBorderColor = colors.accent,
+                focusedTextColor = colors.text,
+                unfocusedTextColor = colors.text
             ),
-            shape = RoundedCornerShape(4.dp),
+            shape = RoundedCornerShape(8.dp),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
         )
     }

@@ -414,7 +414,7 @@ private fun GunduAtaClassicLiveTopBar(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.gundu_ata_logo_gold),
-                contentDescription = "Gundu Ata",
+                contentDescription = "Pride",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.height(44.dp)
             )

@@ -98,7 +98,7 @@ fun PaymentScreen(
     val activeUpiUri = if (usePaybitra) {
         paybitraSession?.upiPayUriOrNull() ?: run {
             val upi = activeUpiId ?: return@run null
-            val name = paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+            val name = paybitraSession?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "Pride"
             val note = "Deposit%20%23${paybitraSession?.sessionKey().orEmpty()}"
             "upi://pay?pa=$upi&pn=${Uri.encode(name)}&am=$payExactAmount&cu=INR&tn=$note"
         }
@@ -268,9 +268,9 @@ fun PaymentScreen(
 
         val upiId = specificUpiId ?: activeUpiId ?: ""
         val payeeName = if (usePaybitra) {
-            session?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+            session?.acc_holder_name?.takeIf { it.isNotBlank() } ?: "Pride"
         } else {
-            staticUpiMethod?.account_name?.takeIf { it.isNotBlank() } ?: "GunduAta"
+            staticUpiMethod?.account_name?.takeIf { it.isNotBlank() } ?: "Pride"
         }
         val sessionKey = session?.sessionKey().orEmpty()
         val am = if (usePaybitra) payExactAmount else amount
@@ -345,7 +345,7 @@ fun PaymentScreen(
     fun saveBitmapToGallery(bitmap: Bitmap) {
         scope.launch {
             try {
-                val filename = "GunduAta_QR_${System.currentTimeMillis()}.jpg"
+                val filename = "Pride_QR_${System.currentTimeMillis()}.jpg"
                 var fos: OutputStream? = null
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     val contentValues = android.content.ContentValues().apply {
@@ -389,7 +389,7 @@ fun PaymentScreen(
                 val bitmap = (result as? BitmapDrawable)?.bitmap
 
                 if (bitmap != null) {
-                    val filename = "GunduAta_QR_${System.currentTimeMillis()}.jpg"
+                    val filename = "Pride_QR_${System.currentTimeMillis()}.jpg"
                     var fos: OutputStream? = null
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         val contentValues = android.content.ContentValues().apply {

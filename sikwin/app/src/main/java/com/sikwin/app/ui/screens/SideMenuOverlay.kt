@@ -36,7 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.sikwin.app.R
-import com.sikwin.app.ui.theme.TextWhite
+import com.sikwin.app.ui.theme.GoldOnWhite
+import com.sikwin.app.ui.theme.rememberAppScreenColors
 
 /**
  * Slide-out side menu matching sidebar.png (4rabet-style, Gundu Ata black/gold).
@@ -50,6 +51,8 @@ fun SideMenuOverlay(
     requireLoginOr: (action: () -> Unit) -> Unit
 ) {
     val context = LocalContext.current
+    val colors = rememberAppScreenColors()
+    val accent = if (colors.isWhite) GoldOnWhite else DualGoldMid
     val panelOffset by animateFloatAsState(
         targetValue = if (open) 0f else -1f,
         animationSpec = tween(durationMillis = 280),
@@ -71,7 +74,13 @@ fun SideMenuOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = scrimAlpha))
+                .background(
+                    if (colors.isWhite) {
+                        Color.Black.copy(alpha = scrimAlpha * 0.35f)
+                    } else {
+                        Color.Black.copy(alpha = scrimAlpha)
+                    }
+                )
                 .then(
                     if (open) {
                         Modifier.pointerInput(Unit) {
@@ -86,7 +95,12 @@ fun SideMenuOverlay(
                 .fillMaxHeight()
                 .fillMaxWidth(0.78f)
                 .graphicsLayer { translationX = panelOffset * size.width }
-                .background(Color(0xFF0A0A0A))
+                .background(colors.background)
+                .then(
+                    if (colors.isWhite) {
+                        Modifier.border(width = 1.dp, color = colors.border)
+                    } else Modifier
+                )
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .clickable(enabled = false, onClick = {})
@@ -100,7 +114,7 @@ fun SideMenuOverlay(
             ) {
                 Text(
                     "Menu",
-                    color = TextWhite,
+                    color = colors.text,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -108,7 +122,7 @@ fun SideMenuOverlay(
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = DualGoldMid,
+                        tint = accent,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -125,7 +139,7 @@ fun SideMenuOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(DualGoldMid)
+                        .background(accent)
                         .clickable {
                             onClose()
                             requireLoginOr { onNavigate("deposit") }
@@ -146,7 +160,7 @@ fun SideMenuOverlay(
 
                 Text(
                     "OUR APPLICATIONS:",
-                    color = TextWhite.copy(alpha = 0.85f),
+                    color = colors.textMuted,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.8.sp
@@ -157,7 +171,9 @@ fun SideMenuOverlay(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.1f))
+                            .background(
+                                if (colors.isWhite) Color(0xFFF3F4F6) else Color.White.copy(alpha = 0.1f)
+                            )
                             .clickable {
                                 onClose()
                                 // iOS app not available yet
@@ -167,7 +183,7 @@ fun SideMenuOverlay(
                         Icon(
                             Icons.Default.PhoneIphone,
                             contentDescription = "iOS",
-                            tint = TextWhite,
+                            tint = colors.text,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -176,7 +192,9 @@ fun SideMenuOverlay(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.1f))
+                            .background(
+                                if (colors.isWhite) Color(0xFFF3F4F6) else Color.White.copy(alpha = 0.1f)
+                            )
                             .clickable {
                                 onClose()
                                 try {
@@ -193,7 +211,7 @@ fun SideMenuOverlay(
                         Icon(
                             Icons.Default.PhoneAndroid,
                             contentDescription = "Android",
-                            tint = DualGoldMid,
+                            tint = accent,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -201,7 +219,7 @@ fun SideMenuOverlay(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(DualGoldMid)
+                            .background(accent)
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
@@ -264,7 +282,7 @@ fun SideMenuOverlay(
                     }
                 )
                 SideMenuItem(
-                    label = "Gundu Ata",
+                    label = "Pride",
                     highlight = true,
                     customIcon = {
                         Image(
@@ -274,7 +292,7 @@ fun SideMenuOverlay(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .border(1.dp, DualGoldMid, CircleShape)
+                                .border(1.dp, accent, CircleShape)
                         )
                     },
                     onClick = {
@@ -359,6 +377,8 @@ private fun SideMenuItem(
     highlight: Boolean = false,
     customIcon: (@Composable () -> Unit)? = null
 ) {
+    val colors = rememberAppScreenColors()
+    val accent = if (colors.isWhite) GoldOnWhite else DualGoldMid
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -376,7 +396,7 @@ private fun SideMenuItem(
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = DualGoldMid,
+                    tint = accent,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -384,7 +404,7 @@ private fun SideMenuItem(
         Spacer(modifier = Modifier.width(14.dp))
         Text(
             label,
-            color = if (highlight) DualGoldMid else TextWhite,
+            color = if (highlight) accent else colors.text,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold
         )

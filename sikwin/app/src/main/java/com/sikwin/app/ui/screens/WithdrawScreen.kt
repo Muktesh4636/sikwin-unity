@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
 import com.sikwin.app.ui.theme.*
+import com.sikwin.app.ui.theme.AppSubScreenHeader
+import com.sikwin.app.ui.theme.rememberAppScreenColors
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
 import com.sikwin.app.utils.MoneyFormat
 
@@ -54,38 +56,19 @@ fun WithdrawScreen(
         }
     }
 
+    val colors = rememberAppScreenColors()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
-            .statusBarsPadding()
+            .background(colors.background)
             .verticalScroll(rememberScrollState())
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = PrimaryYellow,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Text(
-                stringResource(R.string.online_withdrawal),
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.width(48.dp))
-        }
+        AppSubScreenHeader(
+            title = stringResource(R.string.online_withdrawal),
+            colors = colors,
+            onBack = onBack
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -96,7 +79,7 @@ fun WithdrawScreen(
         ) {
             Text(
                 stringResource(R.string.bank_account),
-                color = PrimaryYellow,
+                color = colors.accent,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 12.dp)
@@ -105,11 +88,11 @@ fun WithdrawScreen(
                 modifier = Modifier
                     .width(60.dp)
                     .height(3.dp)
-                    .background(PrimaryYellow)
+                    .background(colors.accent)
             )
         }
 
-        Divider(color = BorderColor, thickness = 1.dp)
+        HorizontalDivider(color = colors.border, thickness = 1.dp)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -119,7 +102,12 @@ fun WithdrawScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .background(SurfaceColor, RoundedCornerShape(8.dp))
+                    .background(colors.surface, RoundedCornerShape(8.dp))
+                    .then(
+                        if (colors.listItemBorder != null) {
+                            Modifier.border(colors.listItemBorder!!, RoundedCornerShape(8.dp))
+                        } else Modifier
+                    )
                     .padding(16.dp)
             ) {
                 Row(
@@ -127,12 +115,12 @@ fun WithdrawScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text(stringResource(R.string.available_balance), color = TextGrey, fontSize = 12.sp)
-                        Text(MoneyFormat.formatRupee(wallet.withdrawable_balance), color = PrimaryYellow, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.available_balance), color = colors.textMuted, fontSize = 12.sp)
+                        Text(MoneyFormat.formatRupee(wallet.withdrawable_balance), color = colors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(stringResource(R.string.unavailable_balance), color = TextGrey, fontSize = 12.sp)
-                        Text(MoneyFormat.formatRupee(wallet.unavailableBalanceDisplay), color = Color.Gray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.unavailable_balance), color = colors.textMuted, fontSize = 12.sp)
+                        Text(MoneyFormat.formatRupee(wallet.unavailableBalanceDisplay), color = colors.textMuted, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -148,13 +136,13 @@ fun WithdrawScreen(
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = PrimaryYellow)
+                CircularProgressIndicator(color = colors.accent)
             }
         } else if (bankAccounts.isEmpty()) {
             // No Bank account added
             Text(
                 "No Bank account added, add bank account",
-                color = PrimaryYellow,
+                color = colors.accent,
                 fontSize = 14.sp,
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier
@@ -175,8 +163,8 @@ fun WithdrawScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { showBankDropdown = true },
-                        color = BlackBackground,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor),
+                        color = colors.surface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Row(
@@ -186,30 +174,30 @@ fun WithdrawScreen(
                         ) {
                             Text(
                                 text = selectedBank?.let { "${it.bank_name}(${it.account_number.takeLast(4)})" } ?: "Select Bank Account",
-                                color = TextWhite,
+                                color = colors.text,
                                 fontSize = 16.sp
                             )
-                            Icon(Icons.Default.ArrowDropDown, null, tint = TextGrey)
+                            Icon(Icons.Default.ArrowDropDown, null, tint = colors.textMuted)
                         }
                     }
                     
                     DropdownMenu(
                         expanded = showBankDropdown,
                         onDismissRequest = { showBankDropdown = false },
-                        modifier = Modifier.fillMaxWidth(0.9f).background(SurfaceColor)
+                        modifier = Modifier.fillMaxWidth(0.9f).background(colors.surface)
                     ) {
                         bankAccounts.forEach { bank ->
                             DropdownMenuItem(
-                                text = { Text("${bank.bank_name}(${bank.account_number.takeLast(4)})", color = TextWhite) },
+                                text = { Text("${bank.bank_name}(${bank.account_number.takeLast(4)})", color = colors.text) },
                                 onClick = {
                                     selectedBank = bank
                                     showBankDropdown = false
                                 }
                             )
                         }
-                        Divider(color = BorderColor)
+                        HorizontalDivider(color = colors.border)
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.add_bank_account), color = PrimaryYellow) },
+                            text = { Text(stringResource(R.string.add_bank_account), color = colors.accent) },
                             onClick = {
                                 showBankDropdown = false
                                 onAddBankAccount()
@@ -225,14 +213,15 @@ fun WithdrawScreen(
                     amount = newValue.filter { it.isDigit() }
                 },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.enter_amount), color = TextGrey) },
-                    leadingIcon = { Text("₹", color = TextWhite, fontSize = 18.sp, modifier = Modifier.padding(start = 12.dp)) },
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        containerColor = BlackBackground,
-                        unfocusedBorderColor = BorderColor,
-                        focusedBorderColor = PrimaryYellow,
-                        focusedTextColor = TextWhite,
-                        unfocusedTextColor = TextWhite
+                    placeholder = { Text(stringResource(R.string.enter_amount), color = colors.textMuted) },
+                    leadingIcon = { Text("₹", color = colors.text, fontSize = 18.sp, modifier = Modifier.padding(start = 12.dp)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = colors.surface,
+                        unfocusedContainerColor = colors.surface,
+                        unfocusedBorderColor = colors.border,
+                        focusedBorderColor = colors.accent,
+                        focusedTextColor = colors.text,
+                        unfocusedTextColor = colors.text
                     ),
                     shape = RoundedCornerShape(4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)

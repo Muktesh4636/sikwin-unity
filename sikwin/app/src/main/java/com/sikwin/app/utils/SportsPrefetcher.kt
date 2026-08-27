@@ -38,14 +38,27 @@ object SportsPrefetcher {
     @Volatile private var myBetsOpen: Boolean = false
     /** After hub load, drop warm/reload history so swipe-back exits Sports. */
     @Volatile private var clearHistoryAfterHubLoad: Boolean = false
+    private var feedPollRunnable: Runnable? = null
     private val readyListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
     private val networkErrorListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
+
+    private const val FEED_POLL_JS = """
+        (function(){
+          var f = document.getElementById('feed');
+          if (!f) return 'loading';
+          if (f.querySelector('.card') || f.querySelector('.empty') || f.querySelector('.error')) return 'done';
+          if (!f.querySelector('.loading')) return 'done';
+          return 'loading';
+        })();
+    """
 
     fun isReady(accessToken: String?, sport: String?): Boolean {
         val wv = webView ?: return false
         if (networkError) return false
         if (!pageReady) return false
-        if (!accessToken.isNullOrBlank() && loadedAccess != accessToken) return false
+        val wantAccess = accessToken.orEmpty()
+        val haveAccess = loadedAccess.orEmpty()
+        if (wantAccess != haveAccess) return false
         val url = wv.url.orEmpty()
         if (WebViewOffline.isChromeErrorUrl(url)) return false
         if (!url.contains("/sports") && !url.contains("/cricket")) return false
@@ -102,6 +115,12 @@ object SportsPrefetcher {
         mainHandler.post {
             try {
                 ensureWebView(activity)
+                webView?.let { wv ->
+                    try {
+                        wv.onResume()
+                    } catch (_: Exception) {
+                    }
+                }
                 loadSports(accessToken, refreshToken, sport, mode)
             } catch (_: Exception) {
             }
@@ -110,8 +129,8 @@ object SportsPrefetcher {
 
     fun attach(
         parent: ViewGroup,
-        accessToken: String,
-        refreshToken: String,
+        accessToken: String?,
+        refreshToken: String?,
         sport: String?,
         mode: String? = null,
         onBack: () -> Unit
@@ -134,11 +153,20 @@ object SportsPrefetcher {
         }
         wv.visibility = android.view.View.VISIBLE
         wv.alpha = if (networkError || !isReady(accessToken, sport)) 0f else 1f
-        wv.evaluateJavascript(buildInjectJs(accessToken, refreshToken), null)
+        if (!accessToken.isNullOrBlank()) {
+            wv.evaluateJavascript(buildInjectJs(accessToken, refreshToken.orEmpty()), null)
+        }
 
-        // Always fetch fresh Sports when opening (no stale parked page after reopen)
-        clearHistoryAfterHubLoad = true
-        loadSports(accessToken, refreshToken, sport, mode, force = true)
+        val needsReload = loadedAccess != accessToken ||
+            sportChanged(sport) ||
+            modeChanged(mode) ||
+            !pageReady ||
+            networkError ||
+            WebViewOffline.isChromeErrorUrl(wv.url.orEmpty())
+        if (needsReload) {
+            clearHistoryAfterHubLoad = true
+        }
+        loadSports(accessToken, refreshToken, sport, mode, force = needsReload)
         return isReady(accessToken, sport)
     }
 
@@ -233,6 +261,7 @@ object SportsPrefetcher {
 
     fun prepareLeave() {
         val wv = webView ?: return
+        cancelFeedPoll()
         myBetsOpen = false
         try {
             wv.alpha = 0f
@@ -282,10 +311,14 @@ object SportsPrefetcher {
     fun detach() {
         val wv = webView ?: return
         val h = holder ?: return
+        cancelFeedPoll()
         try {
             wv.alpha = 0f
             wv.visibility = android.view.View.GONE
-            wv.onPause()
+            // Keep WebView resumed while feed is still loading — onPause stops fetch/JS.
+            if (pageReady) {
+                wv.onPause()
+            }
         } catch (_: Exception) {
         }
         try {
@@ -300,6 +333,7 @@ object SportsPrefetcher {
 
     fun clear() {
         mainHandler.post {
+            cancelFeedPoll()
             try {
                 webView?.stopLoading()
                 webView?.clearCache(true)
@@ -380,9 +414,50 @@ object SportsPrefetcher {
     }
 
     private fun markOffline(view: WebView?) {
+        cancelFeedPoll()
         WebViewOffline.hideChromeErrorPage(view)
         setReady(false)
         notifyNetworkError(true)
+    }
+
+    private fun cancelFeedPoll() {
+        feedPollRunnable?.let { mainHandler.removeCallbacks(it) }
+        feedPollRunnable = null
+    }
+
+    /** Wait until match cards (or empty/error) paint — not just HTML shell. */
+    private fun waitForSportsFeed(view: WebView?, attempt: Int = 0) {
+        cancelFeedPoll()
+        if (view == null) {
+            setReady(true)
+            return
+        }
+        val runnable = Runnable {
+            try {
+                view.evaluateJavascript(FEED_POLL_JS) { result ->
+                    val done = result?.contains("done") == true || attempt >= 50
+                    if (done) {
+                        feedPollRunnable = null
+                        networkError = false
+                        notifyNetworkError(false)
+                        view.alpha = 1f
+                        setReady(true)
+                    } else if (attempt >= 50) {
+                        // Show hub even if cards are slow — matches browser "Loading…" state.
+                        feedPollRunnable = null
+                        view.alpha = 1f
+                        setReady(true)
+                    } else {
+                        waitForSportsFeed(view, attempt + 1)
+                    }
+                }
+            } catch (_: Exception) {
+                view.alpha = 1f
+                setReady(true)
+            }
+        }
+        feedPollRunnable = runnable
+        mainHandler.postDelayed(runnable, if (attempt == 0) 120L else 200L)
     }
 
     private fun buildUrl(
@@ -391,19 +466,9 @@ object SportsPrefetcher {
         sport: String?,
         mode: String?
     ): String {
-        val authJson = JSONObject()
-            .put("accessToken", accessToken.orEmpty())
-            .put("refreshToken", refreshToken.orEmpty())
-            .toString()
+        // Match the browser URL — tokens go via localStorage inject on page finish.
+        // Putting JWTs in query params can exceed WebView URL limits and block the load.
         val b = Uri.parse(Constants.SPORTS_URL).buildUpon()
-        if (!accessToken.isNullOrBlank()) {
-            b.appendQueryParameter("accessToken", accessToken)
-            b.appendQueryParameter("token", accessToken)
-        }
-        if (!refreshToken.isNullOrBlank()) {
-            b.appendQueryParameter("refreshToken", refreshToken)
-        }
-        b.appendQueryParameter("auth", authJson)
         b.appendQueryParameter("_", System.currentTimeMillis().toString())
         normalizeSport(sport)?.let { b.appendQueryParameter("sport", it) }
         val m = normalizeMode(mode)
@@ -434,6 +499,19 @@ object SportsPrefetcher {
                 localStorage.setItem("refreshToken", $refreshLit);
                 localStorage.setItem("refresh_token", $refreshLit);
                 localStorage.setItem("auth", $authLit);
+              } catch (e) {}
+            })();
+        """.trimIndent()
+    }
+
+    private fun buildFeedNudgeJs(): String {
+        return """
+            (function(){
+              try {
+                var f = document.getElementById('feed');
+                if (!f || f.querySelector('.card') || f.querySelector('.empty') || f.querySelector('.error')) return;
+                var btn = document.querySelector('.sport-tab.active');
+                if (btn) btn.click();
               } catch (e) {}
             })();
         """.trimIndent()
@@ -477,9 +555,6 @@ object SportsPrefetcher {
             setReady(false)
         }
         try {
-            if (!accessToken.isNullOrBlank()) {
-                wv.evaluateJavascript(buildInjectJs(accessToken, refreshToken.orEmpty()), null)
-            }
             if (!pageReady) {
                 wv.alpha = 0f
             }
@@ -500,9 +575,11 @@ object SportsPrefetcher {
         }
         if (webView != null) return
 
+        val defaultUa = WebSettings.getDefaultUserAgent(activity)
         val wv = WebView(activity).apply {
             layoutParams = FrameLayout.LayoutParams(1, 1)
             setBackgroundColor(Color.parseColor("#0A0A0A"))
+            settings.userAgentString = "$defaultUa GunduAtaApp/1.0"
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.databaseEnabled = true
@@ -543,12 +620,21 @@ object SportsPrefetcher {
                     }
                     val u = url.orEmpty()
                     if (u.contains("/sports") || u.contains("/cricket")) {
-                        loadedAccess?.let { access ->
+                        val access = loadedAccess
+                        if (!access.isNullOrBlank()) {
                             view?.evaluateJavascript(
                                 buildInjectJs(access, loadedRefresh.orEmpty()),
                                 null
                             )
                         }
+                        view?.evaluateJavascript(buildFeedNudgeJs(), null)
+                        // Never leave the hub invisible if feed polling stalls.
+                        mainHandler.postDelayed({
+                            try {
+                                view?.alpha = 1f
+                            } catch (_: Exception) {
+                            }
+                        }, 2500L)
                         val hub = !u.contains("view=match") && !u.contains("/sports/match")
                         if (hub && clearHistoryAfterHubLoad) {
                             clearHistoryAfterHubLoad = false
@@ -559,8 +645,7 @@ object SportsPrefetcher {
                         }
                         networkError = false
                         notifyNetworkError(false)
-                        view?.alpha = 1f
-                        setReady(true)
+                        waitForSportsFeed(view)
                     }
                 }
 
@@ -581,7 +666,11 @@ object SportsPrefetcher {
                     description: String?,
                     failingUrl: String?
                 ) {
-                    if (!failingUrl.isNullOrBlank()) {
+                    val main = view?.url.orEmpty()
+                    if (!failingUrl.isNullOrBlank() &&
+                        main.isNotBlank() &&
+                        failingUrl.equals(main, ignoreCase = true)
+                    ) {
                         markOffline(view)
                     }
                 }

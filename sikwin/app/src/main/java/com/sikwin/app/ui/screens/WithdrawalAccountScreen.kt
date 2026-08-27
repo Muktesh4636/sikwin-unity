@@ -37,14 +37,16 @@ fun WithdrawalAccountScreen(
         viewModel.clearError()
     }
 
+    val colors = rememberAppScreenColors()
+
     Scaffold(
-        containerColor = BlackBackground,
+        containerColor = colors.background,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
                         stringResource(R.string.my_withdrawal_account),
-                        color = Color(0xFFDAA520),
+                        color = colors.headerTitle,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -54,7 +56,7 @@ fun WithdrawalAccountScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                             contentDescription = "Back",
-                            tint = Color(0xFFDAA520),
+                            tint = PrimaryYellow,
                             modifier = Modifier.size(32.dp)
                         )
                     }

@@ -33,12 +33,14 @@ fun PersonalInfoScreen(
     var showEditDialog by remember { mutableStateOf<String?>(null) }
     var editValue by remember { mutableStateOf("") }
 
+    val colors = rememberAppScreenColors()
+
     if (showEditDialog != null) {
         val field = showEditDialog!!
         AlertDialog(
             onDismissRequest = { showEditDialog = null },
-            title = { Text(stringResource(R.string.edit_field, field), color = Color.White) },
-            containerColor = SurfaceColor,
+            title = { Text(stringResource(R.string.edit_field, field), color = colors.text) },
+            containerColor = colors.surface,
             text = {
                 if (field == "Gender") {
                     Column {
@@ -59,7 +61,7 @@ fun PersonalInfoScreen(
                                     colors = RadioButtonDefaults.colors(selectedColor = PrimaryYellow)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(gender, color = Color.White)
+                                Text(gender, color = colors.text)
                             }
                         }
                     }
@@ -67,14 +69,16 @@ fun PersonalInfoScreen(
                     OutlinedTextField(
                         value = editValue,
                         onValueChange = { editValue = it },
-                        label = { Text(stringResource(R.string.new_field, field), color = TextGrey) },
+                        label = { Text(stringResource(R.string.new_field, field), color = colors.textMuted) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = colors.text,
+                            unfocusedTextColor = colors.text,
                             focusedBorderColor = PrimaryYellow,
-                            unfocusedBorderColor = BorderColor
+                            unfocusedBorderColor = colors.border,
+                            focusedContainerColor = colors.surface,
+                            unfocusedContainerColor = colors.surface
                         )
                     )
                 }
@@ -110,35 +114,9 @@ fun PersonalInfoScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
     ) {
-        // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp, bottom = 8.dp)
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "Back",
-                    tint = PrimaryYellow,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            Text(
-                "My Information",
-                color = PrimaryYellow,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        AppSubScreenHeader(title = "My Information", colors = colors, onBack = onBack)
 
         Column(
             modifier = Modifier
@@ -161,7 +139,7 @@ fun PersonalInfoScreen(
                     }
                 }
                 HorizontalDivider(
-                    color = Color(0xFF2C2C2C),
+                    color = colors.border,
                     thickness = 0.5.dp,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -172,23 +150,25 @@ fun PersonalInfoScreen(
 
 @Composable
 fun InfoRow(data: InfoRowData, onClick: () -> Unit) {
+    val colors = rememberAppScreenColors()
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(colors.surface)
             .clickable(enabled = data.editable) { onClick() }
             .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = data.label,
-            color = TextGrey,
+            color = colors.textMuted,
             fontSize = 15.sp,
             modifier = Modifier.weight(1f)
         )
         
         Text(
             text = data.value,
-            color = if (data.value.isEmpty()) TextGrey else Color(0xFF8E8E8E),
+            color = if (data.value.isEmpty()) colors.textMuted else colors.text,
             fontSize = 15.sp,
             textAlign = TextAlign.End
         )
@@ -198,11 +178,11 @@ fun InfoRow(data: InfoRowData, onClick: () -> Unit) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = Color(0xFF555555),
+                tint = colors.textMuted,
                 modifier = Modifier.size(20.dp)
             )
         } else if (!data.editable) {
-             Spacer(modifier = Modifier.width(24.dp)) // Spacer to maintain alignment when no arrow and not editable
+             Spacer(modifier = Modifier.width(24.dp))
         }
     }
 }

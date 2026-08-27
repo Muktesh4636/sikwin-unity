@@ -71,7 +71,7 @@ fun DualCardsTopBar(
 
         Image(
             painter = painterResource(id = R.drawable.gundu_ata_logo_gold),
-            contentDescription = "Gundu Ata",
+            contentDescription = "Pride",
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .weight(1f)

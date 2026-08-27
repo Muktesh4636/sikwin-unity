@@ -69,15 +69,30 @@ object RetrofitClient {
         }
     }
 
+    private fun isPublicReadPath(path: String, method: String): Boolean {
+        if (method != "GET") return false
+        // These endpoints work without auth; sending an expired Bearer token returns 401.
+        return path.contains("/cricket/matches/") ||
+            path.contains("/cricket/upcoming/") ||
+            path.contains("/cricket/scores/") ||
+            path.contains("/cricket/changes/") ||
+            path.contains("/cricket/live-events/") ||
+            path.contains("/cricket/pre-events/")
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
         .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
         .addInterceptor(logging)
         .addInterceptor { chain ->
-            val requestBuilder = chain.request().newBuilder()
-            sessionManager?.fetchAuthToken()?.let {
-                requestBuilder.addHeader("Authorization", "Bearer $it")
+            val request = chain.request()
+            val path = request.url.encodedPath
+            val requestBuilder = request.newBuilder()
+            if (!isPublicReadPath(path, request.method)) {
+                sessionManager?.fetchAuthToken()?.let {
+                    requestBuilder.addHeader("Authorization", "Bearer $it")
+                }
             }
             val resp = chain.proceed(requestBuilder.build())
             // Report API failures (except telemetry itself) so we can fix production issues.

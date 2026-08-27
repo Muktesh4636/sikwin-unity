@@ -93,7 +93,7 @@ fun GunduAtaWebViewScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        "Gundu Ata uses your real wallet.\nPlease sign in to continue.",
+                        "Pride uses your real wallet.\nPlease sign in to continue.",
                         color = TextGrey,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
@@ -221,7 +221,7 @@ private fun GunduAtaPreloadedWebView(
                     modifier = Modifier.size(44.dp)
                 )
                 Spacer(modifier = Modifier.height(14.dp))
-                Text("Loading Gundu Ata…", color = TextGrey, fontSize = 14.sp)
+                Text("Loading Pride…", color = TextGrey, fontSize = 14.sp)
             }
         }
 

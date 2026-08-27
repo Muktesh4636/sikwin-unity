@@ -321,7 +321,6 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                 cricketMatchesError = if (list.isEmpty()) "No live matches right now." else null
                 true
             } else {
-                logoutIfUnauthorized(resp.code())
                 val err = resp.errorBody()?.string()
                 if (cricketMatches.isEmpty()) cricketMatchesError = parseError(err)
                 false
@@ -363,9 +362,9 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                 }
                 true
             } else {
-                logoutIfUnauthorized(resp.code())
                 val err = resp.errorBody()?.string()
                 if (cricketUpcoming.isEmpty()) cricketUpcomingError = parseError(err)
+                // Public cricket reads should not log the user out on stale tokens.
                 false
             }
         } catch (e: Exception) {
@@ -396,7 +395,6 @@ class GunduAtaViewModel(private val sessionManager: SessionManager) : ViewModel(
                 // Rewriting the matches list every poll was causing scroll jank.
                 true
             } else {
-                logoutIfUnauthorized(resp.code())
                 val err = resp.errorBody()?.string()
                 if (cricketScore == null) cricketScoreError = parseError(err)
                 false

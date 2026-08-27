@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -25,13 +26,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,7 +47,7 @@ fun ThemeScreen(onBack: () -> Unit) {
     val activity = context as? Activity
     val themePrefs = remember { ThemePreferences(context) }
     val bannerPrefs = remember { BannerPreferences(context) }
-    var selected by remember { mutableStateOf(themePrefs.getAppTheme()) }
+    var selected by remember { mutableStateOf(themePrefs.pickerThemeId()) }
     var bannerRevision by remember { mutableIntStateOf(0) }
     val hasCustomBanner = remember(bannerRevision) { bannerPrefs.hasCustomLiveCasinoBanner() }
 
@@ -72,36 +71,18 @@ fun ThemeScreen(onBack: () -> Unit) {
         activity?.recreate()
     }
 
+    val colors = rememberAppScreenColors()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(16.dp)
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = TextWhite,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Text(
-                stringResource(R.string.themes),
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
+        AppSubScreenHeader(
+            title = stringResource(R.string.themes),
+            colors = colors,
+            onBack = onBack
+        )
 
         Column(
             modifier = Modifier
@@ -210,8 +191,8 @@ fun ThemeScreen(onBack: () -> Unit) {
             )
 
             ThemeOptionCard(
-                title = stringResource(R.string.theme_dual_cards_title),
-                subtitle = stringResource(R.string.theme_dual_cards_subtitle),
+                title = stringResource(R.string.theme_dark_title),
+                subtitle = stringResource(R.string.theme_dark_subtitle),
                 selected = selected == ThemePreferences.THEME_DUAL_CARDS,
                 onClick = { applyTheme(ThemePreferences.THEME_DUAL_CARDS) }
             ) {
@@ -224,75 +205,17 @@ fun ThemeScreen(onBack: () -> Unit) {
             }
 
             ThemeOptionCard(
-                title = stringResource(R.string.theme_hero_title),
-                subtitle = stringResource(R.string.theme_hero_subtitle),
-                selected = selected == ThemePreferences.THEME_HERO,
-                onClick = { applyTheme(ThemePreferences.THEME_HERO) }
+                title = stringResource(R.string.theme_white_title),
+                subtitle = stringResource(R.string.theme_white_subtitle),
+                selected = selected == ThemePreferences.THEME_WHITE,
+                onClick = { applyTheme(ThemePreferences.THEME_WHITE) }
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.hero_theme_preview),
+                    painter = painterResource(id = R.drawable.theme_white_preview),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-            }
-
-            ThemeOptionCard(
-                title = stringResource(R.string.theme_classic_title),
-                subtitle = stringResource(R.string.theme_classic_subtitle),
-                selected = selected == ThemePreferences.THEME_CLASSIC,
-                onClick = { applyTheme(ThemePreferences.THEME_CLASSIC) }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(BlackBackground)
-                        .padding(10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "GUNDU ATA",
-                            color = PrimaryYellow,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Serif
-                        )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(SurfaceColor)
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) {
-                            Text("₹ ---", color = TextWhite, fontSize = 9.sp)
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFF1565C0), Color(0xFF0D47A1))
-                                )
-                            )
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.55f)
-                            .height(70.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF1565C0)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("HOT GAMES", color = PrimaryYellow, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
         }
     }

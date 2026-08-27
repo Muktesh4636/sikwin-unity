@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">PG Management</string>
+    <string name="app_name">Pride</string>
     
     <!-- Notifications -->
     <string name="default_notification_channel_id">gundu_ata_notifications</string>
-    <string name="notification_channel_name">PG Management</string>
+    <string name="notification_channel_name">Pride</string>
     <string name="notification_channel_description">Game updates, round alerts, and promotions</string>
     
     <!-- Common -->
@@ -39,6 +39,16 @@
     <string name="theme_hero_subtitle">Live casino banner, categories &amp; daily prizes bottom bar</string>
     <string name="theme_classic_title">Old Theme — Classic</string>
     <string name="theme_classic_subtitle">Current home layout with Hot Games card</string>
+    <string name="theme_dark_title">Dark Theme</string>
+    <string name="theme_dark_subtitle">Current black &amp; gold home with live casino banners</string>
+    <string name="theme_white_title">White Theme</string>
+    <string name="theme_white_subtitle">White background with live odds, casino games &amp; quick bet</string>
+    <string name="white_featured_match">Featured Match</string>
+    <string name="white_upcoming_matches">Upcoming Matches</string>
+    <string name="white_no_upcoming">No upcoming matches right now.</string>
+    <string name="white_quick_bet">Quick Bet</string>
+    <string name="white_custom">Custom</string>
+    <string name="white_casino_section">Casino</string>
     <string name="live_casino_banner_title">Live Casino Banner</string>
     <string name="live_casino_banner_subtitle">Photo shown at the top LIVE CASINO place (Dual Cards &amp; Hero themes)</string>
     <string name="add_banner">Add Banner</string>
@@ -50,11 +60,11 @@
     <string name="help_center">Help center</string>
     <string name="refer_a_friend">Refer a Friend</string>
     <string name="white_label_account">Get Franchise with us</string>
-    <string name="become_partner_banner_subtitle">Get Gundu Ata franchise at 50%% off — Get in touch today!</string>
+    <string name="become_partner_banner_subtitle">Get Pride franchise at 50%% off — Get in touch today!</string>
     <string name="install_apk">Install APK</string>
     <string name="install_apk_subtitle">Download and install the latest version</string>
     <string name="white_label_account_title">Get Franchise with us</string>
-    <string name="white_label_account_subtitle">Get Gundu Ata franchise at 50%% discount. Enter your details below and we\'ll get in touch.</string>
+    <string name="white_label_account_subtitle">Get Pride franchise at 50%% discount. Enter your details below and we\'ll get in touch.</string>
     <string name="white_label_name">Name</string>
     <string name="white_label_name_placeholder">Enter your name</string>
     <string name="white_label_email">Email</string>
@@ -87,9 +97,9 @@
     
     <!-- Auth -->
     <string name="sign_in_required">Sign In Required</string>
-    <string name="sign_in_required_message">Please sign in or sign up to play Gundu Ata and start winning!</string>
+    <string name="sign_in_required_message">Please sign in or sign up to play Pride and start winning!</string>
     <string name="login_required">Login Required</string>
-    <string name="login_required_message">Please sign up to access the Gundu Ata game and start winning!</string>
+    <string name="login_required_message">Please sign up to access the Pride game and start winning!</string>
     <string name="welcome_back">Welcome back</string>
     <string name="login_subtitle">Please enter your username and password to log in</string>
     <string name="phone_number">Phone Number</string>
@@ -100,7 +110,7 @@
     <string name="save_password">Save password for quick login</string>
     <string name="login_with_saved_account">Login with saved account</string>
     <string name="forgot_password">Forgot password</string>
-    <string name="welcome_to_gundu_ata">Welcome to Gundu Ata</string>
+    <string name="welcome_to_gundu_ata">Welcome to Pride</string>
     <string name="enter_username">Please enter your username</string>
     <string name="enter_otp">Enter 4-digit OTP</string>
     <string name="enter_referral_code">Please enter referral code</string>
@@ -209,7 +219,7 @@
     <string name="add_bank_account_button">add bank account number</string>
     <string name="not_default">Not default</string>
     <string name="game_guidelines_title">Game Guidelines</string>
-    <string name="how_to_play">How to Play Gundu Ata</string>
+    <string name="how_to_play">How to Play Pride</string>
     <string name="learn_rules">Learn the rules and strategies to win big!</string>
     <string name="help_center_title">Help Center</string>
     <string name="need_help">Need Help?</string>
@@ -244,7 +254,7 @@
     <!-- Game Guidelines -->
     <string name="game_rules">Game Rules</string>
     <string name="dice_game_basics">Dice Game Basics</string>
-    <string name="dice_game_basics_desc">Gundu Ata is a dice game where 6 dice are rolled. You bet on numbers 1-6 that you think will appear.</string>
+    <string name="dice_game_basics_desc">Pride is a dice game where 6 dice are rolled. You bet on numbers 1-6 that you think will appear.</string>
     <string name="winning_conditions">Winning Conditions</string>
     <string name="winning_conditions_desc">Any number appearing 2 or more times is a winner. Your profit equals bet × frequency (e.g., if a number appears 3 times, profit is 3× your bet).</string>
     <string name="payout_calculation">Payout Calculation</string>

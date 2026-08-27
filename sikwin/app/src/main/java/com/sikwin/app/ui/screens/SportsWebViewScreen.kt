@@ -99,30 +99,21 @@ fun SportsWebViewScreen(
             .statusBarsPadding()
     ) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                accessToken.isNullOrBlank() -> {
-                    SportsLoginRequired(
-                        onLogin = {
-                            closeScreen()
-                            onRequireLogin()
-                        },
-                        onBack = { closeScreen() }
-                    )
+            SportsPreloadedWebView(
+                accessToken = accessToken,
+                refreshToken = refreshToken.orEmpty(),
+                sport = sport,
+                mode = when (selectedTab) {
+                    SportsNavTab.UPCOMING -> "upcoming"
+                    SportsNavTab.MY_BETS -> "bets"
+                    else -> "live"
+                },
+                modifier = Modifier.fillMaxSize(),
+                onRequireLogin = {
+                    closeScreen()
+                    onRequireLogin()
                 }
-                else -> {
-                    SportsPreloadedWebView(
-                        accessToken = accessToken,
-                        refreshToken = refreshToken.orEmpty(),
-                        sport = sport,
-                        mode = when (selectedTab) {
-                            SportsNavTab.UPCOMING -> "upcoming"
-                            SportsNavTab.MY_BETS -> "bets"
-                            else -> "live"
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
+            )
         }
 
         SportsBottomBar(
@@ -229,7 +220,7 @@ private fun SportsLoginRequired(onLogin: () -> Unit, onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                "Sports uses your real Gundu wallet.\nPlease sign in to continue.",
+                "Sports uses your real Pride wallet.\nPlease sign in to continue.",
                 color = TextGrey,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
@@ -254,13 +245,18 @@ private fun SportsLoginRequired(onLogin: () -> Unit, onBack: () -> Unit) {
 
 @Composable
 private fun SportsPreloadedWebView(
-    accessToken: String,
+    accessToken: String?,
     refreshToken: String,
     sport: String?,
     mode: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRequireLogin: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    if (mode == "bets" && accessToken.isNullOrBlank()) {
+        SportsLoginRequired(onLogin = onRequireLogin, onBack = onRequireLogin)
+        return
+    }
     // Once the hub has painted once, never re-show the overlay spinner on top of matches.
     var showLoading by remember {
         mutableStateOf(!SportsPrefetcher.isReady(accessToken, sport) && !SportsPrefetcher.hasNetworkError())

@@ -23,9 +23,9 @@ android {
         gunduata {
             dimension "franchise"
             applicationId "cloud.pgms.app"
-            versionCode 118
-            versionName "1.2.118"
-            resValue "string", "app_name", "PG Management"
+            versionCode 120
+            versionName "1.2.120"
+            resValue "string", "app_name", "Pride"
             archivesBaseName = "PGManagement"
             // TEMP false: Unity/Gundu Ata game binaries excluded from APK. Set true when restoring :unityLibrary.
             buildConfigField "boolean", "HAS_UNITY", "false"

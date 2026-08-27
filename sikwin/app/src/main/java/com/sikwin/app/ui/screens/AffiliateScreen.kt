@@ -33,16 +33,22 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.sikwin.app.R
+import com.sikwin.app.ui.theme.BlackBackground
+import com.sikwin.app.ui.theme.BorderColor
+import com.sikwin.app.ui.theme.GoldOnWhite
+import com.sikwin.app.ui.theme.GreenSuccess
+import com.sikwin.app.ui.theme.PrimaryYellow
+import com.sikwin.app.ui.theme.SurfaceColor
+import com.sikwin.app.ui.theme.AppSubScreenHeader
+import com.sikwin.app.ui.theme.rememberAppScreenColors
 import com.sikwin.app.ui.viewmodels.GunduAtaViewModel
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.sikwin.app.ui.theme.*
 import android.content.Intent
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** Commission tier rates by lifetime referral count (matches backend). */
 private data class CommissionTierRow(val minRefs: Int, val maxRefs: Int?, val rateLabel: String)
@@ -54,6 +60,9 @@ private val COMMISSION_TIER_ROWS = listOf(
     CommissionTierRow(51, 100, "6%"),
     CommissionTierRow(101, null, "8%"),
 )
+
+private val AffiliateCodeBoxDark = Color(0xFF1A1A1A).copy(alpha = 0.5f)
+private val AffiliateCodeBoxLight = Color(0xFFF3F4F6)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,33 +85,20 @@ fun AffiliateScreen(
         ?: viewModel.userProfile?.referral_code
         ?: viewModel.savedReferralCode
         ?: ""
+    val colors = rememberAppScreenColors()
+    val accent = colors.accent
+    val cardSurface = if (colors.isWhite) colors.surface else SurfaceColor
+    val codeBoxBg = if (colors.isWhite) AffiliateCodeBoxLight else AffiliateCodeBoxDark
     
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
     ) {
-        TopAppBar(
-            title = {
-                Text(
-                    stringResource(R.string.refer_earn_title),
-                    color = TextWhite,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = TextWhite
-                    )
-                }
-            },
-            colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                containerColor = BlackBackground
-            )
+        AppSubScreenHeader(
+            title = stringResource(R.string.refer_earn_title),
+            colors = colors,
+            onBack = onBack
         )
         
         Column(
@@ -110,14 +106,17 @@ fun AffiliateScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // New Stylish Hero Section with Gradient
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = listOf(PrimaryYellow.copy(alpha = 0.3f), BlackBackground)
+                            colors = if (colors.isWhite) {
+                                listOf(PrimaryYellow.copy(alpha = 0.22f), colors.background)
+                            } else {
+                                listOf(PrimaryYellow.copy(alpha = 0.3f), BlackBackground)
+                            }
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -126,13 +125,13 @@ fun AffiliateScreen(
                     Icon(
                         imageVector = Icons.Filled.CardGiftcard,
                         contentDescription = null,
-                        tint = PrimaryYellow,
+                        tint = accent,
                         modifier = Modifier.size(80.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         stringResource(R.string.invite_friends_win),
-                        color = TextWhite,
+                        color = colors.text,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
@@ -140,14 +139,14 @@ fun AffiliateScreen(
             }
 
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                // Stylish Referral Code Card
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-30).dp),
                     shape = RoundedCornerShape(16.dp),
-                    color = SurfaceColor,
-                    shadowElevation = 8.dp
+                    color = cardSurface,
+                    shadowElevation = if (colors.isWhite) 2.dp else 8.dp,
+                    border = colors.listItemBorder
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -155,7 +154,7 @@ fun AffiliateScreen(
                     ) {
                         Text(
                             stringResource(R.string.your_referral_code),
-                            color = TextGrey,
+                            color = colors.textMuted,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
@@ -167,7 +166,7 @@ fun AffiliateScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(BlackBackground.copy(alpha = 0.5f))
+                                .background(codeBoxBg)
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                                 .clickable(enabled = referralCode.isNotEmpty()) {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -184,7 +183,7 @@ fun AffiliateScreen(
                             ) {
                                 Text(
                                     text = referralCode,
-                                    color = PrimaryYellow,
+                                    color = accent,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = 1.sp,
@@ -192,7 +191,7 @@ fun AffiliateScreen(
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Icon(Icons.Default.ContentCopy, null, tint = PrimaryYellow, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.ContentCopy, null, tint = accent, modifier = Modifier.size(18.dp))
                         }
                         
                         Spacer(modifier = Modifier.height(20.dp))
@@ -204,7 +203,7 @@ fun AffiliateScreen(
                             Button(
                                 enabled = referralCode.isNotEmpty(),
                                 onClick = {
-                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.tech/signup?ref=$referralCode"
+                                    val shareMessage = "🎲 Join me on Pride and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.tech/signup?ref=$referralCode"
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)
@@ -232,7 +231,7 @@ fun AffiliateScreen(
                             Button(
                                 enabled = referralCode.isNotEmpty(),
                                 onClick = {
-                                    val shareMessage = "🎲 Join me on Gundu Ata and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.tech/signup?ref=$referralCode"
+                                    val shareMessage = "🎲 Join me on Pride and win big!\n\nUse my referral code: $referralCode\n\nDownload now: https://gunduata.tech/signup?ref=$referralCode"
                                     val genericIntent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, shareMessage)
@@ -254,7 +253,7 @@ fun AffiliateScreen(
                 // How it works (at top, under referral code)
                 Text(
                     stringResource(R.string.how_it_works),
-                    color = TextWhite,
+                    color = colors.text,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp
@@ -263,7 +262,8 @@ fun AffiliateScreen(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = SurfaceColor
+                    color = cardSurface,
+                    border = colors.listItemBorder
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         StepItem("1", stringResource(R.string.step_share_code))
@@ -276,17 +276,16 @@ fun AffiliateScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     stringResource(R.string.referral_commission_note),
-                    color = TextGrey,
+                    color = colors.textMuted,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Daily commission tiers
                 Text(
                     stringResource(R.string.daily_commission_tiers),
-                    color = TextWhite,
+                    color = colors.text,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp
@@ -302,15 +301,15 @@ fun AffiliateScreen(
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     shape = RoundedCornerShape(16.dp),
-                    color = SurfaceColor,
-                    border = BorderStroke(1.dp, PrimaryYellow.copy(alpha = 0.5f))
+                    color = cardSurface,
+                    border = BorderStroke(1.dp, accent.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(stringResource(R.string.your_commission_rate), color = TextGrey, fontSize = 12.sp)
-                        Text(currentRate, color = PrimaryYellow, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                        Text(stringResource(R.string.your_commission_rate), color = colors.textMuted, fontSize = 12.sp)
+                        Text(currentRate, color = accent, fontSize = 28.sp, fontWeight = FontWeight.Black)
                         Text(
                             stringResource(R.string.commission_on_referee_loss),
-                            color = TextWhite,
+                            color = colors.text,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 6.dp)
                         )
@@ -408,7 +407,7 @@ fun AffiliateScreen(
                         value = "₹${referralData?.total_earnings ?: "0"}",
                         icon = Icons.Filled.AccountBalanceWallet,
                         modifier = Modifier.fillMaxWidth(),
-                        color = PrimaryYellow
+                        color = accent
                     )
                 }
 
@@ -421,7 +420,7 @@ fun AffiliateScreen(
 
                     Text(
                         stringResource(R.string.my_referrals),
-                        color = TextWhite,
+                        color = colors.text,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp
@@ -430,7 +429,8 @@ fun AffiliateScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        color = SurfaceColor
+                        color = cardSurface,
+                        border = colors.listItemBorder
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             displayedReferrals.forEachIndexed { index, ref ->
@@ -448,7 +448,7 @@ fun AffiliateScreen(
                                     onClick = { showAllReferrals = true },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text(stringResource(R.string.view_all_more, referralsList.size - 3), color = PrimaryYellow, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.view_all_more, referralsList.size - 3), color = accent, fontWeight = FontWeight.Bold)
                                 }
                             } else if (hasMore && showAllReferrals) {
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -456,7 +456,7 @@ fun AffiliateScreen(
                                     onClick = { showAllReferrals = false },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text(stringResource(R.string.view_less), color = PrimaryYellow, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.view_less), color = accent, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -471,11 +471,13 @@ fun AffiliateScreen(
 
 @Composable
 fun CommissionTierCard(label: String, rate: String, active: Boolean) {
+    val colors = rememberAppScreenColors()
+    val accent = colors.accent
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = if (active) PrimaryYellow.copy(alpha = 0.12f) else SurfaceColor,
-        border = BorderStroke(1.dp, if (active) PrimaryYellow else BorderColor)
+        color = if (active) accent.copy(alpha = 0.12f) else colors.surface,
+        border = BorderStroke(1.dp, if (active) accent else colors.border)
     ) {
         Row(
             modifier = Modifier
@@ -484,14 +486,15 @@ fun CommissionTierCard(label: String, rate: String, active: Boolean) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, color = TextWhite, fontSize = 14.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
-            Text(rate, color = if (active) PrimaryYellow else TextGrey, fontSize = 16.sp, fontWeight = FontWeight.Black)
+            Text(label, color = colors.text, fontSize = 14.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+            Text(rate, color = if (active) accent else colors.textMuted, fontSize = 16.sp, fontWeight = FontWeight.Black)
         }
     }
 }
 
 @Composable
 fun StepItem(number: String, text: String) {
+    val colors = rememberAppScreenColors()
     Row(verticalAlignment = Alignment.CenterVertically) {
         Surface(
             modifier = Modifier.size(28.dp),
@@ -503,7 +506,7 @@ fun StepItem(number: String, text: String) {
             }
         }
         Spacer(modifier = Modifier.width(16.dp))
-        Text(text, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(text, color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -524,12 +527,15 @@ fun StatCard(
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier,
-    color: Color = PrimaryYellow
+    color: Color = GoldOnWhite
 ) {
+    val colors = rememberAppScreenColors()
+    val accent = if (color == GoldOnWhite) colors.accent else color
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = SurfaceColor
+        color = colors.surface,
+        border = colors.listItemBorder
     ) {
         Column(
             modifier = Modifier
@@ -540,7 +546,7 @@ fun StatCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = color,
+                tint = accent,
                 modifier = Modifier.size(32.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -553,7 +559,7 @@ fun StatCard(
             ) {
                 Text(
                     value,
-                    color = TextWhite,
+                    color = colors.text,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
@@ -561,7 +567,7 @@ fun StatCard(
             }
             Text(
                 title,
-                color = TextGrey,
+                color = colors.textMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -587,17 +593,19 @@ fun MilestoneCard(
         label != null -> label
         else -> "$count Referrals"
     }
+    val colors = rememberAppScreenColors()
+    val accent = colors.accent
     val highlightGreen = celebrateFirstMilestone && achieved
     val borderColor = when {
         highlightGreen -> GreenSuccess
-        achieved -> PrimaryYellow
-        else -> BorderColor
+        achieved -> accent
+        else -> colors.border
     }
     val borderWidth = if (achieved || highlightGreen) 2.dp else 1.dp
     val bgColor = when {
         highlightGreen -> GreenSuccess.copy(alpha = 0.12f)
-        achieved -> PrimaryYellow.copy(alpha = 0.1f)
-        else -> SurfaceColor
+        achieved -> accent.copy(alpha = 0.1f)
+        else -> colors.surface
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -626,10 +634,10 @@ fun MilestoneCard(
                             modifier = Modifier.size(44.dp),
                             color = when {
                                 highlightGreen -> GreenSuccess
-                                achieved -> PrimaryYellow
-                                else -> PrimaryYellow.copy(alpha = 0.6f)
+                                achieved -> accent
+                                else -> accent.copy(alpha = 0.6f)
                             },
-                            trackColor = Color.DarkGray,
+                            trackColor = if (colors.isWhite) Color(0xFFE5E7EB) else Color.DarkGray,
                             strokeWidth = 4.dp
                         )
                         if (achieved) {
@@ -642,7 +650,7 @@ fun MilestoneCard(
                         } else {
                             Text(
                                 "$progressCurrent/$target",
-                                color = TextWhite,
+                                color = colors.text,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -656,8 +664,8 @@ fun MilestoneCard(
                             resolvedLabel,
                             color = when {
                                 highlightGreen -> GreenSuccess
-                                achieved -> PrimaryYellow
-                                else -> TextWhite
+                                achieved -> accent
+                                else -> colors.text
                             },
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
@@ -668,7 +676,7 @@ fun MilestoneCard(
                                 achieved -> stringResource(R.string.achieved)
                                 else -> "$progressCurrent / $target"
                             },
-                            color = if (highlightGreen) GreenSuccess.copy(alpha = 0.9f) else TextGrey,
+                            color = if (highlightGreen) GreenSuccess.copy(alpha = 0.9f) else colors.textMuted,
                             fontSize = 12.sp,
                             fontWeight = if (highlightGreen) FontWeight.SemiBold else FontWeight.Normal
                         )
@@ -677,7 +685,7 @@ fun MilestoneCard(
 
                 Text(
                     text = bonusDisplay ?: "₹$bonus",
-                    color = if (highlightGreen) GreenSuccess else if (achieved) PrimaryYellow else TextGrey,
+                    color = if (highlightGreen) GreenSuccess else if (achieved) accent else colors.textMuted,
                     fontSize = if (bonusDisplay != null) 14.sp else 20.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -691,11 +699,14 @@ fun ReferralListItem(
     username: String,
     hasDeposit: Boolean
 ) {
+    val colors = rememberAppScreenColors()
+    val accent = colors.accent
+    val rowBg = if (colors.isWhite) AffiliateCodeBoxLight else AffiliateCodeBoxDark
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(BlackBackground.copy(alpha = 0.5f))
+            .background(rowBg)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -704,13 +715,13 @@ fun ReferralListItem(
             Surface(
                 modifier = Modifier.size(36.dp),
                 shape = CircleShape,
-                color = PrimaryYellow.copy(alpha = 0.3f)
+                color = accent.copy(alpha = 0.3f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Filled.Person,
                         contentDescription = null,
-                        tint = PrimaryYellow,
+                        tint = accent,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -718,7 +729,7 @@ fun ReferralListItem(
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = username,
-                color = TextWhite,
+                color = colors.text,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -742,13 +753,14 @@ fun ReferralListItem(
 
 @Composable
 fun BonusRuleItem(tier: String, bonus: String) {
+    val colors = rememberAppScreenColors()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(tier, color = TextGrey, fontSize = 14.sp)
-        Text(bonus, color = PrimaryYellow, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(tier, color = colors.textMuted, fontSize = 14.sp)
+        Text(bonus, color = colors.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }

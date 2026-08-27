@@ -18,6 +18,9 @@ class ThemePreferences(context: Context) {
 
         /** Exact Dual Cards mock (Variant 7) — banners unchanged */
         const val THEME_DUAL_CARDS = "dual_cards"
+
+        /** White background home — live odds, casino grid, quick bet */
+        const val THEME_WHITE = "white"
     }
 
     fun setAppTheme(themeId: String) {
@@ -28,7 +31,17 @@ class ThemePreferences(context: Context) {
         return prefs.getString(KEY_APP_THEME, THEME_DUAL_CARDS) ?: THEME_DUAL_CARDS
     }
 
+    /** Dark / current default home (dual cards). Hero & classic map here for display. */
+    fun isDarkTheme(): Boolean = getAppTheme() != THEME_WHITE
+
     fun isHeroTheme(): Boolean = getAppTheme() == THEME_HERO
 
-    fun isDualCardsTheme(): Boolean = getAppTheme() == THEME_DUAL_CARDS
+    fun isDualCardsTheme(): Boolean =
+        getAppTheme() == THEME_DUAL_CARDS || getAppTheme() == THEME_HERO || getAppTheme() == THEME_CLASSIC
+
+    fun isWhiteTheme(): Boolean = getAppTheme() == THEME_WHITE
+
+    /** Theme picker shows only dark vs white. */
+    fun pickerThemeId(): String =
+        if (getAppTheme() == THEME_WHITE) THEME_WHITE else THEME_DUAL_CARDS
 }

@@ -2,6 +2,7 @@ package com.sikwin.app.ui.screens
 
 import android.app.Activity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -43,40 +44,22 @@ fun LanguageScreen(
         LanguageOption("hi", stringResource(R.string.lang_name_hindi))
     )
 
+    val colors = rememberAppScreenColors()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
+            .background(colors.background)
     ) {
-        // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = TextWhite,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Text(
-                stringResource(R.string.languages),
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
+        AppSubScreenHeader(
+            title = stringResource(R.string.languages),
+            colors = colors,
+            onBack = onBack
+        )
 
         Text(
             stringResource(R.string.choose_language),
-            color = TextGrey,
+            color = colors.textMuted,
             fontSize = 14.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
@@ -87,7 +70,8 @@ fun LanguageScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(SurfaceColor)
+                .background(colors.surface)
+                .border(1.dp, colors.border, RoundedCornerShape(12.dp))
         ) {
             languages.forEach { option ->
                 val isSelected = currentLocale == option.tag
@@ -104,7 +88,7 @@ fun LanguageScreen(
                 ) {
                     Text(
                         option.displayName,
-                        color = TextWhite,
+                        color = colors.text,
                         fontSize = 16.sp,
                         modifier = Modifier.weight(1f)
                     )

@@ -170,7 +170,7 @@ fun AppNavigation(
             text = { 
                 Column {
                     Text(
-                        "A new version of Gundu Ata is available.",
+                        "A new version of Pride is available.",
                         color = com.sikwin.app.ui.theme.TextWhite,
                         fontSize = 16.sp
                     )
@@ -298,7 +298,7 @@ fun AppNavigation(
         if (!com.sikwin.app.BuildConfig.HAS_UNITY) {
             Toast.makeText(
                 context,
-                "Gundu Ata Unity is temporarily unavailable. Try Live or Casino games.",
+                "Pride Unity is temporarily unavailable. Try Live or Casino games.",
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -367,7 +367,7 @@ fun AppNavigation(
             val msg = if (e.message?.contains("storage", ignoreCase = true) == true || freeSpaceMb < 500) {
                 "Not enough storage. Free up space (Settings > Storage) and try again."
             } else {
-                "Unable to open Gundu Ata. Please try again."
+                "Unable to open Pride. Please try again."
             }
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }

@@ -55,27 +55,29 @@ fun TransactionHistoryScreen(
     val dateRangePickerState = rememberDateRangePickerState()
     var showDatePicker by remember { mutableStateOf(false) }
 
+    val colors = rememberAppScreenColors()
+
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(R.string.ok), color = PrimaryYellow)
+                    Text(stringResource(R.string.ok), color = colors.accent)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(R.string.cancel), color = TextGrey)
+                    Text(stringResource(R.string.cancel), color = colors.textMuted)
                 }
             },
             colors = DatePickerDefaults.colors(
-                containerColor = SurfaceColor,
+                containerColor = colors.surface,
             )
         ) {
             DateRangePicker(
                 state = dateRangePickerState,
                 colors = DatePickerDefaults.colors(
-                    containerColor = SurfaceColor,
+                    containerColor = colors.surface,
                 )
             )
         }
@@ -92,30 +94,9 @@ fun TransactionHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BlackBackground)
-            .statusBarsPadding()
+            .background(colors.background)
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = PrimaryYellow, modifier = Modifier.size(32.dp))
-            }
-            Text(
-                title,
-                color = PrimaryYellow,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-            // Functionality for this icon can be added later or removed if not needed
-            Icon(Icons.Default.FilterList, null, tint = Color.Transparent, modifier = Modifier.size(28.dp))
-        }
+        AppSubScreenHeader(title = title, colors = colors, onBack = onBack)
 
         // Main Category Tabs
         if (showTabs) {
@@ -126,7 +107,7 @@ fun TransactionHistoryScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 categories.forEach { category ->
-                    HistoryTab(category, selectedCategory == category) {
+                    HistoryTab(category, selectedCategory == category, colors) {
                         selectedCategory = category
                         selectedFilter = "All" // Reset filter when changing category
                     }
@@ -152,13 +133,13 @@ fun TransactionHistoryScreen(
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = PrimaryYellow,
                             selectedLabelColor = BlackBackground,
-                            containerColor = SurfaceColor,
-                            labelColor = TextGrey
+                            containerColor = colors.chipUnselected,
+                            labelColor = colors.textMuted
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
                             selected = selectedFilter == filter,
-                            borderColor = if (selectedFilter == filter) PrimaryYellow else TextGrey
+                            borderColor = if (selectedFilter == filter) colors.accent else colors.border
                         )
                     )
                 }
@@ -234,14 +215,14 @@ fun TransactionHistoryScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.End
         ) {
-            Text(stringResource(R.string.summary), color = TextWhite, fontSize = 14.sp)
+            Text(stringResource(R.string.summary), color = colors.text, fontSize = 14.sp)
             Text("$itemsCount", color = GreenSuccess, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
 
         // List Content
         if (viewModel.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = PrimaryYellow)
+                CircularProgressIndicator(color = colors.accent)
             }
         } else if (itemsCount > 0) {
             LazyColumn(
@@ -286,7 +267,7 @@ fun TransactionHistoryScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(stringResource(R.string.no_data_available), color = TextGrey, fontSize = 16.sp)
+                Text(stringResource(R.string.no_data_available), color = colors.textMuted, fontSize = 16.sp)
             }
         }
     }
@@ -294,11 +275,13 @@ fun TransactionHistoryScreen(
 
 @Composable
 fun DepositItem(dep: DepositRequest) {
+    val colors = rememberAppScreenColors()
     val isRejected = dep.status == "REJECTED"
     val hasRejectionNote = !dep.admin_note.isNullOrBlank()
     Surface(
-        color = SurfaceColor,
+        color = colors.surface,
         shape = RoundedCornerShape(8.dp),
+        border = colors.listItemBorder,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -310,15 +293,15 @@ fun DepositItem(dep: DepositRequest) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "Deposit #${dep.id} (${dep.status})",
-                        color = if (isRejected) Color.Red else TextWhite,
+                        color = if (isRejected) Color.Red else colors.text,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(dep.created_at, color = TextGrey, fontSize = 12.sp)
+                    Text(dep.created_at, color = colors.textMuted, fontSize = 12.sp)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = "₹ ${dep.amount}",
-                    color = PrimaryYellow,
+                    color = colors.accent,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.widthIn(min = 80.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.End
@@ -328,7 +311,7 @@ fun DepositItem(dep: DepositRequest) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = dep.admin_note!!,
-                    color = TextGrey,
+                    color = colors.textMuted,
                     fontSize = 13.sp,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -339,11 +322,13 @@ fun DepositItem(dep: DepositRequest) {
 
 @Composable
 fun WithdrawItem(wd: WithdrawRequest) {
+    val colors = rememberAppScreenColors()
     val isRejected = wd.status == "REJECTED"
     val hasRejectionNote = !wd.admin_note.isNullOrBlank()
     Surface(
-        color = SurfaceColor,
+        color = colors.surface,
         shape = RoundedCornerShape(8.dp),
+        border = colors.listItemBorder,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -355,15 +340,15 @@ fun WithdrawItem(wd: WithdrawRequest) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "Withdrawal #${wd.id} (${wd.status})",
-                        color = if (isRejected) Color.Red else TextWhite,
+                        color = if (isRejected) Color.Red else colors.text,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(wd.created_at, color = TextGrey, fontSize = 12.sp)
+                    Text(wd.created_at, color = colors.textMuted, fontSize = 12.sp)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = "₹ ${wd.amount}",
-                    color = PrimaryYellow,
+                    color = colors.accent,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.widthIn(min = 80.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.End
@@ -373,7 +358,7 @@ fun WithdrawItem(wd: WithdrawRequest) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = wd.admin_note!!,
-                    color = TextGrey,
+                    color = colors.textMuted,
                     fontSize = 13.sp,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -384,9 +369,11 @@ fun WithdrawItem(wd: WithdrawRequest) {
 
 @Composable
 fun TransactionItem(title: String, amount: String, date: String) {
+    val colors = rememberAppScreenColors()
     Surface(
-        color = SurfaceColor,
+        color = colors.surface,
         shape = RoundedCornerShape(8.dp),
+        border = colors.listItemBorder,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -395,13 +382,13 @@ fun TransactionItem(title: String, amount: String, date: String) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = TextWhite, fontWeight = FontWeight.Bold)
-                Text(date, color = TextGrey, fontSize = 12.sp)
+                Text(title, color = colors.text, fontWeight = FontWeight.Bold)
+                Text(date, color = colors.textMuted, fontSize = 12.sp)
             }
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = "₹ $amount",
-                color = PrimaryYellow,
+                color = colors.accent,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.widthIn(min = 80.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.End
@@ -412,12 +399,14 @@ fun TransactionItem(title: String, amount: String, date: String) {
 
 @Composable
 fun BettingItem(roundId: String, number: String, amount: String, status: String, statusColor: Color, date: String) {
+    val colors = rememberAppScreenColors()
     val context = LocalContext.current
     val diceIconId = context.resources.getIdentifier("ic_gundu_ata_nav", "drawable", context.packageName)
     
     Surface(
-        color = SurfaceColor,
+        color = colors.surface,
         shape = RoundedCornerShape(8.dp),
+        border = colors.listItemBorder,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -437,13 +426,13 @@ fun BettingItem(roundId: String, number: String, amount: String, status: String,
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Column {
-                        Text(stringResource(R.string.round_id, roundId), color = TextWhite, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.bet_on_number_value, number), color = PrimaryYellow, fontSize = 14.sp)
-                        Text(date, color = TextGrey, fontSize = 12.sp)
+                        Text(stringResource(R.string.round_id, roundId), color = colors.text, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.bet_on_number_value, number), color = colors.accent, fontSize = 14.sp)
+                        Text(date, color = colors.textMuted, fontSize = 12.sp)
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("₹ $amount", color = TextWhite, fontWeight = FontWeight.Bold)
+                    Text("₹ $amount", color = colors.text, fontWeight = FontWeight.Bold)
                     Text(status, color = statusColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
@@ -452,14 +441,14 @@ fun BettingItem(roundId: String, number: String, amount: String, status: String,
 }
 
 @Composable
-fun HistoryTab(text: String, isSelected: Boolean, onClick: () -> Unit) {
+fun HistoryTab(text: String, isSelected: Boolean, colors: AppScreenColors, onClick: () -> Unit) {
     Column(
         modifier = Modifier.clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = text,
-            color = if (isSelected) PrimaryYellow else TextGrey,
+            color = if (isSelected) colors.accent else colors.textMuted,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -471,7 +460,7 @@ fun HistoryTab(text: String, isSelected: Boolean, onClick: () -> Unit) {
                     .height(3.dp)
                     .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                     .background(
-                        Brush.verticalGradient(listOf(PrimaryYellow, Color.Transparent))
+                        Brush.verticalGradient(listOf(colors.accent, Color.Transparent))
                     )
             )
         }

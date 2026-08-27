@@ -135,7 +135,7 @@ fun GuestSpinWheelDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "GUNDU ATA",
+                        "PRIDE",
                         color = PrimaryYellow,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Black
