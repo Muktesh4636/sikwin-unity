@@ -45,9 +45,16 @@ object SportsPrefetcher {
     private const val FEED_POLL_JS = """
         (function(){
           var f = document.getElementById('feed');
-          if (!f) return 'loading';
-          if (f.querySelector('.card') || f.querySelector('.empty') || f.querySelector('.error')) return 'done';
-          if (!f.querySelector('.loading')) return 'done';
+          if (f) {
+            if (f.querySelector('.card') || f.querySelector('.empty') || f.querySelector('.error')) return 'done';
+            if (!f.querySelector('.loading')) return 'done';
+            return 'loading';
+          }
+          // /cricket/ has no #feed — treat painted match UI (or no spinner) as ready
+          if (document.querySelector('.card') || document.querySelector('.empty') ||
+              document.querySelector('.error') || document.querySelector('.match-card') ||
+              document.querySelector('[data-event-id]')) return 'done';
+          if (!document.querySelector('.loading')) return 'done';
           return 'loading';
         })();
     """
@@ -64,11 +71,20 @@ object SportsPrefetcher {
         if (!url.contains("/sports") && !url.contains("/cricket")) return false
         val want = normalizeSport(sport)
         if (want.isNullOrBlank()) return true
-        // If a specific sport was requested, accept hub or matching deep link
-        return url.contains("sport=$want") || url.contains("/sports")
+        return when (want) {
+            "cricket" -> url.contains("/cricket") || url.contains("sport=cricket")
+            else -> url.contains("sport=$want") || url.contains("/sports")
+        }
     }
 
     fun hasNetworkError(): Boolean = networkError
+
+    /** True when the WebView is already on the sports/cricket hub (even if feed still loading). */
+    fun hasHubUrl(): Boolean {
+        val url = webView?.url.orEmpty()
+        if (url.isBlank() || WebViewOffline.isChromeErrorUrl(url)) return false
+        return url.contains("/sports") || url.contains("/cricket")
+    }
 
     fun addReadyListener(listener: (Boolean) -> Unit) {
         readyListeners.add(listener)
@@ -270,6 +286,22 @@ object SportsPrefetcher {
         }
     }
 
+    /** Pause sports JS when opening Casino so shared Chromium isn't contended. */
+    fun haltForOtherWebGame() {
+        mainHandler.post {
+            cancelFeedPoll()
+            try {
+                webView?.stopLoading()
+                webView?.loadUrl("about:blank")
+                webView?.onPause()
+            } catch (_: Exception) {
+            }
+            pageReady = false
+            setReady(false)
+            loadedAccess = null
+        }
+    }
+
     /**
      * Android / gesture back:
      * - My Bets overlay → close overlay
@@ -460,25 +492,84 @@ object SportsPrefetcher {
         mainHandler.postDelayed(runnable, if (attempt == 0) 120L else 200L)
     }
 
+    /**
+     * Hub URL like casino:
+     * - Live lobby → [Constants.SPORTS_URL]
+     * - Cricket → [Constants.CRICKET_URL]
+     * - Soccer/tennis → /sports/?sport=…
+     * Auth: ?token=&refresh= (same as casino/games). Refresh is omitted from the
+     * query when tokens are long — WebView silently fails oversized URLs; refresh
+     * is still injected into localStorage on page finish.
+     */
     private fun buildUrl(
         accessToken: String?,
         refreshToken: String?,
         sport: String?,
         mode: String?
     ): String {
-        // Match the browser URL — tokens go via localStorage inject on page finish.
-        // Putting JWTs in query params can exceed WebView URL limits and block the load.
-        val b = Uri.parse(Constants.SPORTS_URL).buildUpon()
-        b.appendQueryParameter("_", System.currentTimeMillis().toString())
-        normalizeSport(sport)?.let { b.appendQueryParameter("sport", it) }
-        val m = normalizeMode(mode)
-        // Web sports hub only understands live | upcoming
-        if (m == "upcoming") {
-            b.appendQueryParameter("mode", "upcoming")
-        } else if (m == "live") {
-            b.appendQueryParameter("mode", "live")
+        val s = normalizeSport(sport)
+        val base = when (s) {
+            "cricket" -> Constants.CRICKET_URL
+            else -> Constants.SPORTS_URL
         }
+        val b = Uri.parse(base).buildUpon()
+        if (s != null && s != "cricket") {
+            b.appendQueryParameter("sport", s)
+        }
+        val m = normalizeMode(mode)
+        if (base == Constants.SPORTS_URL) {
+            when (m) {
+                "upcoming" -> b.appendQueryParameter("mode", "upcoming")
+                "live" -> b.appendQueryParameter("mode", "live")
+            }
+        }
+        appendAuthQuery(b, accessToken, refreshToken, allowRefreshInQuery = true)
         return b.build().toString()
+    }
+
+    /**
+     * Casino-style: always put `token` when present.
+     * Also put `refresh` when both JWTs fit a safe WebView URL budget.
+     */
+    private fun appendAuthQuery(
+        builder: Uri.Builder,
+        accessToken: String?,
+        refreshToken: String?,
+        allowRefreshInQuery: Boolean = true
+    ) {
+        if (accessToken.isNullOrBlank()) return
+        builder.appendQueryParameter("token", accessToken)
+        if (!allowRefreshInQuery || refreshToken.isNullOrBlank()) return
+        // Dual JWTs in the query regularly exceed WebView URL limits → blank page.
+        val projected = (accessToken.length + refreshToken.length)
+        if (projected <= 1800) {
+            builder.appendQueryParameter("refresh", refreshToken)
+        }
+    }
+
+    /** Keep JWT on same-origin sports/cricket navigations (match detail, etc.). */
+    private fun withAuthIfNeeded(url: String): String {
+        if (url.isBlank()) return url
+        if (!url.contains("gunduata.tech") && !url.startsWith("/")) return url
+        val lower = url.lowercase()
+        val sportsPath = lower.contains("/sports") || lower.contains("/cricket")
+        if (!sportsPath) return url
+        if (lower.contains("token=")) return url
+        val access = loadedAccess
+        if (access.isNullOrBlank()) return url
+        val absolute = if (url.startsWith("/")) {
+            Constants.WEB_ORIGIN + url
+        } else {
+            url
+        }
+        return try {
+            val b = Uri.parse(absolute).buildUpon()
+            // Match pages: token only (casino pattern) — keeps URL short
+            appendAuthQuery(b, access, loadedRefresh, allowRefreshInQuery = false)
+            b.build().toString()
+        } catch (_: Exception) {
+            absolute
+        }
     }
 
     private fun buildInjectJs(accessToken: String, refreshToken: String): String {
@@ -490,15 +581,23 @@ object SportsPrefetcher {
                 .put("refreshToken", refreshToken)
                 .toString()
         )
+        val bearerLit = JSONObject.quote("Bearer $accessToken")
         return """
             (function(){
               try {
+                localStorage.setItem("token", $accessLit);
                 localStorage.setItem("accessToken", $accessLit);
                 localStorage.setItem("access_token", $accessLit);
                 localStorage.setItem("gundu_access_token", $accessLit);
+                localStorage.setItem("refresh", $refreshLit);
                 localStorage.setItem("refreshToken", $refreshLit);
                 localStorage.setItem("refresh_token", $refreshLit);
                 localStorage.setItem("auth", $authLit);
+                localStorage.setItem("kokoroko_auth", $authLit);
+                sessionStorage.setItem("token", $accessLit);
+                sessionStorage.setItem("accessToken", $accessLit);
+                sessionStorage.setItem("refreshToken", $refreshLit);
+                localStorage.setItem("Authorization", $bearerLit);
               } catch (e) {}
             })();
         """.trimIndent()
@@ -596,7 +695,28 @@ object SportsPrefetcher {
                 override fun shouldOverrideUrlLoading(
                     view: WebView?,
                     request: WebResourceRequest?
-                ): Boolean = false
+                ): Boolean {
+                    val raw = request?.url?.toString().orEmpty()
+                    if (raw.isBlank()) return false
+                    val withAuth = withAuthIfNeeded(raw)
+                    if (withAuth != raw && view != null) {
+                        view.loadUrl(withAuth)
+                        return true
+                    }
+                    return false
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                    val raw = url.orEmpty()
+                    if (raw.isBlank()) return false
+                    val withAuth = withAuthIfNeeded(raw)
+                    if (withAuth != raw && view != null) {
+                        view.loadUrl(withAuth)
+                        return true
+                    }
+                    return false
+                }
 
                 override fun onPageStarted(
                     view: WebView?,
@@ -605,9 +725,10 @@ object SportsPrefetcher {
                 ) {
                     val u = url.orEmpty()
                     if (u.contains("/sports") || u.contains("/cricket")) {
-                        setReady(false)
+                        // Soft hide while new hub loads — do not clear pageReady yet so
+                        // Compose does not flash a false "no internet" overlay.
                         try {
-                            view?.alpha = 0f
+                            if (!pageReady) view?.alpha = 0f
                         } catch (_: Exception) {
                         }
                     }
@@ -628,14 +749,17 @@ object SportsPrefetcher {
                             )
                         }
                         view?.evaluateJavascript(buildFeedNudgeJs(), null)
-                        // Never leave the hub invisible if feed polling stalls.
-                        mainHandler.postDelayed({
-                            try {
-                                view?.alpha = 1f
-                            } catch (_: Exception) {
-                            }
-                        }, 2500L)
-                        val hub = !u.contains("view=match") && !u.contains("/sports/match")
+                        networkError = false
+                        notifyNetworkError(false)
+                        // Show shell immediately so match list can paint; feed poll refines readiness.
+                        try {
+                            view?.alpha = 1f
+                        } catch (_: Exception) {
+                        }
+                        setReady(true)
+                        val hub = !u.contains("view=match") &&
+                            !u.contains("/sports/match") &&
+                            !u.contains("view=match")
                         if (hub && clearHistoryAfterHubLoad) {
                             clearHistoryAfterHubLoad = false
                             try {
@@ -643,8 +767,6 @@ object SportsPrefetcher {
                             } catch (_: Exception) {
                             }
                         }
-                        networkError = false
-                        notifyNetworkError(false)
                         waitForSportsFeed(view)
                     }
                 }

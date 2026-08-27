@@ -215,7 +215,7 @@ fun WhiteHomeScreen(
                         selectedTab = WhiteHomeTab.HOME
                         scrollScope.launch { scrollState.scrollTo(0) }
                     },
-                    onLive = { onNavigate("sports?sport=cricket") },
+                    onLive = { onNavigate("live") },
                     onCasino = { requireLoginOr { onNavigate("casino_games") } },
                     onWallet = { requireLoginOr { onNavigate("wallet") } },
                     onProfile = { onNavigate("me") }
@@ -601,7 +601,7 @@ internal fun WhiteBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 2.dp, vertical = 6.dp),
+                .padding(horizontal = 2.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             WhiteNavItem(
@@ -655,7 +655,7 @@ private fun WhiteNavItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .height(52.dp)
+            .height(48.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 2.dp)
     ) {
@@ -663,13 +663,13 @@ private fun WhiteNavItem(
             icon,
             contentDescription = label,
             tint = if (selected) GoldOnWhite else WhiteMuted,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(24.dp)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(22.dp),
+                .height(18.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(

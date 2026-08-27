@@ -121,7 +121,7 @@ fun HeroHomeScreen(
             HeroBottomBar(
                 selectedTab = DualNavTab.HOME,
                 onHome = { /* already home */ },
-                onLive = { requireLoginOr { onNavigate("sports") } },
+                onLive = { onNavigate("live") },
                 onCasino = { requireLoginOr { onNavigate("casino_games") } },
                 onWallet = { requireLoginOr { onNavigate("wallet") } },
                 onProfile = { onNavigate("me") }

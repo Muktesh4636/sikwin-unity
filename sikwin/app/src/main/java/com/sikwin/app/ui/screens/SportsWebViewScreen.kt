@@ -56,7 +56,9 @@ private val SportsBg = Color(0xFF0A0A0A)
 private enum class SportsNavTab { HOME, LIVE, UPCOMING, CASINO, MY_BETS }
 
 /**
- * Sports hub — loads WebView when opened (no background prefetch).
+ * Sports hub — WebView like casino.
+ * LIVE lobby → [Constants.SPORTS_URL], Cricket → [Constants.CRICKET_URL],
+ * auth via ?token=&refresh= + localStorage inject.
  * Bottom bar: Home | Live | Upcoming | Casino | My Bets
  */
 @Composable
@@ -87,9 +89,11 @@ fun SportsWebViewScreen(
     })
 
     LaunchedEffect(accessToken, refreshToken, sport) {
-        // Load only when user opens Sports
+        // Casino lobby shares gunduata.tech origin — if it keeps running, gundu-auth.js
+        // can infinite-loop on storage/kokoroko-auth and freeze sports feed fetches.
+        CasinoPrefetcher.prepareLeave()
+        CasinoPrefetcher.haltForOtherWebGame()
         SportsPrefetcher.warm(context, accessToken, refreshToken, sport, mode = "live")
-        CasinoPrefetcher.prefetchWhilePlaying(context, accessToken)
     }
 
     Column(
@@ -295,10 +299,11 @@ private fun SportsPreloadedWebView(
         }
         val ok = NetworkUtils.awaitReadyOrOffline(
             context = context,
-            isReady = { SportsPrefetcher.isReady(accessToken, sport) },
+            isReady = { SportsPrefetcher.isReady(accessToken, sport) || SportsPrefetcher.hasHubUrl() },
             hasError = { SportsPrefetcher.hasNetworkError() }
         )
-        if (!ok) {
+        // Slow match feed is not offline — only show offline when load truly failed.
+        if (!ok && !SportsPrefetcher.hasHubUrl()) {
             networkError = true
         }
         showLoading = false

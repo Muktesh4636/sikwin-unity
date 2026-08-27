@@ -61,6 +61,7 @@ import com.sikwin.app.ui.theme.PrimaryYellow
 import com.sikwin.app.ui.theme.TextGrey
 import com.sikwin.app.ui.theme.TextWhite
 import com.sikwin.app.utils.CasinoPrefetcher
+import com.sikwin.app.utils.SportsPrefetcher
 import com.sikwin.app.utils.NetworkUtils
 import com.sikwin.app.utils.Constants
 import kotlinx.coroutines.Dispatchers
@@ -138,7 +139,10 @@ fun ChickenRoadWebViewScreen(
     })
 
     LaunchedEffect(game, accessToken) {
-        if (game != ChickenRoadGame.CASINO) {
+        if (game == ChickenRoadGame.CASINO) {
+            // Sports shares origin/Chromium — blank it so casino lobby can paint.
+            SportsPrefetcher.haltForOtherWebGame()
+        } else {
             // Prefetch casino lobby while playing so Casino opens instantly next
             CasinoPrefetcher.prefetchWhilePlaying(context, accessToken)
         }

@@ -125,7 +125,7 @@ fun DualCardsHomeScreen(
             DualCardsBottomBar(
                 selectedTab = DualNavTab.HOME,
                 onHome = { },
-                onLive = { requireLoginOr { onNavigate("sports") } },
+                onLive = { onNavigate("live") },
                 onCasino = { requireLoginOr { onNavigate("casino_games") } },
                 onWallet = { requireLoginOr { onNavigate("wallet") } },
                 onProfile = { onNavigate("me") }

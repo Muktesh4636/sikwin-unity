@@ -10,10 +10,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.sikwin.app.data.auth.SessionManager
 import com.sikwin.app.ui.screens.*
 import com.sikwin.app.ui.screens.AffiliateScreen
@@ -249,6 +251,32 @@ fun AppNavigation(
             lastNavigationTime = currentTime
             com.sikwin.app.utils.EventLogger.click("navigate", mapOf("route" to route))
             navController.navigate(route)
+        }
+    }
+
+    /** Open sports WebView (LIVE lobby or a specific sport). Never gated on login. */
+    fun openSportsWebView(sport: String? = null) {
+        val dest = when (val s = sport?.trim()?.lowercase().orEmpty()) {
+            "", "live" -> "live"
+            "cricket", "soccer", "tennis", "football" -> {
+                val key = if (s == "football") "soccer" else s
+                "sports/$key"
+            }
+            else -> "live"
+        }
+        com.sikwin.app.utils.EventLogger.click("open_sports", mapOf("dest" to dest, "sport" to (sport ?: "")))
+        try {
+            navController.navigate(dest) {
+                launchSingleTop = true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AppNavigation", "openSportsWebView failed dest=$dest", e)
+            com.sikwin.app.utils.EventLogger.error(
+                name = "sports_nav_failed",
+                message = e.message ?: e.javaClass.simpleName,
+                props = mapOf("dest" to dest)
+            )
+            Toast.makeText(context, "Could not open Sports", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -602,36 +630,16 @@ fun AppNavigation(
                                 restoreState = true
                             }
                         }
-                    } else if (route == "sports" || route.startsWith("sports?")) {
-                        if (!viewModel.loginSuccess) {
-                            showAuthDialog = true
-                        } else {
-                            navController.navigate(route) {
-                                popUpTo("home") { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+                    } else if (route == "live" || route == "sports") {
+                        openSportsWebView(null)
+                    } else if (route.startsWith("sports?sport=")) {
+                        openSportsWebView(route.substringAfter("sports?sport=").substringBefore("&"))
+                    } else if (route.startsWith("sports/")) {
+                        openSportsWebView(route.removePrefix("sports/"))
                     } else if (route == "soccer") {
-                        if (!viewModel.loginSuccess) {
-                            showAuthDialog = true
-                        } else {
-                            navController.navigate("sports?sport=soccer") {
-                                popUpTo("home") { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+                        openSportsWebView("soccer")
                     } else if (route == "tennis") {
-                        if (!viewModel.loginSuccess) {
-                            showAuthDialog = true
-                        } else {
-                            navController.navigate("sports?sport=tennis") {
-                                popUpTo("home") { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+                        openSportsWebView("tennis")
                     } else if (route == "chicken_road") {
                         if (!viewModel.loginSuccess) {
                             showAuthDialog = true
@@ -663,15 +671,7 @@ fun AppNavigation(
                             }
                         }
                     } else if (route == "ipl" || route == "cricket") {
-                        if (!viewModel.loginSuccess) {
-                            showAuthDialog = true
-                        } else {
-                            navController.navigate("sports?sport=cricket") {
-                                popUpTo("home") { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+                        openSportsWebView("cricket")
                     } else if (route == "coin") {
                         navController.navigate("coin") {
                             popUpTo("home") { saveState = true }
@@ -744,6 +744,16 @@ fun AppNavigation(
                                 restoreState = true
                             }
                         }
+                    } else if (route == "live" || route == "sports" || route.startsWith("sports?") || route.startsWith("sports/")) {
+                        openSportsWebView(
+                            when {
+                                route == "live" || route == "sports" -> null
+                                route.startsWith("sports?sport=") ->
+                                    route.substringAfter("sports?sport=").substringBefore("&")
+                                route.startsWith("sports/") -> route.removePrefix("sports/")
+                                else -> null
+                            }
+                        )
                     } else if (route == "login") {
                         navController.navigate("login") {
                             popUpTo("home") { inclusive = false }
@@ -862,6 +872,28 @@ fun AppNavigation(
         composable("cock_fight") {
             CockFightScreen(onBack = { navController.popBackStack() })
         }
+        // LIVE bottom-nav → sports lobby WebView (unique route; avoids sports? query conflicts)
+        composable("live") {
+            SportsWebViewScreen(
+                accessToken = sessionManager.fetchAuthToken(),
+                refreshToken = sessionManager.fetchRefreshToken(),
+                sport = null,
+                onBack = {
+                    if (!navController.popBackStack("home", inclusive = false)) {
+                        navController.navigate("home") {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onCasino = {
+                    navController.navigate("casino_games") {
+                        launchSingleTop = true
+                    }
+                },
+                onRequireLogin = { showAuthDialog = true }
+            )
+        }
         composable("sports") {
             SportsWebViewScreen(
                 accessToken = sessionManager.fetchAuthToken(),
@@ -883,7 +915,10 @@ fun AppNavigation(
                 onRequireLogin = { showAuthDialog = true }
             )
         }
-        composable("sports?sport={sport}") { backStackEntry ->
+        composable(
+            route = "sports/{sport}",
+            arguments = listOf(navArgument("sport") { type = NavType.StringType })
+        ) { backStackEntry ->
             SportsWebViewScreen(
                 accessToken = sessionManager.fetchAuthToken(),
                 refreshToken = sessionManager.fetchRefreshToken(),

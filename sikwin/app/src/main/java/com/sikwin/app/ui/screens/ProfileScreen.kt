@@ -93,7 +93,7 @@ private fun ClassicProfileScreen(
             DualCardsBottomBar(
                 selectedTab = DualNavTab.PROFILE,
                 onHome = { onNavigate("home") },
-                onLive = { onNavigate("sports") },
+                onLive = { onNavigate("live") },
                 onCasino = { onNavigate("casino_games") },
                 onWallet = { onNavigate("wallet") },
                 onProfile = { }
@@ -354,7 +354,7 @@ private fun WhiteProfileScreen(
             WhiteBottomBar(
                 selectedTab = WhiteHomeTab.PROFILE,
                 onHome = { onNavigate("home") },
-                onLive = { onNavigate("sports?sport=cricket") },
+                onLive = { onNavigate("live") },
                 onCasino = { onNavigate("casino_games") },
                 onWallet = { onNavigate("wallet") },
                 onProfile = { }

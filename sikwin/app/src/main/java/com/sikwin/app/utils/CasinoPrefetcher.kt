@@ -47,6 +47,8 @@ object CasinoPrefetcher {
     private var loadedToken: String? = null
     @Volatile private var pageReady: Boolean = false
     @Volatile private var networkError: Boolean = false
+    /** Set when Sports (or another same-origin WebView) blanked the casino page. */
+    @Volatile private var haltedByOtherGame: Boolean = false
     private val assetsStarted = AtomicBoolean(false)
     private val readyListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
     private val networkErrorListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
@@ -186,12 +188,32 @@ object CasinoPrefetcher {
         wv.visibility = android.view.View.VISIBLE
         applyAttachedAlpha(wv, token)
 
-        // Use parked lobby if ready — instant Casino open + restore scroll
-        if (isReady(token)) {
+        val blank = WebViewOffline.isChromeErrorUrl(wv.url.orEmpty()) ||
+            wv.url.isNullOrBlank() ||
+            wv.url.equals("about:blank", ignoreCase = true) ||
+            haltedByOtherGame
+        // After Sports halt, always force a fresh lobby load.
+        if (isReady(token) && !blank) {
             restoreLobbyScroll(wv)
             return true
         }
-        loadCasino(token, force = false)
+        loadCasino(token, force = true, cacheBust = blank)
+        // Failsafe: if lobby URL is up but ready flag lagged (e.g. after Sports halt), show it.
+        mainHandler.postDelayed({
+            if (!attachedVisible) return@postDelayed
+            val u = webView?.url.orEmpty()
+            if (u.contains("/casino") && !looksLikeInnerGame(u) && !WebViewOffline.isChromeErrorUrl(u)) {
+                networkError = false
+                notifyNetworkError(false)
+                setReady(true)
+                try {
+                    webView?.onResume()
+                    webView?.alpha = 1f
+                    webView?.visibility = android.view.View.VISIBLE
+                } catch (_: Exception) {
+                }
+            }
+        }, 2500L)
         return isReady(token)
     }
 
@@ -273,6 +295,27 @@ object CasinoPrefetcher {
             pageReady = false
             networkError = false
             setReady(false)
+            haltedByOtherGame = false
+        }
+    }
+
+    /**
+     * Kill casino page JS immediately (about:blank + pause).
+     * Required when opening Sports: casino and sports share gunduata.tech origin /
+     * Chromium process; a gundu-auth infinite loop freezes sports "Loading matches…".
+     */
+    fun haltForOtherWebGame() {
+        mainHandler.post {
+            haltedByOtherGame = true
+            try {
+                webView?.stopLoading()
+                webView?.loadUrl("about:blank")
+                webView?.onPause()
+            } catch (_: Exception) {
+            }
+            pageReady = false
+            setReady(false)
+            loadedToken = null
         }
     }
 
@@ -551,18 +594,27 @@ object CasinoPrefetcher {
             markOffline(wv)
             return
         }
+        try {
+            wv.onResume()
+        } catch (_: Exception) {
+        }
         val current = wv.url.orEmpty()
-        val onLobby = current.contains("/casino") &&
-            !looksLikeInnerGame(current) &&
-            !WebViewOffline.isChromeErrorUrl(current)
+        val blank = current.isBlank() ||
+            current.equals("about:blank", ignoreCase = true) ||
+            WebViewOffline.isChromeErrorUrl(current) ||
+            haltedByOtherGame
+        val onLobby = !blank &&
+            current.contains("/casino") &&
+            !looksLikeInnerGame(current)
         // Same token + already on (or loading) casino lobby → do not reload (keeps scroll)
-        if (!force && loadedToken == token && !networkError && onLobby) {
+        if (!force && !blank && loadedToken == token && !networkError && onLobby) {
             if (pageReady) {
                 setReady(true)
                 restoreLobbyScroll(wv)
             }
             return
         }
+        haltedByOtherGame = false
         loadedToken = token
         networkError = false
         notifyNetworkError(false)
@@ -570,7 +622,7 @@ object CasinoPrefetcher {
         if (savedLobbyScrollY > 0) pendingRestoreScroll = true
         applyAttachedAlpha(wv, token)
         try {
-            wv.loadUrl(buildUrl(token, cacheBust = cacheBust))
+            wv.loadUrl(buildUrl(token, cacheBust = cacheBust || blank))
         } catch (_: Exception) {
             markOffline(wv)
         }
@@ -683,13 +735,19 @@ object CasinoPrefetcher {
                     if (u.contains("/casino") && !looksLikeInnerGame(u)) {
                         networkError = false
                         notifyNetworkError(false)
+                        // Mark ready BEFORE alpha — applyAttachedAlpha uses isReady()/pageReady.
+                        setReady(true)
                         if (attachedVisible) {
+                            try {
+                                view?.alpha = 1f
+                                view?.visibility = android.view.View.VISIBLE
+                            } catch (_: Exception) {
+                            }
                             applyAttachedAlpha(view, loadedToken)
                             unmuteAudio(view)
                         } else {
                             muteParked(view)
                         }
-                        setReady(true)
                         restoreLobbyScroll(view)
                         // Pause only after lobby is fully loaded (saves CPU, keeps page in memory)
                         if (!attachedVisible) {
@@ -720,7 +778,11 @@ object CasinoPrefetcher {
                     description: String?,
                     failingUrl: String?
                 ) {
-                    if (!failingUrl.isNullOrBlank()) {
+                    val main = view?.url.orEmpty()
+                    if (!failingUrl.isNullOrBlank() &&
+                        main.isNotBlank() &&
+                        failingUrl.equals(main, ignoreCase = true)
+                    ) {
                         markOffline(view)
                     }
                 }
