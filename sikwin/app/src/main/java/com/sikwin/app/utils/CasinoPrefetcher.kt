@@ -228,6 +228,11 @@ object CasinoPrefetcher {
     ): Boolean {
         this.onBack = onBack
         this.onOpenGame = onOpenGame
+        // Halt sports BEFORE loading casino — LaunchedEffect ran too late and caused glitches.
+        try {
+            SportsPrefetcher.haltForOtherWebGame()
+        } catch (_: Exception) {
+        }
         attachedVisible = true
         val activity = resolveActivity(parent.context) ?: return false
         ensureWebView(activity)
@@ -247,18 +252,20 @@ object CasinoPrefetcher {
         } catch (_: Exception) {
         }
         wv.visibility = android.view.View.VISIBLE
+        // While on Casino screen, keep WebView opaque — Compose loader covers boot.
+        // Alpha 0 + dismissed overlay was the intermittent black screen.
+        wv.alpha = if (networkError) 0f else 1f
+        waitingForOverlayReveal = false
         val blank = WebViewOffline.isChromeErrorUrl(wv.url.orEmpty()) ||
             wv.url.isNullOrBlank() ||
             wv.url.equals("about:blank", ignoreCase = true) ||
             haltedByOtherGame
         // After Sports halt, always force a fresh lobby load.
         if (isReady(token) && !blank) {
-            waitingForOverlayReveal = false
             applyAttachedAlpha(wv, token)
             restoreLobbyScroll(wv)
             return true
         }
-        waitingForOverlayReveal = true
         applyAttachedAlpha(wv, token)
         loadCasino(token, force = true, cacheBust = blank)
         // Failsafe: if lobby URL is up but ready flag lagged (e.g. after Sports halt), mark ready.
@@ -270,15 +277,9 @@ object CasinoPrefetcher {
                 notifyNetworkError(false)
                 setLoadProgress(100)
                 setReady(true)
-                // Stay hidden until Compose overlay hits 100% and calls revealAfterBoot().
-                try {
-                    webView?.onResume()
-                    webView?.alpha = 0f
-                    webView?.visibility = android.view.View.VISIBLE
-                } catch (_: Exception) {
-                }
+                forceVisibleIfAttached()
             }
-        }, 2500L)
+        }, 1800L)
         return isReady(token)
     }
 
@@ -286,9 +287,16 @@ object CasinoPrefetcher {
     fun revealAfterBoot() {
         mainHandler.post {
             waitingForOverlayReveal = false
-            val wv = webView ?: return@post
+            forceVisibleIfAttached()
+        }
+    }
+
+    /** Hard guarantee: attached casino WebView is never left at alpha 0. */
+    fun forceVisibleIfAttached() {
+        mainHandler.post {
             if (!attachedVisible || networkError) return@post
-            if (!pageReady && !wv.url.orEmpty().contains("/casino")) return@post
+            val wv = webView ?: return@post
+            waitingForOverlayReveal = false
             try {
                 wv.visibility = android.view.View.VISIBLE
                 wv.alpha = 1f
@@ -389,8 +397,9 @@ object CasinoPrefetcher {
      * Chromium process; a gundu-auth infinite loop freezes sports "Loading matches…".
      */
     fun haltForOtherWebGame() {
-        mainHandler.post {
+        val work = Runnable {
             haltedByOtherGame = true
+            attachedVisible = false
             try {
                 webView?.stopLoading()
                 webView?.loadUrl("about:blank")
@@ -402,6 +411,11 @@ object CasinoPrefetcher {
             setLoadProgress(0, force = true)
             setReady(false)
             loadedToken = null
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            work.run()
+        } else {
+            mainHandler.post(work)
         }
     }
 
@@ -666,10 +680,13 @@ object CasinoPrefetcher {
     private fun applyAttachedAlpha(wv: WebView?, token: String?) {
         if (wv == null) return
         try {
+            // Attached casino screen: always opaque (Compose overlay covers boot).
+            // Parked/warm loads may stay hidden.
             wv.alpha = when {
                 networkError -> 0f
+                attachedVisible -> 1f
                 waitingForOverlayReveal -> 0f
-                attachedVisible && isReady(token) -> 1f
+                isReady(token) -> 1f
                 else -> 0f
             }
         } catch (_: Exception) {
@@ -752,7 +769,7 @@ object CasinoPrefetcher {
         networkError = false
         notifyNetworkError(false)
         if (attachedVisible) {
-            waitingForOverlayReveal = true
+            waitingForOverlayReveal = false
         }
         setLoadProgress(2, force = true)
         setReady(false)
@@ -864,12 +881,15 @@ object CasinoPrefetcher {
                     if (u.contains("/casino") && !looksLikeInnerGame(u)) {
                         setLoadProgress(5)
                         setReady(false)
-                        if (attachedVisible) {
-                            waitingForOverlayReveal = true
-                            try {
+                        try {
+                            if (attachedVisible) {
+                                // Stay opaque — Compose overlay covers boot (no black flash).
+                                forceVisibleIfAttached()
+                            } else {
+                                waitingForOverlayReveal = true
                                 view?.alpha = 0f
-                            } catch (_: Exception) {
                             }
+                        } catch (_: Exception) {
                         }
                     }
                 }
@@ -885,15 +905,9 @@ object CasinoPrefetcher {
                         notifyNetworkError(false)
                         setLoadProgress(96)
                         view?.evaluateJavascript(buildThemeInjectJs(resolveWebThemeMode()), null)
-                        // Mark ready BEFORE reveal — Compose overlay drives 100% then revealAfterBoot.
                         setReady(true)
                         if (attachedVisible) {
-                            try {
-                                view?.alpha = 0f
-                                view?.visibility = android.view.View.VISIBLE
-                            } catch (_: Exception) {
-                            }
-                            applyAttachedAlpha(view, loadedToken)
+                            forceVisibleIfAttached()
                         } else {
                             muteParked(view)
                         }

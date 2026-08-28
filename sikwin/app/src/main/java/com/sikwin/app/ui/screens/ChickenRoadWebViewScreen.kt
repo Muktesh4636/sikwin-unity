@@ -142,7 +142,7 @@ fun ChickenRoadWebViewScreen(
 
     LaunchedEffect(game, accessToken) {
         if (game == ChickenRoadGame.CASINO) {
-            // Sports shares origin/Chromium — blank it so casino lobby can paint.
+            // Attach path also halts sports synchronously; keep this as a safety net.
             SportsPrefetcher.haltForOtherWebGame()
         } else {
             // Prefetch casino lobby while playing so Casino opens instantly next
@@ -257,7 +257,12 @@ private fun CasinoPreloadedWebView(
 
     DisposableEffect(accessToken) {
         val readyListener: (Boolean) -> Unit = { isReady ->
-            ready = CasinoPrefetcher.isReady(accessToken)
+            val ok = isReady || CasinoPrefetcher.isReady(accessToken)
+            ready = ok
+            // Reload blanked the lobby — bring the loader back so we don't sit on black.
+            if (!ok && !CasinoPrefetcher.hasNetworkError()) {
+                showLoading = true
+            }
             if (!isReady && CasinoPrefetcher.hasNetworkError()) {
                 networkError = true
             }
@@ -289,6 +294,9 @@ private fun CasinoPreloadedWebView(
         if (ready) {
             showLoading = false
             CasinoPrefetcher.revealAfterBoot()
+            CasinoPrefetcher.forceVisibleIfAttached()
+        } else if (!networkError) {
+            showLoading = true
         }
         onDispose {
             CasinoPrefetcher.removeReadyListener(readyListener)
@@ -300,12 +308,50 @@ private fun CasinoPreloadedWebView(
 
     // Background load done → 100% → reveal lobby.
     LaunchedEffect(ready, networkError) {
-        if (networkError || !ready || !showLoading) return@LaunchedEffect
-        progress = 1f
-        statusText = "Ready"
-        delay(220)
-        showLoading = false
+        if (networkError || !ready) return@LaunchedEffect
+        if (showLoading) {
+            progress = 1f
+            statusText = "Ready"
+            delay(160)
+            showLoading = false
+        }
         CasinoPrefetcher.revealAfterBoot()
+        CasinoPrefetcher.forceVisibleIfAttached()
+    }
+
+    // Watchdog: keep WebView opaque whenever casino screen is up.
+    LaunchedEffect(accessToken) {
+        while (true) {
+            delay(400)
+            if (networkError) continue
+            CasinoPrefetcher.forceVisibleIfAttached()
+            if (CasinoPrefetcher.isReady(accessToken)) {
+                ready = true
+                if (showLoading) {
+                    progress = 1f
+                    showLoading = false
+                }
+            }
+        }
+    }
+
+    // Hard failsafe: dismiss loader quickly once lobby is ready.
+    LaunchedEffect(showLoading, accessToken) {
+        if (!showLoading) return@LaunchedEffect
+        repeat(30) {
+            delay(200)
+            if (!showLoading || networkError) return@LaunchedEffect
+            if (CasinoPrefetcher.isReady(accessToken)) {
+                ready = true
+                progress = 1f
+                showLoading = false
+                CasinoPrefetcher.revealAfterBoot()
+                CasinoPrefetcher.forceVisibleIfAttached()
+                return@LaunchedEffect
+            }
+        }
+        // Still not ready — keep overlay, but never leave alpha 0 underneath.
+        CasinoPrefetcher.forceVisibleIfAttached()
     }
 
     LaunchedEffect(accessToken, networkError) {
@@ -325,15 +371,16 @@ private fun CasinoPreloadedWebView(
             showLoading = false
         } else {
             ready = true
+            CasinoPrefetcher.forceVisibleIfAttached()
         }
     }
 
     LaunchedEffect(showLoading, networkError, ready) {
         while (showLoading && !networkError && !ready) {
             if (progress < 0.96f) {
-                progress = (progress + 0.008f).coerceAtMost(0.96f)
+                progress = (progress + 0.012f).coerceAtMost(0.96f)
             }
-            delay(90)
+            delay(70)
         }
     }
 
@@ -360,8 +407,10 @@ private fun CasinoPreloadedWebView(
                     if (ready) {
                         showLoading = false
                         CasinoPrefetcher.revealAfterBoot()
+                        CasinoPrefetcher.forceVisibleIfAttached()
                     } else {
                         showLoading = true
+                        CasinoPrefetcher.forceVisibleIfAttached()
                     }
                     networkError = CasinoPrefetcher.hasNetworkError()
                 }
@@ -381,7 +430,15 @@ private fun CasinoPreloadedWebView(
                         }
                     )
                 }
-                ready = CasinoPrefetcher.isReady(accessToken)
+                if (CasinoPrefetcher.isReady(accessToken)) {
+                    ready = true
+                    if (!showLoading) {
+                        CasinoPrefetcher.forceVisibleIfAttached()
+                    }
+                } else if (!CasinoPrefetcher.hasNetworkError() && !showLoading) {
+                    showLoading = true
+                }
+                CasinoPrefetcher.forceVisibleIfAttached()
                 networkError = CasinoPrefetcher.hasNetworkError()
             },
             modifier = Modifier.fillMaxSize()

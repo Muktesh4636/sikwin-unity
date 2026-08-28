@@ -618,13 +618,38 @@ internal fun WhiteBottomBar(
                 onClick = onLive,
                 modifier = Modifier.weight(1f)
             )
-            WhiteNavItem(
-                label = "CASINO",
-                icon = Icons.Default.Casino,
-                selected = selectedTab == WhiteHomeTab.CASINO,
-                onClick = onCasino,
-                modifier = Modifier.weight(1f)
-            )
+            // Same chip symbol as black-theme DualCasinoNavItem
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .clickable(onClick = onCasino)
+                    .padding(horizontal = 2.dp)
+            ) {
+                CasinoChipIcon(
+                    selected = selectedTab == WhiteHomeTab.CASINO,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(18.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "CASINO",
+                        color = if (selectedTab == WhiteHomeTab.CASINO) WhiteText else WhiteMuted,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 9.sp,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
             WhiteNavItem(
                 label = "WALLET",
                 icon = Icons.Default.AccountBalanceWallet,

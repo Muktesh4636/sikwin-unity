@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.sikwin.app.utils.Constants
 import com.sikwin.app.utils.CasinoPrefetcher
+import com.sikwin.app.utils.SportsPrefetcher
 import com.unity3d.player.UnityTokenHolder
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -282,6 +283,26 @@ fun AppNavigation(
                 props = mapOf("dest" to dest)
             )
             Toast.makeText(context, "Could not open Sports", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Open Casino lobby WebView — single-top + ignore spam taps. */
+    fun openCasinoGames() {
+        val current = navController.currentBackStackEntry?.destination?.route.orEmpty()
+        if (current == "casino_games") return
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastNavigationTime <= navigationCooldown) return
+        lastNavigationTime = currentTime
+        com.sikwin.app.utils.EventLogger.click("open_casino", emptyMap())
+        try {
+            // Halt sports before nav so first casino frame isn't contending Chromium.
+            SportsPrefetcher.haltForOtherWebGame()
+            navController.navigate("casino_games") {
+                launchSingleTop = true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AppNavigation", "openCasinoGames failed", e)
+            Toast.makeText(context, "Could not open Casino", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -635,6 +656,12 @@ fun AppNavigation(
                                 restoreState = true
                             }
                         }
+                    } else if (route == "casino_games" || route == "casino") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            openCasinoGames()
+                        }
                     } else if (route == "live" || route == "sports") {
                         openSportsWebView(null)
                     } else if (route.startsWith("sports?sport=")) {
@@ -748,6 +775,12 @@ fun AppNavigation(
                                 launchSingleTop = true
                                 restoreState = true
                             }
+                        }
+                    } else if (route == "casino_games" || route == "casino") {
+                        if (!viewModel.loginSuccess) {
+                            showAuthDialog = true
+                        } else {
+                            openCasinoGames()
                         }
                     } else if (route == "live" || route == "sports" || route.startsWith("sports?") || route.startsWith("sports/")) {
                         openSportsWebView(
@@ -891,11 +924,7 @@ fun AppNavigation(
                         }
                     }
                 },
-                onCasino = {
-                    navController.navigate("casino_games") {
-                        launchSingleTop = true
-                    }
-                },
+                onCasino = { openCasinoGames() },
                 onRequireLogin = { showAuthDialog = true }
             )
         }
@@ -912,11 +941,7 @@ fun AppNavigation(
                         }
                     }
                 },
-                onCasino = {
-                    navController.navigate("casino_games") {
-                        launchSingleTop = true
-                    }
-                },
+                onCasino = { openCasinoGames() },
                 onRequireLogin = { showAuthDialog = true }
             )
         }
@@ -936,11 +961,7 @@ fun AppNavigation(
                         }
                     }
                 },
-                onCasino = {
-                    navController.navigate("casino_games") {
-                        launchSingleTop = true
-                    }
-                },
+                onCasino = { openCasinoGames() },
                 onRequireLogin = { showAuthDialog = true }
             )
         }
@@ -958,11 +979,7 @@ fun AppNavigation(
                         }
                     }
                 },
-                onCasino = {
-                    navController.navigate("casino_games") {
-                        launchSingleTop = true
-                    }
-                },
+                onCasino = { openCasinoGames() },
                 onRequireLogin = { showAuthDialog = true }
             )
         }
@@ -1130,11 +1147,7 @@ fun AppNavigation(
                 refreshToken = sessionManager.fetchRefreshToken(),
                 sport = "cricket",
                 onBack = { navController.popBackStack() },
-                onCasino = {
-                    navController.navigate("casino_games") {
-                        launchSingleTop = true
-                    }
-                },
+                onCasino = { openCasinoGames() },
                 onRequireLogin = { showAuthDialog = true }
             )
         }

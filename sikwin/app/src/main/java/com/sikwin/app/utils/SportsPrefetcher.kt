@@ -474,7 +474,7 @@ object SportsPrefetcher {
 
     /** Pause sports JS when opening Casino so shared Chromium isn't contended. */
     fun haltForOtherWebGame() {
-        mainHandler.post {
+        val work = Runnable {
             attachedVisible = false
             cancelFeedPoll()
             try {
@@ -488,6 +488,12 @@ object SportsPrefetcher {
             setReady(false)
             setLoadProgress(0, force = true)
             loadedAccess = null
+        }
+        // Must run before Casino attach — async post raced AndroidView.factory and glitched lobby.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            work.run()
+        } else {
+            mainHandler.post(work)
         }
     }
 
