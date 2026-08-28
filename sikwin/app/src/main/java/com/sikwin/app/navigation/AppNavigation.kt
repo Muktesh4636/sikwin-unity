@@ -264,6 +264,11 @@ fun AppNavigation(
             }
             else -> "live"
         }
+        val current = navController.currentBackStackEntry?.destination?.route.orEmpty()
+        // Already on this sports destination — ignore spam taps (avoids remount glitch).
+        if (current == dest || (dest == "live" && (current == "live" || current.startsWith("sports?")))) {
+            return
+        }
         com.sikwin.app.utils.EventLogger.click("open_sports", mapOf("dest" to dest, "sport" to (sport ?: "")))
         try {
             navController.navigate(dest) {

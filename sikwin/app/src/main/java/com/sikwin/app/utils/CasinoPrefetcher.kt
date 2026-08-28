@@ -11,18 +11,21 @@ import android.os.Looper
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import com.sikwin.app.data.prefs.ThemePreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
@@ -49,9 +52,17 @@ object CasinoPrefetcher {
     @Volatile private var networkError: Boolean = false
     /** Set when Sports (or another same-origin WebView) blanked the casino page. */
     @Volatile private var haltedByOtherGame: Boolean = false
+    /** 0–100 WebView load progress for the casino boot overlay. */
+    @Volatile private var loadProgress: Int = 0
+    /**
+     * When true, keep WebView alpha 0 until [revealAfterBoot] so Compose can
+     * finish the 100% loading bar before showing the lobby.
+     */
+    @Volatile private var waitingForOverlayReveal: Boolean = false
     private val assetsStarted = AtomicBoolean(false)
     private val readyListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
     private val networkErrorListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
+    private val progressListeners = CopyOnWriteArrayList<(Int) -> Unit>()
 
     private var onBack: (() -> Unit)? = null
     private var onOpenGame: ((String, String) -> Unit)? = null
@@ -71,6 +82,9 @@ object CasinoPrefetcher {
     }
 
     fun hasNetworkError(): Boolean = networkError
+
+    /** 0–100 progress while the lobby boots under the loading overlay. */
+    fun getLoadProgress(): Int = loadProgress.coerceIn(0, 100)
 
     fun addReadyListener(listener: (Boolean) -> Unit) {
         readyListeners.add(listener)
@@ -97,10 +111,24 @@ object CasinoPrefetcher {
         networkErrorListeners.remove(listener)
     }
 
+    fun addProgressListener(listener: (Int) -> Unit) {
+        progressListeners.add(listener)
+        try {
+            listener(getLoadProgress())
+        } catch (_: Exception) {
+        }
+    }
+
+    fun removeProgressListener(listener: (Int) -> Unit) {
+        progressListeners.remove(listener)
+    }
+
     fun retry(token: String?) {
         mainHandler.post {
             networkError = false
             notifyNetworkError(false)
+            waitingForOverlayReveal = attachedVisible
+            setLoadProgress(2, force = true)
             setReady(false)
             loadCasino(token, force = true, cacheBust = true)
         }
@@ -131,6 +159,39 @@ object CasinoPrefetcher {
                 }
             } catch (_: Exception) {
                 /* soft */
+            }
+        }
+    }
+
+    /**
+     * Push app Black/White theme into casino WebView immediately.
+     * Writes `gundu_casino_theme` and calls GunduCasinoTheme.apply when present.
+     */
+    fun applyAppTheme(context: Context?, mode: String? = null) {
+        val activity = resolveActivity(context) ?: return
+        activityRef = WeakReference(activity)
+        val theme = mode?.takeIf { it == "light" || it == "dark" }
+            ?: ThemePreferences(activity).webThemeMode()
+        mainHandler.post {
+            try {
+                ensureWebView(activity)
+                val wv = webView ?: return@post
+                try {
+                    wv.onResume()
+                } catch (_: Exception) {
+                }
+                wv.evaluateJavascript(buildThemeInjectJs(theme), null)
+                val url = wv.url.orEmpty()
+                // Never reload casino while Sports LIVE is attached — freezes shared Chromium.
+                if (com.sikwin.app.utils.SportsPrefetcher.isAttachedVisible()) return@post
+                val onLobby = url.contains("/casino") &&
+                    !looksLikeInnerGame(url) &&
+                    !WebViewOffline.isChromeErrorUrl(url) &&
+                    !url.equals("about:blank", ignoreCase = true)
+                if (onLobby) {
+                    wv.reload()
+                }
+            } catch (_: Exception) {
             }
         }
     }
@@ -186,35 +247,56 @@ object CasinoPrefetcher {
         } catch (_: Exception) {
         }
         wv.visibility = android.view.View.VISIBLE
-        applyAttachedAlpha(wv, token)
-
         val blank = WebViewOffline.isChromeErrorUrl(wv.url.orEmpty()) ||
             wv.url.isNullOrBlank() ||
             wv.url.equals("about:blank", ignoreCase = true) ||
             haltedByOtherGame
         // After Sports halt, always force a fresh lobby load.
         if (isReady(token) && !blank) {
+            waitingForOverlayReveal = false
+            applyAttachedAlpha(wv, token)
             restoreLobbyScroll(wv)
             return true
         }
+        waitingForOverlayReveal = true
+        applyAttachedAlpha(wv, token)
         loadCasino(token, force = true, cacheBust = blank)
-        // Failsafe: if lobby URL is up but ready flag lagged (e.g. after Sports halt), show it.
+        // Failsafe: if lobby URL is up but ready flag lagged (e.g. after Sports halt), mark ready.
         mainHandler.postDelayed({
             if (!attachedVisible) return@postDelayed
             val u = webView?.url.orEmpty()
             if (u.contains("/casino") && !looksLikeInnerGame(u) && !WebViewOffline.isChromeErrorUrl(u)) {
                 networkError = false
                 notifyNetworkError(false)
+                setLoadProgress(100)
                 setReady(true)
+                // Stay hidden until Compose overlay hits 100% and calls revealAfterBoot().
                 try {
                     webView?.onResume()
-                    webView?.alpha = 1f
+                    webView?.alpha = 0f
                     webView?.visibility = android.view.View.VISIBLE
                 } catch (_: Exception) {
                 }
             }
         }, 2500L)
         return isReady(token)
+    }
+
+    /** Show the lobby after the Compose loading overlay reaches 100%. */
+    fun revealAfterBoot() {
+        mainHandler.post {
+            waitingForOverlayReveal = false
+            val wv = webView ?: return@post
+            if (!attachedVisible || networkError) return@post
+            if (!pageReady && !wv.url.orEmpty().contains("/casino")) return@post
+            try {
+                wv.visibility = android.view.View.VISIBLE
+                wv.alpha = 1f
+                wv.onResume()
+                unmuteAudio(wv)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     /** Hide WebView before navigating away so home does not flicker. */
@@ -294,6 +376,8 @@ object CasinoPrefetcher {
             loadedToken = null
             pageReady = false
             networkError = false
+            waitingForOverlayReveal = false
+            setLoadProgress(0, force = true)
             setReady(false)
             haltedByOtherGame = false
         }
@@ -314,6 +398,8 @@ object CasinoPrefetcher {
             } catch (_: Exception) {
             }
             pageReady = false
+            waitingForOverlayReveal = false
+            setLoadProgress(0, force = true)
             setReady(false)
             loadedToken = null
         }
@@ -549,11 +635,40 @@ object CasinoPrefetcher {
         return builder.build().toString()
     }
 
+    private fun resolveWebThemeMode(): String {
+        val ctx = activityRef?.get() ?: return "dark"
+        return try {
+            ThemePreferences(ctx).webThemeMode()
+        } catch (_: Exception) {
+            "dark"
+        }
+    }
+
+    private fun buildThemeInjectJs(theme: String): String {
+        val themeLit = JSONObject.quote(if (theme == "light") "light" else "dark")
+        return """
+            (function(){
+              try {
+                localStorage.setItem("gundu_casino_theme", $themeLit);
+                if (window.GunduCasinoTheme && typeof window.GunduCasinoTheme.apply === "function") {
+                  window.GunduCasinoTheme.write($themeLit);
+                  window.GunduCasinoTheme.apply($themeLit);
+                } else {
+                  document.documentElement.setAttribute("data-theme", $themeLit);
+                  document.documentElement.classList.toggle("theme-light", $themeLit === "light");
+                  document.documentElement.classList.toggle("theme-dark", $themeLit === "dark");
+                }
+              } catch (e) {}
+            })();
+        """.trimIndent()
+    }
+
     private fun applyAttachedAlpha(wv: WebView?, token: String?) {
         if (wv == null) return
         try {
             wv.alpha = when {
                 networkError -> 0f
+                waitingForOverlayReveal -> 0f
                 attachedVisible && isReady(token) -> 1f
                 else -> 0f
             }
@@ -563,9 +678,24 @@ object CasinoPrefetcher {
 
     private fun setReady(ready: Boolean) {
         pageReady = ready
+        if (ready) {
+            setLoadProgress(100)
+        }
         readyListeners.forEach { listener ->
             try {
                 listener(ready)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun setLoadProgress(progress: Int, force: Boolean = false) {
+        val p = progress.coerceIn(0, 100)
+        if (!force && p < loadProgress && p > 5) return
+        loadProgress = p
+        progressListeners.forEach {
+            try {
+                it(p)
             } catch (_: Exception) {
             }
         }
@@ -583,6 +713,8 @@ object CasinoPrefetcher {
 
     private fun markOffline(view: WebView?) {
         WebViewOffline.hideChromeErrorPage(view)
+        waitingForOverlayReveal = false
+        setLoadProgress(0, force = true)
         setReady(false)
         notifyNetworkError(true)
     }
@@ -609,6 +741,7 @@ object CasinoPrefetcher {
         // Same token + already on (or loading) casino lobby → do not reload (keeps scroll)
         if (!force && !blank && loadedToken == token && !networkError && onLobby) {
             if (pageReady) {
+                setLoadProgress(100)
                 setReady(true)
                 restoreLobbyScroll(wv)
             }
@@ -618,6 +751,10 @@ object CasinoPrefetcher {
         loadedToken = token
         networkError = false
         notifyNetworkError(false)
+        if (attachedVisible) {
+            waitingForOverlayReveal = true
+        }
+        setLoadProgress(2, force = true)
         setReady(false)
         if (savedLobbyScrollY > 0) pendingRestoreScroll = true
         applyAttachedAlpha(wv, token)
@@ -703,6 +840,15 @@ object CasinoPrefetcher {
 
             addJavascriptInterface(CasinoBridge(), "AndroidBridge")
 
+            webChromeClient = object : WebChromeClient() {
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    if (pageReady || networkError) return
+                    if (newProgress in 1..99) {
+                        setLoadProgress((newProgress * 0.92f).toInt().coerceIn(3, 92))
+                    }
+                }
+            }
+
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
                     view: WebView?,
@@ -716,8 +862,10 @@ object CasinoPrefetcher {
                 ) {
                     val u = url.orEmpty()
                     if (u.contains("/casino") && !looksLikeInnerGame(u)) {
+                        setLoadProgress(5)
                         setReady(false)
                         if (attachedVisible) {
+                            waitingForOverlayReveal = true
                             try {
                                 view?.alpha = 0f
                             } catch (_: Exception) {
@@ -735,16 +883,17 @@ object CasinoPrefetcher {
                     if (u.contains("/casino") && !looksLikeInnerGame(u)) {
                         networkError = false
                         notifyNetworkError(false)
-                        // Mark ready BEFORE alpha — applyAttachedAlpha uses isReady()/pageReady.
+                        setLoadProgress(96)
+                        view?.evaluateJavascript(buildThemeInjectJs(resolveWebThemeMode()), null)
+                        // Mark ready BEFORE reveal — Compose overlay drives 100% then revealAfterBoot.
                         setReady(true)
                         if (attachedVisible) {
                             try {
-                                view?.alpha = 1f
+                                view?.alpha = 0f
                                 view?.visibility = android.view.View.VISIBLE
                             } catch (_: Exception) {
                             }
                             applyAttachedAlpha(view, loadedToken)
-                            unmuteAudio(view)
                         } else {
                             muteParked(view)
                         }

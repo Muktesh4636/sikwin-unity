@@ -185,7 +185,7 @@ fun WalletCard(
                 } else Modifier
             ),
         colors = CardDefaults.cardColors(
-            containerColor = if (colors.isWhite) colors.surface else Color(0xFFF0F0F0)
+            containerColor = colors.surface
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {

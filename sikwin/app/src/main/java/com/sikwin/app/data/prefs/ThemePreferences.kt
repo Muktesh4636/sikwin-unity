@@ -41,6 +41,12 @@ class ThemePreferences(context: Context) {
 
     fun isWhiteTheme(): Boolean = getAppTheme() == THEME_WHITE
 
+    /**
+     * WebView theme for sports/casino: "light" or "dark".
+     * App white theme → light; all other home themes → dark.
+     */
+    fun webThemeMode(): String = if (isWhiteTheme()) "light" else "dark"
+
     /** Theme picker shows only dark vs white. */
     fun pickerThemeId(): String =
         if (getAppTheme() == THEME_WHITE) THEME_WHITE else THEME_DUAL_CARDS

@@ -153,7 +153,6 @@ fun DualCardsHomeScreen(
                 banners = listOf(
                     HomePromoBanner(
                         imageRes = R.drawable.live_casino_banner,
-                        allowCustomLiveCasino = true,
                         onPlayNow = { requireLoginOr { showGunduAtaChoiceDialog = true } }
                     ),
                     HomePromoBanner(

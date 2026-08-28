@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
@@ -60,6 +59,7 @@ import com.sikwin.app.data.api.RetrofitClient
 import com.sikwin.app.ui.theme.PrimaryYellow
 import com.sikwin.app.ui.theme.TextGrey
 import com.sikwin.app.ui.theme.TextWhite
+import com.sikwin.app.ui.theme.rememberAppScreenColors
 import com.sikwin.app.utils.CasinoPrefetcher
 import com.sikwin.app.utils.SportsPrefetcher
 import com.sikwin.app.utils.NetworkUtils
@@ -123,6 +123,8 @@ fun ChickenRoadWebViewScreen(
     onOpenNativeGame: (route: String) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val screenColors = rememberAppScreenColors()
+    val screenBg = if (screenColors.isWhite) screenColors.background else ChickenRoadBg
     val leaveCasino = remember(onBack) {
         {
             CasinoPrefetcher.prepareLeave()
@@ -153,7 +155,7 @@ fun ChickenRoadWebViewScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ChickenRoadBg)
+            .background(screenBg)
     ) {
         when {
             accessToken.isNullOrBlank() -> {
@@ -241,9 +243,17 @@ private fun CasinoPreloadedWebView(
     val context = androidx.compose.ui.platform.LocalContext.current
     var ready by remember { mutableStateOf(CasinoPrefetcher.isReady(accessToken)) }
     var networkError by remember { mutableStateOf(CasinoPrefetcher.hasNetworkError()) }
-
-    // Do not call warm() here — attach() loads if needed.
-    // warm() from home/login already prefetched; a second warm was pausing the visible WebView.
+    var showLoading by remember {
+        mutableStateOf(!CasinoPrefetcher.isReady(accessToken) && !CasinoPrefetcher.hasNetworkError())
+    }
+    var progress by remember {
+        mutableFloatStateOf((CasinoPrefetcher.getLoadProgress() / 100f).coerceAtLeast(0.02f))
+    }
+    var statusText by remember {
+        mutableStateOf(
+            if (CasinoPrefetcher.hasOpenInnerGame()) "Loading game…" else "Opening lobby…"
+        )
+    }
 
     DisposableEffect(accessToken) {
         val readyListener: (Boolean) -> Unit = { isReady ->
@@ -252,22 +262,57 @@ private fun CasinoPreloadedWebView(
                 networkError = true
             }
         }
-        val errorListener: (Boolean) -> Unit = { networkError = it }
+        val errorListener: (Boolean) -> Unit = { err ->
+            networkError = err
+            if (err) {
+                showLoading = false
+                statusText = "No internet connection"
+            }
+        }
+        val progressListener: (Int) -> Unit = { p ->
+            if (!networkError && showLoading) {
+                progress = (p / 100f).coerceIn(0.02f, 0.98f)
+                statusText = when {
+                    CasinoPrefetcher.hasOpenInnerGame() -> "Loading game…"
+                    p < 25 -> "Connecting…"
+                    p < 55 -> "Loading Casino…"
+                    p < 85 -> "Opening lobby…"
+                    else -> "Almost ready…"
+                }
+            }
+        }
         CasinoPrefetcher.addReadyListener(readyListener)
         CasinoPrefetcher.addNetworkErrorListener(errorListener)
+        CasinoPrefetcher.addProgressListener(progressListener)
         ready = CasinoPrefetcher.isReady(accessToken)
         networkError = CasinoPrefetcher.hasNetworkError()
+        if (ready) {
+            showLoading = false
+            CasinoPrefetcher.revealAfterBoot()
+        }
         onDispose {
             CasinoPrefetcher.removeReadyListener(readyListener)
             CasinoPrefetcher.removeNetworkErrorListener(errorListener)
+            CasinoPrefetcher.removeProgressListener(progressListener)
             CasinoPrefetcher.detach()
         }
+    }
+
+    // Background load done → 100% → reveal lobby.
+    LaunchedEffect(ready, networkError) {
+        if (networkError || !ready || !showLoading) return@LaunchedEffect
+        progress = 1f
+        statusText = "Ready"
+        delay(220)
+        showLoading = false
+        CasinoPrefetcher.revealAfterBoot()
     }
 
     LaunchedEffect(accessToken, networkError) {
         if (networkError) return@LaunchedEffect
         if (!NetworkUtils.isOnline(context)) {
             networkError = true
+            showLoading = false
             return@LaunchedEffect
         }
         val ok = NetworkUtils.awaitReadyOrOffline(
@@ -277,8 +322,18 @@ private fun CasinoPreloadedWebView(
         )
         if (!ok) {
             networkError = true
+            showLoading = false
         } else {
             ready = true
+        }
+    }
+
+    LaunchedEffect(showLoading, networkError, ready) {
+        while (showLoading && !networkError && !ready) {
+            if (progress < 0.96f) {
+                progress = (progress + 0.008f).coerceAtMost(0.96f)
+            }
+            delay(90)
         }
     }
 
@@ -302,6 +357,12 @@ private fun CasinoPreloadedWebView(
                         }
                     )
                     ready = already || CasinoPrefetcher.isReady(accessToken)
+                    if (ready) {
+                        showLoading = false
+                        CasinoPrefetcher.revealAfterBoot()
+                    } else {
+                        showLoading = true
+                    }
                     networkError = CasinoPrefetcher.hasNetworkError()
                 }
             },
@@ -326,25 +387,24 @@ private fun CasinoPreloadedWebView(
             modifier = Modifier.fillMaxSize()
         )
 
-        if (!ready && !networkError) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(
-                    color = PrimaryYellow,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(44.dp)
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    if (CasinoPrefetcher.hasOpenInnerGame()) "Loading game…" else "Loading Casino…",
-                    color = TextGrey,
-                    fontSize = 14.sp
-                )
-            }
+        if (showLoading && !networkError) {
+            ChickenRoadLoadingOverlay(
+                title = "Casino",
+                loadingImageRes = R.drawable.casino_loading,
+                progress = progress,
+                status = statusText
+            )
         }
 
         if (networkError) {
             NoInternetConnectionOverlay(
-                onRetry = { CasinoPrefetcher.retry(accessToken) },
+                onRetry = {
+                    showLoading = true
+                    ready = false
+                    progress = 0.02f
+                    statusText = "Connecting…"
+                    CasinoPrefetcher.retry(accessToken)
+                },
                 background = ChickenRoadBg
             )
         }
@@ -682,11 +742,14 @@ private fun ChickenRoadLoadingOverlay(
     val p = progress.coerceIn(0f, 1f)
     val pct = (p * 100).toInt()
     val barShape = RoundedCornerShape(50)
+    val colors = rememberAppScreenColors()
+    val accent = if (colors.isWhite) colors.accent else PrimaryYellow
+    val overlayBg = if (colors.isWhite) colors.background else ChickenRoadBg
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ChickenRoadBg),
+            .background(overlayBg),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -709,7 +772,7 @@ private fun ChickenRoadLoadingOverlay(
             } else {
                 Text(
                     title.uppercase(),
-                    color = PrimaryYellow,
+                    color = accent,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.5.sp,
@@ -717,15 +780,15 @@ private fun ChickenRoadLoadingOverlay(
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Text(status, color = TextGrey, fontSize = 14.sp, textAlign = TextAlign.Center)
+            Text(status, color = colors.textMuted, fontSize = 14.sp, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(18.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(18.dp)
                     .clip(barShape)
-                    .border(1.5.dp, PrimaryYellow.copy(alpha = 0.85f), barShape)
-                    .background(Color(0xFF1A1A1A))
+                    .border(1.5.dp, accent.copy(alpha = 0.85f), barShape)
+                    .background(if (colors.isWhite) Color(0xFFE5E7EB) else Color(0xFF1A1A1A))
             ) {
                 Box(
                     modifier = Modifier
@@ -734,11 +797,19 @@ private fun ChickenRoadLoadingOverlay(
                         .clip(barShape)
                         .background(
                             Brush.horizontalGradient(
-                                listOf(
-                                    Color(0xFFFFCC00),
-                                    Color(0xFFFFE082),
-                                    Color(0xFFFFCC00)
-                                )
+                                if (loadingImageRes == R.drawable.casino_loading) {
+                                    listOf(
+                                        Color(0xFF1B5E20),
+                                        Color(0xFF66BB6A),
+                                        Color(0xFFFFD54F)
+                                    )
+                                } else {
+                                    listOf(
+                                        Color(0xFFFFCC00),
+                                        Color(0xFFFFE082),
+                                        Color(0xFFFFCC00)
+                                    )
+                                }
                             )
                         )
                 )
@@ -746,7 +817,7 @@ private fun ChickenRoadLoadingOverlay(
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 "$pct%",
-                color = PrimaryYellow,
+                color = accent,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Black
             )

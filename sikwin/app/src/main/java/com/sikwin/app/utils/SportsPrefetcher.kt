@@ -8,17 +8,22 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import com.sikwin.app.data.prefs.ThemePreferences
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Parks a Sports WebView off-screen from APK/home open so LIVE / Cricket / Soccer / Tennis
@@ -36,11 +41,26 @@ object SportsPrefetcher {
     @Volatile private var pageReady: Boolean = false
     @Volatile private var networkError: Boolean = false
     @Volatile private var myBetsOpen: Boolean = false
+    /** Ignore rapid same-mode tab taps that re-click the hub / force-reload. */
+    private var lastNavigateMode: String? = null
+    private var lastNavigateAtMs: Long = 0L
+    /** 0–100 WebView load progress for the cricket/sports boot overlay. */
+    @Volatile private var loadProgress: Int = 0
+    /**
+     * Keep WebView hidden until Compose finishes the 100% bar and calls [revealAfterBoot].
+     * Prevents empty black screen when a reload sets alpha=0 after the overlay was dismissed.
+     */
+    @Volatile private var waitingForOverlayReveal: Boolean = false
+    /** True while Sports screen has the WebView in its Compose hierarchy. */
+    @Volatile private var attachedVisible: Boolean = false
     /** After hub load, drop warm/reload history so swipe-back exits Sports. */
     @Volatile private var clearHistoryAfterHubLoad: Boolean = false
     private var feedPollRunnable: Runnable? = null
     private val readyListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
     private val networkErrorListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
+    private val progressListeners = CopyOnWriteArrayList<(Int) -> Unit>()
+    private val themeListeners = CopyOnWriteArrayList<(String) -> Unit>()
+    private val themeBridgeAttached = AtomicBoolean(false)
 
     private const val FEED_POLL_JS = """
         (function(){
@@ -79,6 +99,12 @@ object SportsPrefetcher {
 
     fun hasNetworkError(): Boolean = networkError
 
+    /** True while Sports LIVE screen has the WebView attached (Compose visible). */
+    fun isAttachedVisible(): Boolean = attachedVisible
+
+    /** 0–100 progress while the hub boots under the loading overlay. */
+    fun getLoadProgress(): Int = loadProgress.coerceIn(0, 100)
+
     /** True when the WebView is already on the sports/cricket hub (even if feed still loading). */
     fun hasHubUrl(): Boolean {
         val url = webView?.url.orEmpty()
@@ -110,10 +136,71 @@ object SportsPrefetcher {
         networkErrorListeners.remove(listener)
     }
 
+    fun addProgressListener(listener: (Int) -> Unit) {
+        progressListeners.add(listener)
+        try {
+            listener(getLoadProgress())
+        } catch (_: Exception) {
+        }
+    }
+
+    fun removeProgressListener(listener: (Int) -> Unit) {
+        progressListeners.remove(listener)
+    }
+
+    fun addThemeListener(listener: (String) -> Unit) {
+        themeListeners.add(listener)
+    }
+
+    fun removeThemeListener(listener: (String) -> Unit) {
+        themeListeners.remove(listener)
+    }
+
+    /**
+     * Called from WebView when sports page toggles light/dark.
+     * Persists app theme + notifies Compose (bottom bar).
+     * Does NOT touch Casino WebView while LIVE is open — that froze Chromium.
+     */
+    fun notifyWebThemeChanged(theme: String) {
+        val mode = if (theme == "light") "light" else "dark"
+        mainHandler.post {
+            var changed = false
+            try {
+                activityRef?.get()?.let { act ->
+                    val prefs = ThemePreferences(act)
+                    val want = if (mode == "light") {
+                        ThemePreferences.THEME_WHITE
+                    } else {
+                        ThemePreferences.THEME_DUAL_CARDS
+                    }
+                    if (prefs.getAppTheme() != want) {
+                        prefs.setAppTheme(want)
+                        changed = true
+                    }
+                }
+            } catch (_: Exception) {
+            }
+            themeListeners.forEach {
+                try {
+                    it(mode)
+                } catch (_: Exception) {
+                }
+            }
+            // Sync casino only after leave LIVE, and only when theme actually changed.
+            if (changed && !attachedVisible) {
+                try {
+                    CasinoPrefetcher.applyAppTheme(activityRef?.get(), mode)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
     fun retry(accessToken: String?, refreshToken: String?, sport: String?, mode: String? = null) {
         mainHandler.post {
             networkError = false
             notifyNetworkError(false)
+            setLoadProgress(2, force = true)
             clearHistoryAfterHubLoad = true
             loadSports(accessToken, refreshToken, sport, mode, force = true)
         }
@@ -143,6 +230,37 @@ object SportsPrefetcher {
         }
     }
 
+    /**
+     * Push app Black/White theme into sports/cricket WebView immediately.
+     * Writes `gundu_sports_theme` and calls GunduSportsTheme.apply when present.
+     */
+    fun applyAppTheme(context: Context?, mode: String? = null) {
+        val activity = resolveActivity(context) ?: return
+        activityRef = WeakReference(activity)
+        val theme = mode?.takeIf { it == "light" || it == "dark" }
+            ?: ThemePreferences(activity).webThemeMode()
+        mainHandler.post {
+            try {
+                ensureWebView(activity)
+                val wv = webView ?: return@post
+                try {
+                    wv.onResume()
+                } catch (_: Exception) {
+                }
+                wv.evaluateJavascript(buildThemeInjectJs(theme), null)
+                val url = wv.url.orEmpty()
+                val onHub = (url.contains("/sports") || url.contains("/cricket")) &&
+                    !WebViewOffline.isChromeErrorUrl(url) &&
+                    !url.equals("about:blank", ignoreCase = true)
+                if (onHub) {
+                    // Soft reload so CSS/theme scripts re-read storage cleanly.
+                    wv.reload()
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     fun attach(
         parent: ViewGroup,
         accessToken: String?,
@@ -154,6 +272,7 @@ object SportsPrefetcher {
         val activity = resolveActivity(parent.context) ?: return false
         ensureWebView(activity)
         val wv = webView ?: return false
+        attachedVisible = true
 
         (wv.parent as? ViewGroup)?.removeView(wv)
         parent.addView(
@@ -168,32 +287,80 @@ object SportsPrefetcher {
         } catch (_: Exception) {
         }
         wv.visibility = android.view.View.VISIBLE
-        wv.alpha = if (networkError || !isReady(accessToken, sport)) 0f else 1f
-        if (!accessToken.isNullOrBlank()) {
-            wv.evaluateJavascript(buildInjectJs(accessToken, refreshToken.orEmpty()), null)
-        }
-
+        // While on LIVE screen, keep WebView opaque — Compose loader covers boot.
+        // Alpha 0 + dismissed overlay was the intermittent black screen.
+        wv.alpha = if (networkError) 0f else 1f
+        waitingForOverlayReveal = false
+        val blank = wv.url.isNullOrBlank() ||
+            wv.url.equals("about:blank", ignoreCase = true) ||
+            WebViewOffline.isChromeErrorUrl(wv.url.orEmpty())
         val needsReload = loadedAccess != accessToken ||
             sportChanged(sport) ||
             modeChanged(mode) ||
             !pageReady ||
             networkError ||
-            WebViewOffline.isChromeErrorUrl(wv.url.orEmpty())
+            blank
         if (needsReload) {
             clearHistoryAfterHubLoad = true
+        }
+        if (!accessToken.isNullOrBlank()) {
+            wv.evaluateJavascript(buildInjectJs(accessToken, refreshToken.orEmpty()), null)
         }
         loadSports(accessToken, refreshToken, sport, mode, force = needsReload)
         return isReady(accessToken, sport)
     }
 
+    /** Show the parked WebView after the Compose loading overlay hits 100%. */
+    fun revealAfterBoot() {
+        mainHandler.post {
+            waitingForOverlayReveal = false
+            forceVisibleIfAttached()
+        }
+    }
+
+    /** Hard guarantee: attached LIVE WebView is never left at alpha 0. */
+    fun forceVisibleIfAttached() {
+        mainHandler.post {
+            applyAttachedVisibility()
+        }
+    }
+
+    private fun applyAttachedVisibility() {
+        if (!attachedVisible || networkError) return
+        val wv = webView ?: return
+        try {
+            wv.visibility = android.view.View.VISIBLE
+            wv.alpha = 1f
+            wv.onResume()
+        } catch (_: Exception) {
+        }
+    }
+
     /** Switch Live / Upcoming / My Bets without leaving Sports screen. */
     fun navigateMode(accessToken: String?, refreshToken: String?, sport: String?, mode: String?) {
         mainHandler.post {
-            val wv = webView ?: run {
-                loadSports(accessToken, refreshToken, sport, mode, force = true)
+            val m = normalizeMode(mode)
+            val now = SystemClock.uptimeMillis()
+            // Same tab double-tap / spam — ignore (was re-clicking hub mode and glitching feed).
+            if (m != "bets" &&
+                m == lastNavigateMode &&
+                now - lastNavigateAtMs < 700L &&
+                !myBetsOpen
+            ) {
                 return@post
             }
-            val m = normalizeMode(mode)
+            lastNavigateMode = m
+            lastNavigateAtMs = now
+
+            val wv = webView ?: run {
+                loadSports(accessToken, refreshToken, sport, m, force = true)
+                return@post
+            }
+            // Already on this tab with hub URL — do not reload or re-click mode button.
+            if (m != "bets" && loadedMode == m && !myBetsOpen && hasHubUrl()) {
+                applyAttachedVisibility()
+                return@post
+            }
             loadedMode = m
             if (m == "bets") {
                 showMyBetsOverlay(wv)
@@ -208,7 +375,15 @@ object SportsPrefetcher {
                     var panel = document.getElementById('apk-my-bets');
                     if (panel) panel.remove();
                     var btn = document.querySelector('.mode-row button[data-mode="$m"]');
-                    if (btn) { btn.click(); return 'ok'; }
+                    if (btn) {
+                      if (btn.classList && btn.classList.contains('active')) return 'ok';
+                      btn.click();
+                      return 'ok';
+                    }
+                    // No mode button (e.g. cricket) — stay on current hub without reload.
+                    if (location.href.indexOf('/sports') >= 0 || location.href.indexOf('/cricket') >= 0) {
+                      return 'ok';
+                    }
                   } catch (e) {}
                   return 'reload';
                 })();
@@ -216,6 +391,16 @@ object SportsPrefetcher {
             ) { result ->
                 val ok = result?.contains("ok") == true
                 if (!ok) {
+                    // Hub already showing — never force full reload (that caused LIVE spam glitches).
+                    if (hasHubUrl()) {
+                        try {
+                            wv.alpha = 1f
+                            waitingForOverlayReveal = false
+                            applyAttachedVisibility()
+                        } catch (_: Exception) {
+                        }
+                        return@evaluateJavascript
+                    }
                     clearHistoryAfterHubLoad = true
                     loadSports(accessToken, refreshToken, sport, m, force = true)
                 }
@@ -276,6 +461,7 @@ object SportsPrefetcher {
     }
 
     fun prepareLeave() {
+        attachedVisible = false
         val wv = webView ?: return
         cancelFeedPoll()
         myBetsOpen = false
@@ -289,6 +475,7 @@ object SportsPrefetcher {
     /** Pause sports JS when opening Casino so shared Chromium isn't contended. */
     fun haltForOtherWebGame() {
         mainHandler.post {
+            attachedVisible = false
             cancelFeedPoll()
             try {
                 webView?.stopLoading()
@@ -297,7 +484,9 @@ object SportsPrefetcher {
             } catch (_: Exception) {
             }
             pageReady = false
+            waitingForOverlayReveal = false
             setReady(false)
+            setLoadProgress(0, force = true)
             loadedAccess = null
         }
     }
@@ -341,6 +530,7 @@ object SportsPrefetcher {
     }
 
     fun detach() {
+        attachedVisible = false
         val wv = webView ?: return
         val h = holder ?: return
         cancelFeedPoll()
@@ -380,6 +570,10 @@ object SportsPrefetcher {
             loadedMode = null
             pageReady = false
             networkError = false
+            attachedVisible = false
+            waitingForOverlayReveal = false
+            themeBridgeAttached.set(false)
+            setLoadProgress(0, force = true)
             setReady(false)
         }
     }
@@ -427,9 +621,24 @@ object SportsPrefetcher {
 
     private fun setReady(ready: Boolean) {
         pageReady = ready
+        if (ready) {
+            setLoadProgress(100)
+        }
         readyListeners.forEach {
             try {
                 it(ready)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun setLoadProgress(progress: Int, force: Boolean = false) {
+        val p = progress.coerceIn(0, 100)
+        if (!force && p < loadProgress && p > 5) return
+        loadProgress = p
+        progressListeners.forEach {
+            try {
+                it(p)
             } catch (_: Exception) {
             }
         }
@@ -448,6 +657,7 @@ object SportsPrefetcher {
     private fun markOffline(view: WebView?) {
         cancelFeedPoll()
         WebViewOffline.hideChromeErrorPage(view)
+        setLoadProgress(0, force = true)
         setReady(false)
         notifyNetworkError(true)
     }
@@ -464,32 +674,71 @@ object SportsPrefetcher {
             setReady(true)
             return
         }
-        val runnable = Runnable {
+        // Hub HTML is already up — don't leave the APK loader hanging on slow/hung feed JS.
+        if (attempt == 0) {
+            setLoadProgress(92)
+        } else if (attempt % 2 == 0) {
+            setLoadProgress((92 + attempt.coerceAtMost(12)).coerceAtMost(98))
+        }
+        // Force ready after ~4s even if feed poll JS never callbacks (WebView pause hang).
+        if (attempt >= 20) {
+            feedPollRunnable = null
+            networkError = false
+            notifyNetworkError(false)
+            try {
+                applyAttachedVisibility()
+                if (!attachedVisible) {
+                    view.alpha = if (waitingForOverlayReveal) 0f else 1f
+                }
+            } catch (_: Exception) {
+            }
+            setReady(true)
+            return
+        }
+        lateinit var runnable: Runnable
+        runnable = Runnable {
+            // If evaluateJavascript never returns, advance poll anyway.
+            val hangWatch = Runnable {
+                if (feedPollRunnable === runnable) {
+                    waitForSportsFeed(view, attempt + 1)
+                }
+            }
+            mainHandler.postDelayed(hangWatch, 450L)
             try {
                 view.evaluateJavascript(FEED_POLL_JS) { result ->
-                    val done = result?.contains("done") == true || attempt >= 50
-                    if (done) {
+                    mainHandler.removeCallbacks(hangWatch)
+                    if (feedPollRunnable !== runnable && feedPollRunnable != null) return@evaluateJavascript
+                    val done = result?.contains("done") == true
+                    if (done || attempt >= 20) {
                         feedPollRunnable = null
                         networkError = false
                         notifyNetworkError(false)
-                        view.alpha = 1f
-                        setReady(true)
-                    } else if (attempt >= 50) {
-                        // Show hub even if cards are slow — matches browser "Loading…" state.
-                        feedPollRunnable = null
-                        view.alpha = 1f
+                        try {
+                            applyAttachedVisibility()
+                            if (!attachedVisible) {
+                                view.alpha = if (waitingForOverlayReveal) 0f else 1f
+                            }
+                        } catch (_: Exception) {
+                        }
                         setReady(true)
                     } else {
                         waitForSportsFeed(view, attempt + 1)
                     }
                 }
             } catch (_: Exception) {
-                view.alpha = 1f
+                mainHandler.removeCallbacks(hangWatch)
+                try {
+                    applyAttachedVisibility()
+                    if (!attachedVisible) {
+                        view.alpha = if (waitingForOverlayReveal) 0f else 1f
+                    }
+                } catch (_: Exception) {
+                }
                 setReady(true)
             }
         }
         feedPollRunnable = runnable
-        mainHandler.postDelayed(runnable, if (attempt == 0) 120L else 200L)
+        mainHandler.postDelayed(runnable, if (attempt == 0) 80L else 180L)
     }
 
     /**
@@ -582,6 +831,8 @@ object SportsPrefetcher {
                 .toString()
         )
         val bearerLit = JSONObject.quote("Bearer $accessToken")
+        val theme = resolveWebThemeMode()
+        val themeLit = JSONObject.quote(theme)
         return """
             (function(){
               try {
@@ -598,9 +849,95 @@ object SportsPrefetcher {
                 sessionStorage.setItem("accessToken", $accessLit);
                 sessionStorage.setItem("refreshToken", $refreshLit);
                 localStorage.setItem("Authorization", $bearerLit);
+                localStorage.setItem("gundu_sports_theme", $themeLit);
+                try {
+                  if (window.GunduSportsTheme && typeof window.GunduSportsTheme.apply === "function") {
+                    window.GunduSportsTheme.write($themeLit);
+                    window.GunduSportsTheme.apply($themeLit);
+                  } else {
+                    document.documentElement.setAttribute("data-theme", $themeLit);
+                    document.documentElement.classList.toggle("theme-light", $themeLit === "light");
+                    document.documentElement.classList.toggle("theme-dark", $themeLit === "dark");
+                  }
+                } catch (te) {}
+                try { ${THEME_BRIDGE_HOOK_JS} } catch (e2) {}
               } catch (e) {}
             })();
         """.trimIndent()
+    }
+
+    private fun buildThemeInjectJs(theme: String): String {
+        val themeLit = JSONObject.quote(if (theme == "light") "light" else "dark")
+        return """
+            (function(){
+              try {
+                localStorage.setItem("gundu_sports_theme", $themeLit);
+                if (window.GunduSportsTheme && typeof window.GunduSportsTheme.apply === "function") {
+                  window.GunduSportsTheme.write($themeLit);
+                  window.GunduSportsTheme.apply($themeLit);
+                } else {
+                  document.documentElement.setAttribute("data-theme", $themeLit);
+                  document.documentElement.classList.toggle("theme-light", $themeLit === "light");
+                  document.documentElement.classList.toggle("theme-dark", $themeLit === "dark");
+                }
+              } catch (e) {}
+              try { ${THEME_BRIDGE_HOOK_JS} } catch (e2) {}
+            })();
+        """.trimIndent()
+    }
+
+    /** Hook sports page theme toggle → Android bottom bar / prefs. */
+    private val THEME_BRIDGE_HOOK_JS = """
+      (function(){
+        function notify(t){
+          try {
+            t = (t === 'light') ? 'light' : 'dark';
+            if (window.__gunduLastThemeNotify === t) return;
+            window.__gunduLastThemeNotify = t;
+            if (window.GunduTheme && typeof window.GunduTheme.onThemeChanged === 'function') {
+              window.GunduTheme.onThemeChanged(t);
+            }
+          } catch (e) {}
+        }
+        function hookApi(){
+          var api = window.GunduSportsTheme;
+          if (!api || api.__gunduBridged) return;
+          api.__gunduBridged = true;
+          var _toggle = api.toggle.bind(api);
+          // Only bridge user toggle — do not wrap apply/write (APK inject + page boot
+          // call those and were freezing LIVE by waking Casino WebView).
+          api.toggle = function(){
+            var r = _toggle();
+            notify(r);
+            return r;
+          };
+        }
+        hookApi();
+        if (!window.__gunduThemeClickHook) {
+          window.__gunduThemeClickHook = true;
+          document.addEventListener('click', function(e){
+            var btn = e.target && e.target.closest && e.target.closest('[data-theme-toggle]');
+            if (!btn) return;
+            setTimeout(function(){
+              try {
+                var t = (window.GunduSportsTheme && window.GunduSportsTheme.read)
+                  ? window.GunduSportsTheme.read()
+                  : (document.documentElement.getAttribute('data-theme') || 'dark');
+                notify(t);
+              } catch (err) {}
+            }, 40);
+          }, true);
+        }
+      })();
+    """.trimIndent()
+
+    private fun resolveWebThemeMode(): String {
+        val ctx = activityRef?.get() ?: return "dark"
+        return try {
+            ThemePreferences(ctx).webThemeMode()
+        } catch (_: Exception) {
+            "dark"
+        }
     }
 
     private fun buildFeedNudgeJs(): String {
@@ -637,6 +974,7 @@ object SportsPrefetcher {
             !modeChanged(mode) &&
             wv.url.orEmpty().let { it.contains("/sports") || it.contains("/cricket") }
         ) {
+            setLoadProgress(100)
             setReady(true)
             return
         }
@@ -646,17 +984,26 @@ object SportsPrefetcher {
         loadedMode = normalizeMode(mode)
         networkError = false
         notifyNetworkError(false)
-        // Keep spinner off if hub is already on screen (matches visible via prior paint)
-        val alreadyShowing = wv.url.orEmpty().let {
-            (it.contains("/sports") || it.contains("/cricket")) && !WebViewOffline.isChromeErrorUrl(it)
-        }
-        if (!alreadyShowing) {
+        val blank = wv.url.isNullOrBlank() ||
+            wv.url.equals("about:blank", ignoreCase = true) ||
+            WebViewOffline.isChromeErrorUrl(wv.url.orEmpty())
+        val alreadyShowing = !blank &&
+            wv.url.orEmpty().let { it.contains("/sports") || it.contains("/cricket") }
+        // Soft-reload under Compose loader — keep WebView opaque while attached (no black flash).
+        if (force || blank || !alreadyShowing || !pageReady) {
+            waitingForOverlayReveal = !attachedVisible
+            setLoadProgress(2, force = true)
             setReady(false)
+            if (!attachedVisible) {
+                try {
+                    wv.alpha = 0f
+                } catch (_: Exception) {
+                }
+            } else {
+                applyAttachedVisibility()
+            }
         }
         try {
-            if (!pageReady) {
-                wv.alpha = 0f
-            }
             wv.loadUrl(url)
         } catch (_: Exception) {
             markOffline(wv)
@@ -690,6 +1037,20 @@ object SportsPrefetcher {
             settings.setSupportZoom(false)
             CookieManager.getInstance().setAcceptCookie(true)
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+            if (themeBridgeAttached.compareAndSet(false, true)) {
+                addJavascriptInterface(SportsThemeBridge(), "GunduTheme")
+            }
+
+            webChromeClient = object : WebChromeClient() {
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    if (pageReady || networkError) return
+                    if (newProgress in 1..99) {
+                        // Cap under 90 until feed poll finishes — then Compose drives to 100%.
+                        setLoadProgress((newProgress * 0.88f).toInt().coerceIn(3, 88))
+                    }
+                }
+            }
 
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
@@ -725,10 +1086,15 @@ object SportsPrefetcher {
                 ) {
                     val u = url.orEmpty()
                     if (u.contains("/sports") || u.contains("/cricket")) {
-                        // Soft hide while new hub loads — do not clear pageReady yet so
-                        // Compose does not flash a false "no internet" overlay.
+                        setLoadProgress(5)
+                        // Attached LIVE screen: stay opaque (Compose overlay covers boot).
+                        // Parked warm load may stay hidden.
                         try {
-                            if (!pageReady) view?.alpha = 0f
+                            if (attachedVisible) {
+                                applyAttachedVisibility()
+                            } else if (!pageReady) {
+                                view?.alpha = 0f
+                            }
                         } catch (_: Exception) {
                         }
                     }
@@ -747,25 +1113,41 @@ object SportsPrefetcher {
                                 buildInjectJs(access, loadedRefresh.orEmpty()),
                                 null
                             )
+                        } else {
+                            view?.evaluateJavascript(buildThemeInjectJs(resolveWebThemeMode()), null)
                         }
+                        // Always re-hook theme bridge after scripts load (GunduSportsTheme / toggle).
+                        view?.evaluateJavascript(
+                            """
+                            (function(){ try { $THEME_BRIDGE_HOOK_JS } catch (e) {} })();
+                            """.trimIndent(),
+                            null
+                        )
                         view?.evaluateJavascript(buildFeedNudgeJs(), null)
                         networkError = false
                         notifyNetworkError(false)
-                        // Show shell immediately so match list can paint; feed poll refines readiness.
+                        setLoadProgress(90)
                         try {
-                            view?.alpha = 1f
+                            if (attachedVisible) {
+                                applyAttachedVisibility()
+                            } else {
+                                view?.alpha = if (waitingForOverlayReveal) 0f else 1f
+                            }
                         } catch (_: Exception) {
                         }
-                        setReady(true)
                         val hub = !u.contains("view=match") &&
-                            !u.contains("/sports/match") &&
-                            !u.contains("view=match")
+                            !u.contains("/sports/match")
                         if (hub && clearHistoryAfterHubLoad) {
                             clearHistoryAfterHubLoad = false
                             try {
                                 view?.clearHistory()
                             } catch (_: Exception) {
                             }
+                        }
+                        // Mark hub ready quickly so the loading bar can't sit mid-way forever.
+                        // Feed poll still runs and will re-assert ready when cards paint.
+                        if (hub) {
+                            setReady(true)
                         }
                         waitForSportsFeed(view)
                     }
@@ -800,5 +1182,12 @@ object SportsPrefetcher {
         }
         webView = wv
         holder?.addView(wv)
+    }
+
+    private class SportsThemeBridge {
+        @JavascriptInterface
+        fun onThemeChanged(theme: String?) {
+            notifyWebThemeChanged(theme.orEmpty())
+        }
     }
 }
