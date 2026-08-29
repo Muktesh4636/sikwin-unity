@@ -50,8 +50,14 @@ object CasinoPrefetcher {
     private var loadedToken: String? = null
     @Volatile private var pageReady: Boolean = false
     @Volatile private var networkError: Boolean = false
-    /** Set when Sports (or another same-origin WebView) blanked the casino page. */
+    /** Set when Sports (or another same-origin WebView) blanked/paused the casino page. */
     @Volatile private var haltedByOtherGame: Boolean = false
+    /**
+     * After LIVE soft-halts casino, URL can still be /casino while paused.
+     * Treating that as ready dismissed the loader → intermittent black Casino.
+     * Cleared only when a casino page finishes loading.
+     */
+    @Volatile private var lobbyStale: Boolean = false
     /** 0–100 WebView load progress for the casino boot overlay. */
     @Volatile private var loadProgress: Int = 0
     /**
@@ -82,6 +88,18 @@ object CasinoPrefetcher {
     }
 
     fun hasNetworkError(): Boolean = networkError
+
+    /**
+     * True when WebView is on a casino URL that is safe to treat as painted.
+     * Returns false while [lobbyStale] (paused/reloading after LIVE) — old /casino URL
+     * must not dismiss the loader (same intermittent black-screen bug as LIVE).
+     */
+    fun hasCasinoUrl(): Boolean {
+        if (lobbyStale || haltedByOtherGame) return false
+        val u = webView?.url.orEmpty()
+        return u.contains("/casino") && !WebViewOffline.isChromeErrorUrl(u) &&
+            !u.equals("about:blank", ignoreCase = true)
+    }
 
     /** 0–100 progress while the lobby boots under the loading overlay. */
     fun getLoadProgress(): Int = loadProgress.coerceIn(0, 100)
@@ -134,33 +152,13 @@ object CasinoPrefetcher {
         }
     }
 
-    /** Warm casino lobby WebView (optional force reload). */
+    /**
+     * Warm casino lobby WebView (optional force reload).
+     * Disabled: background lobby + gundu-auth.js kokoroko loop froze shared Chromium
+     * and blocked cricket/LIVE match feeds in the APK.
+     */
     fun warm(context: Context?, token: String? = null, force: Boolean = false) {
-        val activity = resolveActivity(context) ?: return
-        activityRef = WeakReference(activity)
-        warmHttpAssets()
-        mainHandler.post {
-            try {
-                ensureWebView(activity)
-                // Never interrupt an on-screen Casino session
-                if (attachedVisible && !force) return@post
-                if (attachedVisible && force) {
-                    loadCasino(token, force = true)
-                    return@post
-                }
-                // Must be resumed or the lobby never finishes loading in the background.
-                try {
-                    webView?.onResume()
-                } catch (_: Exception) {
-                }
-                loadCasino(token, force = force)
-                if (!attachedVisible) {
-                    muteParked(webView)
-                }
-            } catch (_: Exception) {
-                /* soft */
-            }
-        }
+        // no-op — casino loads on attach only
     }
 
     /**
@@ -201,9 +199,7 @@ object CasinoPrefetcher {
      * Skip if already ready for this token.
      */
     fun prefetchOnHome(context: Context?, token: String?) {
-        if (token.isNullOrBlank()) return
-        if (isReady(token)) return
-        warm(context, token, force = false)
+        // Disabled: warm+onPause left an empty ES-module lobby and contended Chromium with LIVE.
     }
 
     /**
@@ -212,9 +208,7 @@ object CasinoPrefetcher {
      * Never force-reload — that wiped a parked lobby (and scroll) when returning.
      */
     fun prefetchWhilePlaying(context: Context?, token: String? = null) {
-        if (token.isNullOrBlank()) return
-        if (isReady(token)) return
-        warm(context, token, force = false)
+        // Disabled — see prefetchOnHome.
     }
 
     /**
@@ -253,34 +247,30 @@ object CasinoPrefetcher {
         }
         wv.visibility = android.view.View.VISIBLE
         // While on Casino screen, keep WebView opaque — Compose loader covers boot.
-        // Alpha 0 + dismissed overlay was the intermittent black screen.
         wv.alpha = if (networkError) 0f else 1f
         waitingForOverlayReveal = false
         val blank = WebViewOffline.isChromeErrorUrl(wv.url.orEmpty()) ||
             wv.url.isNullOrBlank() ||
             wv.url.equals("about:blank", ignoreCase = true) ||
             haltedByOtherGame
-        // After Sports halt, always force a fresh lobby load.
-        if (isReady(token) && !blank) {
-            applyAttachedAlpha(wv, token)
-            restoreLobbyScroll(wv)
-            return true
-        }
+        // Always reload when Casino screen opens. Home warm used to set pageReady on
+        // HTML finish then onPause before ES modules painted tiles → empty lobby forever.
+        haltedByOtherGame = false
+        lobbyStale = true
+        pageReady = false
+        setReady(false)
+        setLoadProgress(2, force = true)
         applyAttachedAlpha(wv, token)
-        loadCasino(token, force = true, cacheBust = blank)
-        // Failsafe: if lobby URL is up but ready flag lagged (e.g. after Sports halt), mark ready.
-        mainHandler.postDelayed({
-            if (!attachedVisible) return@postDelayed
-            val u = webView?.url.orEmpty()
-            if (u.contains("/casino") && !looksLikeInnerGame(u) && !WebViewOffline.isChromeErrorUrl(u)) {
-                networkError = false
-                notifyNetworkError(false)
-                setLoadProgress(100)
-                setReady(true)
-                forceVisibleIfAttached()
+        mainHandler.post {
+            if (!attachedVisible) return@post
+            forceVisibleIfAttached()
+            try {
+                wv.onResume()
+            } catch (_: Exception) {
             }
-        }, 1800L)
-        return isReady(token)
+            loadCasino(token, force = true, cacheBust = blank)
+        }
+        return false
     }
 
     /** Show the lobby after the Compose loading overlay reaches 100%. */
@@ -392,25 +382,26 @@ object CasinoPrefetcher {
     }
 
     /**
-     * Kill casino page JS immediately (about:blank + pause).
-     * Required when opening Sports: casino and sports share gunduata.tech origin /
-     * Chromium process; a gundu-auth infinite loop freezes sports "Loading matches…".
+     * Kill casino page JS when opening Sports/cricket.
+     * Always about:blank — a parked lobby still runs gundu-auth/lobby listeners and
+     * can stack-overflow Chromium (shared with cricket WebView).
      */
     fun haltForOtherWebGame() {
         val work = Runnable {
             haltedByOtherGame = true
+            lobbyStale = true
             attachedVisible = false
             try {
                 webView?.stopLoading()
+                // Do NOT onPause — shared Chromium; pausing one WebView freezes the other.
                 webView?.loadUrl("about:blank")
-                webView?.onPause()
+                loadedToken = null
+                pageReady = false
+                waitingForOverlayReveal = false
+                setLoadProgress(0, force = true)
+                setReady(false)
             } catch (_: Exception) {
             }
-            pageReady = false
-            waitingForOverlayReveal = false
-            setLoadProgress(0, force = true)
-            setReady(false)
-            loadedToken = null
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
             work.run()
@@ -419,14 +410,9 @@ object CasinoPrefetcher {
         }
     }
 
-    /** Mute audio while parked. Pause only after lobby is ready so prefetch can finish. */
+    /** Mute audio while parked. Do not onPause — that aborts lobby module paint / XHR. */
     private fun silenceParked(wv: WebView?) {
         muteParked(wv)
-        if (wv == null || !pageReady) return
-        try {
-            wv.onPause()
-        } catch (_: Exception) {
-        }
     }
 
     private fun muteParked(wv: WebView?) {
@@ -696,6 +682,7 @@ object CasinoPrefetcher {
     private fun setReady(ready: Boolean) {
         pageReady = ready
         if (ready) {
+            lobbyStale = false
             setLoadProgress(100)
         }
         readyListeners.forEach { listener ->
@@ -736,6 +723,51 @@ object CasinoPrefetcher {
         notifyNetworkError(true)
     }
 
+
+    private var lobbyContentCheck: Runnable? = null
+
+    private fun scheduleLobbyContentCheck(view: WebView?, token: String?, attempt: Int = 0) {
+        lobbyContentCheck?.let { mainHandler.removeCallbacks(it) }
+        if (view == null || !attachedVisible) return
+        val r = Runnable {
+            if (!attachedVisible) return@Runnable
+            try {
+                view.evaluateJavascript(
+                    """
+                    (function(){
+                      var n = document.querySelectorAll('article.card, .card, .game-card, .rail article').length;
+                      return String(n);
+                    })();
+                    """.trimIndent()
+                ) { raw ->
+                    val n = raw?.trim()?.trim('"')?.toIntOrNull() ?: 0
+                    if (n > 0) {
+                        lobbyStale = false
+                        setReady(true)
+                        forceVisibleIfAttached()
+                    } else if (attempt < 2) {
+                        // Modules still booting — check again.
+                        scheduleLobbyContentCheck(view, token, attempt + 1)
+                    } else if (attempt == 2) {
+                        // Empty after ~2s — hard reload once with cache bust.
+                        loadCasino(token, force = true, cacheBust = true)
+                        mainHandler.postDelayed({
+                            scheduleLobbyContentCheck(webView, token, attempt = 3)
+                        }, 2500L)
+                    } else {
+                        // Give UI something to show even if still empty.
+                        setReady(true)
+                        forceVisibleIfAttached()
+                    }
+                }
+            } catch (_: Exception) {
+                setReady(true)
+            }
+        }
+        lobbyContentCheck = r
+        mainHandler.postDelayed(r, if (attempt == 0) 700L else 900L)
+    }
+
     private fun loadCasino(token: String?, force: Boolean = false, cacheBust: Boolean = false) {
         val wv = webView ?: return
         val ctx = activityRef?.get()
@@ -768,6 +800,11 @@ object CasinoPrefetcher {
         loadedToken = token
         networkError = false
         notifyNetworkError(false)
+        // Mark stale only when replacing a parked/blank document — not every soft force
+        // reload (that kept hasCasinoUrl() false and aborted tile painting).
+        if (blank) {
+            lobbyStale = true
+        }
         if (attachedVisible) {
             waitingForOverlayReveal = false
         }
@@ -776,7 +813,12 @@ object CasinoPrefetcher {
         if (savedLobbyScrollY > 0) pendingRestoreScroll = true
         applyAttachedAlpha(wv, token)
         try {
-            wv.loadUrl(buildUrl(token, cacheBust = cacheBust || blank))
+            try {
+            wv.settings.cacheMode = if (force || cacheBust || blank) android.webkit.WebSettings.LOAD_NO_CACHE
+                else android.webkit.WebSettings.LOAD_DEFAULT
+        } catch (_: Exception) {
+        }
+        wv.loadUrl(buildUrl(token, cacheBust = cacheBust || blank))
         } catch (_: Exception) {
             markOffline(wv)
         }
@@ -900,25 +942,32 @@ object CasinoPrefetcher {
                         return
                     }
                     val u = url.orEmpty()
-                    if (u.contains("/casino") && !looksLikeInnerGame(u)) {
+                    // Any casino page (lobby or inner) counts as painted when attached —
+                    // waiting only for lobby used to leave the loader stuck forever.
+                    if (u.contains("/casino")) {
+                        lobbyStale = false
                         networkError = false
                         notifyNetworkError(false)
                         setLoadProgress(96)
-                        view?.evaluateJavascript(buildThemeInjectJs(resolveWebThemeMode()), null)
+                        if (!looksLikeInnerGame(u)) {
+                            view?.evaluateJavascript(buildThemeInjectJs(resolveWebThemeMode()), null)
+                        }
                         setReady(true)
                         if (attachedVisible) {
+                            waitingForOverlayReveal = false
                             forceVisibleIfAttached()
                         } else {
                             muteParked(view)
                         }
-                        restoreLobbyScroll(view)
-                        // Pause only after lobby is fully loaded (saves CPU, keeps page in memory)
-                        if (!attachedVisible) {
-                            try {
-                                view?.onPause()
-                            } catch (_: Exception) {
-                            }
+                        if (!looksLikeInnerGame(u)) {
+                            restoreLobbyScroll(view)
                         }
+                        // Never onPause here: type=module lobby JS runs AFTER onPageFinished.
+                        // Pausing left an empty lobby that attach treated as ready (no reload).
+                        if (!looksLikeInnerGame(u) && attachedVisible) {
+                            scheduleLobbyContentCheck(view, token = loadedToken)
+                        }
+
                     } else if (!attachedVisible) {
                         muteParked(view)
                     }
@@ -960,6 +1009,15 @@ object CasinoPrefetcher {
         fun goBack() {
             handleBack { onBack?.invoke() }
         }
+
+        /** Lobby JS calls goHome(); alias to the same handler as goBack(). */
+        @JavascriptInterface
+        fun goHome() {
+            goBack()
+        }
+
+        @JavascriptInterface
+        fun isSystemBarsInsetApplied(): Boolean = true
 
         @JavascriptInterface
         fun openGame(id: String, url: String) {

@@ -125,11 +125,10 @@ fun SportsWebViewScreen(
     }
 
     LaunchedEffect(accessToken, refreshToken, sport) {
-        // Casino lobby shares gunduata.tech origin — if it keeps running, gundu-auth.js
-        // can infinite-loop on storage/kokoroko-auth and freeze sports feed fetches.
+        // Attach already loads the hub. warm() here issued a second loadUrl that
+        // aborted the first page's match-feed fetch → empty cricket/LIVE data.
         CasinoPrefetcher.prepareLeave()
         CasinoPrefetcher.haltForOtherWebGame()
-        SportsPrefetcher.warm(context, accessToken, refreshToken, sport, mode = "live")
     }
 
     Column(
@@ -395,29 +394,32 @@ private fun SportsPreloadedWebView(
         SportsPrefetcher.forceVisibleIfAttached()
     }
 
-    // Hub URL is enough to finish the bar — don't wait forever for feed JS.
+    // Hub URL is enough to finish the bar — but only a fresh (non-stale) hub.
     LaunchedEffect(showLoading, networkError) {
         if (!showLoading || networkError) return@LaunchedEffect
         var waited = 0
-        while (showLoading && !networkError && waited < 20) {
+        while (showLoading && !networkError && waited < 25) {
             delay(400)
             waited++
-            if (SportsPrefetcher.hasHubUrl() || SportsPrefetcher.isReady(accessToken, sport)) {
+            // Prefer isReady — hasHubUrl alone used to fire on a paused old /sports URL.
+            if (SportsPrefetcher.isReady(accessToken, sport)) {
                 pageReadyFlag = true
                 if (progress < 0.95f) progress = 0.95f
                 break
             }
+            if (SportsPrefetcher.hasHubUrl() && progress < 0.95f) {
+                progress = 0.95f
+            }
         }
     }
 
-    // Hard failsafe: never leave the loader stuck mid-bar.
+    // Hard failsafe: never leave the loader stuck mid-bar OR dismiss into black.
     LaunchedEffect(showLoading, accessToken, sport) {
         if (!showLoading) return@LaunchedEffect
-        // Reveal as soon as hub URL is up (don't wait 10s).
-        repeat(25) {
+        repeat(30) {
             delay(200)
             if (!showLoading || networkError) return@LaunchedEffect
-            if (SportsPrefetcher.hasHubUrl() || SportsPrefetcher.isReady(accessToken, sport)) {
+            if (SportsPrefetcher.isReady(accessToken, sport)) {
                 pageReadyFlag = true
                 progress = 1f
                 statusText = "Ready"
@@ -427,42 +429,52 @@ private fun SportsPreloadedWebView(
                 SportsPrefetcher.forceVisibleIfAttached()
                 return@LaunchedEffect
             }
+            // Fresh hub URL (not stale after Casino halt) can finish the bar.
+            if (SportsPrefetcher.hasHubUrl()) {
+                pageReadyFlag = true
+                if (progress < 0.95f) progress = 0.95f
+            }
         }
         if (!showLoading || networkError) return@LaunchedEffect
         SportsPrefetcher.retry(accessToken, refreshToken, sport, mode)
         delay(5_000)
         if (!showLoading || networkError) return@LaunchedEffect
-        if (SportsPrefetcher.hasHubUrl() || SportsPrefetcher.isReady(accessToken, sport)) {
+        if (SportsPrefetcher.isReady(accessToken, sport)) {
             pageReadyFlag = true
             progress = 1f
             showLoading = false
             SportsPrefetcher.revealAfterBoot()
             SportsPrefetcher.forceVisibleIfAttached()
         } else {
-            // Still show the page if anything painted — avoid infinite stuck loader.
+            // Never fake "offline" over a page that is still booting — that hid match data.
             showLoading = false
             SportsPrefetcher.forceVisibleIfAttached()
-            if (!SportsPrefetcher.hasHubUrl()) {
+            if (!NetworkUtils.isOnline(context) && !SportsPrefetcher.hasHubUrl()) {
                 networkError = true
+            } else {
+                pageReadyFlag = true
+                SportsPrefetcher.revealAfterBoot()
             }
         }
     }
 
-    // Watchdog: keep WebView opaque whenever hub is up (kills intermittent black screens).
+    // Watchdog: keep WebView opaque; only drop loader when truly ready.
     LaunchedEffect(accessToken, sport) {
         while (true) {
-            delay(700)
+            delay(400)
             if (networkError) continue
             SportsPrefetcher.forceVisibleIfAttached()
-            if (SportsPrefetcher.hasHubUrl() || SportsPrefetcher.isReady(accessToken, sport)) {
+            if (SportsPrefetcher.isReady(accessToken, sport)) {
+                pageReadyFlag = true
                 if (showLoading) {
-                    pageReadyFlag = true
-                } else {
-                    SportsPrefetcher.revealAfterBoot()
+                    progress = 1f
+                    showLoading = false
                 }
-                if (SportsPrefetcher.isReady(accessToken, sport)) {
-                    pageReadyFlag = true
-                }
+                SportsPrefetcher.revealAfterBoot()
+            } else if (showLoading && SportsPrefetcher.hasHubUrl()) {
+                // Progress only — keep overlay until isReady so we never flash black.
+                pageReadyFlag = true
+                if (progress < 0.95f) progress = 0.95f
             }
         }
     }
@@ -476,16 +488,16 @@ private fun SportsPreloadedWebView(
         }
         val ok = NetworkUtils.awaitReadyOrOffline(
             context = context,
-            isReady = { SportsPrefetcher.isReady(accessToken, sport) || SportsPrefetcher.hasHubUrl() },
+            isReady = { SportsPrefetcher.isReady(accessToken, sport) },
             hasError = { SportsPrefetcher.hasNetworkError() }
         )
-        // Slow match feed is not offline — only show offline when load truly failed.
-        if (!ok && !SportsPrefetcher.hasHubUrl()) {
-            networkError = true
-            showLoading = false
-        } else if (SportsPrefetcher.isReady(accessToken, sport) || SportsPrefetcher.hasHubUrl()) {
+        if (ok) {
             pageReadyFlag = true
             SportsPrefetcher.revealAfterBoot()
+            SportsPrefetcher.forceVisibleIfAttached()
+        } else if (!NetworkUtils.isOnline(context) && !SportsPrefetcher.hasHubUrl()) {
+            networkError = true
+            showLoading = false
         }
     }
 
@@ -539,13 +551,14 @@ private fun SportsPreloadedWebView(
                         onBack = {}
                     )
                 }
-                if (SportsPrefetcher.isReady(accessToken, sport) || SportsPrefetcher.hasHubUrl()) {
+                SportsPrefetcher.forceVisibleIfAttached()
+                if (SportsPrefetcher.isReady(accessToken, sport)) {
                     pageReadyFlag = true
                     if (!showLoading) {
                         SportsPrefetcher.revealAfterBoot()
                     }
-                } else if (!SportsPrefetcher.hasNetworkError() && !showLoading && !SportsPrefetcher.hasHubUrl()) {
-                    // True cold reload only — don't flash loader on LIVE re-taps / soft mode switch.
+                } else if (!SportsPrefetcher.hasNetworkError() && !showLoading) {
+                    // Reloading / stale hub — keep overlay so we never sit on black.
                     showLoading = true
                 }
                 networkError = SportsPrefetcher.hasNetworkError()

@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -19,6 +20,7 @@ import android.widget.FrameLayout
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Parks Gundu Ata (virtual web) WebView from APK open so Virtual opens instantly.
@@ -34,6 +36,9 @@ object GunduAtaPrefetcher {
     @Volatile private var networkError: Boolean = false
     /** True only while Virtual screen is showing the WebView. */
     @Volatile private var attachedVisible: Boolean = false
+    /** Compose close — game JS AndroidBridge.goBack/goHome must use this, not load /. */
+    @Volatile private var leaveHandler: (() -> Unit)? = null
+    private val bridgeAttached = AtomicBoolean(false)
     private val readyListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
     private val networkErrorListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
 
@@ -43,7 +48,8 @@ object GunduAtaPrefetcher {
         if (!accessToken.isNullOrBlank() && loadedAccess != accessToken) return false
         val url = wv.url.orEmpty()
         if (WebViewOffline.isChromeErrorUrl(url)) return false
-        return url.contains("/game") || url.contains("gunduata.tech")
+        // Only /game — site home (/) must never count as Virtual ready.
+        return url.contains("/game")
     }
 
     fun hasNetworkError(): Boolean = networkError
@@ -87,11 +93,13 @@ object GunduAtaPrefetcher {
     fun attach(
         parent: ViewGroup,
         accessToken: String,
-        refreshToken: String
+        refreshToken: String,
+        onLeave: (() -> Unit)? = null
     ): Boolean {
         val activity = resolveActivity(parent.context) ?: return false
         ensureWebView(activity)
         val wv = webView ?: return false
+        leaveHandler = onLeave
 
         (wv.parent as? ViewGroup)?.removeView(wv)
         parent.addView(
@@ -111,13 +119,13 @@ object GunduAtaPrefetcher {
         wv.evaluateJavascript(buildInjectJs(accessToken, refreshToken), null)
         unmuteAudio(wv)
 
-        // Always fetch fresh Virtual when opening (no stale parked page after reopen)
         loadGame(accessToken, refreshToken, force = true)
         return isReady(accessToken)
     }
 
     fun prepareLeave() {
         attachedVisible = false
+        leaveHandler = null
         val wv = webView ?: return
         silenceParked(wv)
         try {
@@ -127,26 +135,10 @@ object GunduAtaPrefetcher {
         }
     }
 
-    fun handleBack(onClose: () -> Unit) {
-        val wv = webView
-        if (wv != null && wv.canGoBack()) {
-            wv.goBack()
-        } else {
-            prepareLeave()
-            onClose()
-        }
-    }
-
     fun detach() {
-        attachedVisible = false
+        prepareLeave()
         val wv = webView ?: return
         val h = holder ?: return
-        silenceParked(wv)
-        try {
-            wv.alpha = 0f
-            wv.visibility = android.view.View.GONE
-        } catch (_: Exception) {
-        }
         try {
             (wv.parent as? ViewGroup)?.removeView(wv)
             if (wv.parent == null) {
@@ -157,8 +149,43 @@ object GunduAtaPrefetcher {
         }
     }
 
+    /**
+     * Hardware / gesture back: always leave Virtual.
+     * Do not WebView.goBack() — game pushState/popstate loads https://gunduata.tech/ inside WebView.
+     */
+    fun handleBack(onClose: () -> Unit) {
+        requestLeave(onClose)
+    }
+
+    private fun requestLeave(fallback: (() -> Unit)? = null) {
+        mainHandler.post {
+            val leave = leaveHandler
+            // Capture before prepareLeave clears it.
+            prepareLeave()
+            try {
+                leave?.invoke() ?: fallback?.invoke()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun isLeaveAwayUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        val lower = url.lowercase()
+        if (!lower.contains("gunduata.tech")) return false
+        if (lower.contains("/game")) return false
+        return try {
+            val path = Uri.parse(url).path.orEmpty().trimEnd('/').ifEmpty { "/" }
+            path == "/" || path == "/index.html" || path == "/ga" ||
+                path == "/casino" || path.startsWith("/casino/")
+        } catch (_: Exception) {
+            lower.endsWith("gunduata.tech/") || lower.contains("/casino")
+        }
+    }
+
     fun clear() {
         attachedVisible = false
+        leaveHandler = null
         mainHandler.post {
             try {
                 webView?.stopLoading()
@@ -172,11 +199,11 @@ object GunduAtaPrefetcher {
             loadedRefresh = null
             pageReady = false
             networkError = false
+            bridgeAttached.set(false)
             setReady(false)
         }
     }
 
-    /** Mute + pause so prefetched Virtual never plays sound on home. */
     private fun silenceParked(wv: WebView?) {
         if (wv == null) return
         try {
@@ -251,6 +278,8 @@ object GunduAtaPrefetcher {
         if (!refreshToken.isNullOrBlank()) {
             b.appendQueryParameter("refreshToken", refreshToken)
         }
+        // Tell game page to prefer AndroidBridge leave (not website /).
+        b.appendQueryParameter("from", "app")
         b.appendQueryParameter("auth", authJson)
         b.appendQueryParameter("_", System.currentTimeMillis().toString())
         return b.build().toString()
@@ -274,6 +303,8 @@ object GunduAtaPrefetcher {
                 localStorage.setItem("refreshToken", $refreshLit);
                 localStorage.setItem("refresh_token", $refreshLit);
                 localStorage.setItem("auth", $authLit);
+                try { sessionStorage.setItem("gundu_game_from", "app"); } catch (e2) {}
+                try { document.body && document.body.classList.add("in-app"); } catch (e3) {}
               } catch (e) {}
             })();
         """.trimIndent()
@@ -348,14 +379,40 @@ object GunduAtaPrefetcher {
             CookieManager.getInstance().setAcceptCookie(true)
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
+            if (bridgeAttached.compareAndSet(false, true)) {
+                // Game page: window.AndroidBridge.goBack / goHome
+                addJavascriptInterface(GunduAtaBridge(), "AndroidBridge")
+            }
+
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
                     view: WebView?,
                     request: WebResourceRequest?
-                ): Boolean = false
+                ): Boolean {
+                    val u = request?.url?.toString().orEmpty()
+                    if (attachedVisible && isLeaveAwayUrl(u)) {
+                        requestLeave()
+                        return true
+                    }
+                    return false
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                    val u = url.orEmpty()
+                    if (attachedVisible && isLeaveAwayUrl(u)) {
+                        requestLeave()
+                        return true
+                    }
+                    return false
+                }
 
                 override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                     val u = url.orEmpty()
+                    if (attachedVisible && isLeaveAwayUrl(u)) {
+                        requestLeave()
+                        return
+                    }
                     if (u.contains("/game")) {
                         setReady(false)
                         if (attachedVisible) {
@@ -365,7 +422,6 @@ object GunduAtaPrefetcher {
                             }
                         }
                     }
-                    // Prefetch must stay silent until the Virtual screen attaches
                     if (!attachedVisible) {
                         view?.evaluateJavascript(GUNDU_ATA_MUTE_JS, null)
                     }
@@ -377,6 +433,10 @@ object GunduAtaPrefetcher {
                         return
                     }
                     val u = url.orEmpty()
+                    if (attachedVisible && isLeaveAwayUrl(u)) {
+                        requestLeave()
+                        return
+                    }
                     if (u.contains("/game")) {
                         loadedAccess?.let { access ->
                             view?.evaluateJavascript(
@@ -390,7 +450,6 @@ object GunduAtaPrefetcher {
                             view?.alpha = 1f
                             unmuteAudio(view)
                         } else {
-                            // Background warm — keep ready but silent
                             silenceParked(view)
                         }
                         setReady(true)
@@ -424,6 +483,24 @@ object GunduAtaPrefetcher {
         holder?.addView(wv)
     }
 
+    /**
+     * Game page (/game/) calls AndroidBridge.goBack / goHome on HTML back.
+     * Without this, JS does location.replace('/') → website home in WebView.
+     */
+    private class GunduAtaBridge {
+        @JavascriptInterface
+        fun goBack() {
+            requestLeave()
+        }
+
+        @JavascriptInterface
+        fun goHome() {
+            requestLeave()
+        }
+
+        @JavascriptInterface
+        fun isSystemBarsInsetApplied(): Boolean = true
+    }
 }
 
 private val GUNDU_ATA_MUTE_JS = """

@@ -121,6 +121,7 @@ fun GunduAtaWebViewScreen(
                 GunduAtaPreloadedWebView(
                     accessToken = accessToken,
                     refreshToken = refreshToken.orEmpty(),
+                    onLeave = { closeScreen() },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -132,6 +133,7 @@ fun GunduAtaWebViewScreen(
 private fun GunduAtaPreloadedWebView(
     accessToken: String,
     refreshToken: String,
+    onLeave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -191,7 +193,8 @@ private fun GunduAtaPreloadedWebView(
                     val already = GunduAtaPrefetcher.attach(
                         parent = frame,
                         accessToken = accessToken,
-                        refreshToken = refreshToken
+                        refreshToken = refreshToken,
+                        onLeave = onLeave
                     )
                     if (already || GunduAtaPrefetcher.isReady(accessToken)) {
                         showLoading = false
@@ -204,7 +207,8 @@ private fun GunduAtaPreloadedWebView(
                     GunduAtaPrefetcher.attach(
                         parent = frame,
                         accessToken = accessToken,
-                        refreshToken = refreshToken
+                        refreshToken = refreshToken,
+                        onLeave = onLeave
                     )
                 }
                 if (GunduAtaPrefetcher.isReady(accessToken)) showLoading = false

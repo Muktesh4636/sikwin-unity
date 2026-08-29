@@ -41,6 +41,14 @@ object SportsPrefetcher {
     @Volatile private var pageReady: Boolean = false
     @Volatile private var networkError: Boolean = false
     @Volatile private var myBetsOpen: Boolean = false
+    /** Set when Casino (or another same-origin WebView) paused/blanked sports. */
+    @Volatile private var haltedByOtherGame: Boolean = false
+    /**
+     * After a halt/forced reload the WebView URL can still be /sports while the page is
+     * paused or mid-navigation. Treating that as "hub ready" dismissed the loader early
+     * → intermittent black LIVE screen. Cleared only when a hub page finishes loading.
+     */
+    @Volatile private var hubStale: Boolean = false
     /** Ignore rapid same-mode tab taps that re-click the hub / force-reload. */
     private var lastNavigateMode: String? = null
     private var lastNavigateAtMs: Long = 0L
@@ -105,10 +113,16 @@ object SportsPrefetcher {
     /** 0–100 progress while the hub boots under the loading overlay. */
     fun getLoadProgress(): Int = loadProgress.coerceIn(0, 100)
 
-    /** True when the WebView is already on the sports/cricket hub (even if feed still loading). */
+    /**
+     * True when the WebView is on a sports/cricket hub that is safe to treat as painted.
+     * Returns false while [hubStale] (paused/reloading) — old /sports URL must not dismiss
+     * the LIVE loader (that caused intermittent black screens).
+     */
     fun hasHubUrl(): Boolean {
+        if (hubStale || haltedByOtherGame) return false
         val url = webView?.url.orEmpty()
         if (url.isBlank() || WebViewOffline.isChromeErrorUrl(url)) return false
+        if (url.equals("about:blank", ignoreCase = true)) return false
         return url.contains("/sports") || url.contains("/cricket")
     }
 
@@ -269,6 +283,12 @@ object SportsPrefetcher {
         mode: String? = null,
         onBack: () -> Unit
     ): Boolean {
+        // Halt casino BEFORE sports load — LaunchedEffect ran too late and blanking
+        // casino mid-load froze Chromium → black LIVE screen.
+        try {
+            CasinoPrefetcher.haltForOtherWebGame()
+        } catch (_: Exception) {
+        }
         val activity = resolveActivity(parent.context) ?: return false
         ensureWebView(activity)
         val wv = webView ?: return false
@@ -288,26 +308,33 @@ object SportsPrefetcher {
         }
         wv.visibility = android.view.View.VISIBLE
         // While on LIVE screen, keep WebView opaque — Compose loader covers boot.
-        // Alpha 0 + dismissed overlay was the intermittent black screen.
         wv.alpha = if (networkError) 0f else 1f
         waitingForOverlayReveal = false
         val blank = wv.url.isNullOrBlank() ||
             wv.url.equals("about:blank", ignoreCase = true) ||
-            WebViewOffline.isChromeErrorUrl(wv.url.orEmpty())
-        val needsReload = loadedAccess != accessToken ||
-            sportChanged(sport) ||
-            modeChanged(mode) ||
-            !pageReady ||
-            networkError ||
-            blank
-        if (needsReload) {
-            clearHistoryAfterHubLoad = true
-        }
+            WebViewOffline.isChromeErrorUrl(wv.url.orEmpty()) ||
+            haltedByOtherGame
+        // Always reload when LIVE opens so match feed XHR runs while WebView is resumed.
+        // Skipping reload after halt/onPause left an empty "Loading…" feed.
+        haltedByOtherGame = false
+        if (blank) hubStale = true
+        pageReady = false
+        setReady(false)
+        clearHistoryAfterHubLoad = true
+        setLoadProgress(2, force = true)
         if (!accessToken.isNullOrBlank()) {
             wv.evaluateJavascript(buildInjectJs(accessToken, refreshToken.orEmpty()), null)
         }
-        loadSports(accessToken, refreshToken, sport, mode, force = needsReload)
-        return isReady(accessToken, sport)
+        mainHandler.post {
+            if (!attachedVisible) return@post
+            applyAttachedVisibility()
+            try {
+                wv.onResume()
+            } catch (_: Exception) {
+            }
+            loadSports(accessToken, refreshToken, sport, mode, force = true)
+        }
+        return false
     }
 
     /** Show the parked WebView after the Compose loading overlay hits 100%. */
@@ -475,21 +502,28 @@ object SportsPrefetcher {
     /** Pause sports JS when opening Casino so shared Chromium isn't contended. */
     fun haltForOtherWebGame() {
         val work = Runnable {
+            val wasOnScreen = attachedVisible
             attachedVisible = false
+            haltedByOtherGame = true
+            hubStale = true
             cancelFeedPoll()
             try {
                 webView?.stopLoading()
-                webView?.loadUrl("about:blank")
-                webView?.onPause()
+                // Do NOT onPause — shared Chromium; pausing one WebView freezes the other.
+                // webView?.onPause()
+                // Always clear ready so next LIVE open shows loader + resumes cleanly
+                // (soft onPause alone left pageReady=true → black screen with no overlay).
+                pageReady = false
+                setReady(false)
+                setLoadProgress(0, force = true)
+                if (wasOnScreen) {
+                    webView?.loadUrl("about:blank")
+                    loadedAccess = null
+                }
             } catch (_: Exception) {
             }
-            pageReady = false
             waitingForOverlayReveal = false
-            setReady(false)
-            setLoadProgress(0, force = true)
-            loadedAccess = null
         }
-        // Must run before Casino attach — async post raced AndroidView.factory and glitched lobby.
         if (Looper.myLooper() == Looper.getMainLooper()) {
             work.run()
         } else {
@@ -628,6 +662,7 @@ object SportsPrefetcher {
     private fun setReady(ready: Boolean) {
         pageReady = ready
         if (ready) {
+            hubStale = false
             setLoadProgress(100)
         }
         readyListeners.forEach {
@@ -692,8 +727,10 @@ object SportsPrefetcher {
             networkError = false
             notifyNetworkError(false)
             try {
-                applyAttachedVisibility()
-                if (!attachedVisible) {
+                if (attachedVisible) {
+                    waitingForOverlayReveal = false
+                    applyAttachedVisibility()
+                } else {
                     view.alpha = if (waitingForOverlayReveal) 0f else 1f
                 }
             } catch (_: Exception) {
@@ -720,8 +757,10 @@ object SportsPrefetcher {
                         networkError = false
                         notifyNetworkError(false)
                         try {
-                            applyAttachedVisibility()
-                            if (!attachedVisible) {
+                            if (attachedVisible) {
+                                waitingForOverlayReveal = false
+                                applyAttachedVisibility()
+                            } else {
                                 view.alpha = if (waitingForOverlayReveal) 0f else 1f
                             }
                         } catch (_: Exception) {
@@ -734,8 +773,10 @@ object SportsPrefetcher {
             } catch (_: Exception) {
                 mainHandler.removeCallbacks(hangWatch)
                 try {
-                    applyAttachedVisibility()
-                    if (!attachedVisible) {
+                    if (attachedVisible) {
+                        waitingForOverlayReveal = false
+                        applyAttachedVisibility()
+                    } else {
                         view.alpha = if (waitingForOverlayReveal) 0f else 1f
                     }
                 } catch (_: Exception) {
@@ -951,12 +992,69 @@ object SportsPrefetcher {
             (function(){
               try {
                 var f = document.getElementById('feed');
-                if (!f || f.querySelector('.card') || f.querySelector('.empty') || f.querySelector('.error')) return;
-                var btn = document.querySelector('.sport-tab.active');
+                if (f && (f.querySelector('.card') || f.querySelector('.empty') || f.querySelector('.error'))) return;
+                if (document.querySelector('.match-card') || document.querySelector('[data-event-id]')) return;
+                // /cricket/ list first (do NOT call load — that is match-odds inside renderMatch)
+                if (typeof renderList === 'function') { renderList(); return; }
+                // /sports/ hub
+                if (typeof loadFeed === 'function') { loadFeed({ soft: false }); return; }
+                var btn = document.querySelector('.sport-tab.active') || document.querySelector('[data-tab="live"]');
                 if (btn) btn.click();
               } catch (e) {}
             })();
         """.trimIndent()
+    }
+
+
+    private var feedContentCheck: Runnable? = null
+
+    private fun scheduleFeedContentCheck(view: WebView?, accessToken: String?, refreshToken: String?, sport: String?, mode: String?, attempt: Int = 0) {
+        feedContentCheck?.let { mainHandler.removeCallbacks(it) }
+        if (view == null || !attachedVisible) return
+        val r = Runnable {
+            if (!attachedVisible) return@Runnable
+            try {
+                view.evaluateJavascript(
+                    """
+                    (function(){
+                      var f = document.getElementById('feed');
+                      if (f) {
+                        if (f.querySelector('.card') || f.querySelector('.empty') || f.querySelector('.error')) return 'ok';
+                        return 'empty';
+                      }
+                      if (document.querySelector('.match-card') || document.querySelector('[data-event-id]') ||
+                          document.querySelector('.error')) return 'ok';
+                      if (document.querySelector('.loading')) return 'loading';
+                      return 'empty';
+                    })();
+                    """.trimIndent()
+                ) { raw ->
+                    val v = raw?.trim()?.trim('"').orEmpty()
+                    when {
+                        v == "ok" -> {
+                            hubStale = false
+                            setReady(true)
+                            forceVisibleIfAttached()
+                        }
+                        attempt < 3 -> scheduleFeedContentCheck(view, accessToken, refreshToken, sport, mode, attempt + 1)
+                        attempt == 3 -> {
+                            loadSports(accessToken, refreshToken, sport, mode, force = true)
+                            mainHandler.postDelayed({
+                                scheduleFeedContentCheck(webView, accessToken, refreshToken, sport, mode, 4)
+                            }, 2500L)
+                        }
+                        else -> {
+                            setReady(true)
+                            forceVisibleIfAttached()
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                setReady(true)
+            }
+        }
+        feedContentCheck = r
+        mainHandler.postDelayed(r, if (attempt == 0) 800L else 1000L)
     }
 
     private fun loadSports(
@@ -996,21 +1094,29 @@ object SportsPrefetcher {
         val alreadyShowing = !blank &&
             wv.url.orEmpty().let { it.contains("/sports") || it.contains("/cricket") }
         // Soft-reload under Compose loader — keep WebView opaque while attached (no black flash).
+        // hubStale only when document is blank/unknown — not every force reload (aborted feed XHR).
         if (force || blank || !alreadyShowing || !pageReady) {
-            waitingForOverlayReveal = !attachedVisible
+            if (blank || !alreadyShowing) hubStale = true
+            waitingForOverlayReveal = false
             setLoadProgress(2, force = true)
             setReady(false)
-            if (!attachedVisible) {
+            if (attachedVisible) {
+                applyAttachedVisibility()
+            } else {
+                waitingForOverlayReveal = true
                 try {
                     wv.alpha = 0f
                 } catch (_: Exception) {
                 }
-            } else {
-                applyAttachedVisibility()
             }
         }
         try {
-            wv.loadUrl(url)
+            try {
+            wv.settings.cacheMode = if (force) android.webkit.WebSettings.LOAD_NO_CACHE
+                else android.webkit.WebSettings.LOAD_DEFAULT
+        } catch (_: Exception) {
+        }
+        wv.loadUrl(url)
         } catch (_: Exception) {
             markOffline(wv)
         }
@@ -1113,6 +1219,7 @@ object SportsPrefetcher {
                     }
                     val u = url.orEmpty()
                     if (u.contains("/sports") || u.contains("/cricket")) {
+                        hubStale = false
                         val access = loadedAccess
                         if (!access.isNullOrBlank()) {
                             view?.evaluateJavascript(
@@ -1130,11 +1237,22 @@ object SportsPrefetcher {
                             null
                         )
                         view?.evaluateJavascript(buildFeedNudgeJs(), null)
+                        if (attachedVisible) {
+                            scheduleFeedContentCheck(
+                                view,
+                                loadedAccess,
+                                loadedRefresh,
+                                loadedSport,
+                                loadedMode
+                            )
+                        }
                         networkError = false
                         notifyNetworkError(false)
                         setLoadProgress(90)
                         try {
+                            // Never leave attached LIVE at alpha 0 (waitingForOverlayReveal caused black screens).
                             if (attachedVisible) {
+                                waitingForOverlayReveal = false
                                 applyAttachedVisibility()
                             } else {
                                 view?.alpha = if (waitingForOverlayReveal) 0f else 1f

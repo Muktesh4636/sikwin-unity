@@ -319,7 +319,7 @@ private fun CasinoPreloadedWebView(
         CasinoPrefetcher.forceVisibleIfAttached()
     }
 
-    // Watchdog: keep WebView opaque whenever casino screen is up.
+    // Watchdog: keep WebView opaque; only drop loader when truly ready.
     LaunchedEffect(accessToken) {
         while (true) {
             delay(400)
@@ -331,14 +331,18 @@ private fun CasinoPreloadedWebView(
                     progress = 1f
                     showLoading = false
                 }
+                CasinoPrefetcher.revealAfterBoot()
+            } else if (showLoading && CasinoPrefetcher.hasCasinoUrl()) {
+                // Progress only — keep overlay until isReady (never flash black on stale URL).
+                if (progress < 0.95f) progress = 0.95f
             }
         }
     }
 
-    // Hard failsafe: dismiss loader quickly once lobby is ready.
+    // Hard failsafe: never leave Casino stuck on the loader OR dismiss into black.
     LaunchedEffect(showLoading, accessToken) {
         if (!showLoading) return@LaunchedEffect
-        repeat(30) {
+        repeat(20) {
             delay(200)
             if (!showLoading || networkError) return@LaunchedEffect
             if (CasinoPrefetcher.isReady(accessToken)) {
@@ -349,9 +353,41 @@ private fun CasinoPreloadedWebView(
                 CasinoPrefetcher.forceVisibleIfAttached()
                 return@LaunchedEffect
             }
+            if (CasinoPrefetcher.hasCasinoUrl() && progress < 0.95f) {
+                progress = 0.95f
+            }
         }
-        // Still not ready — keep overlay, but never leave alpha 0 underneath.
+        // Still stuck — force a reload once.
+        if (!showLoading || networkError) return@LaunchedEffect
+        statusText = "Retrying…"
+        progress = 0.2f
+        CasinoPrefetcher.retry(accessToken)
+        repeat(20) {
+            delay(250)
+            if (!showLoading || networkError) return@LaunchedEffect
+            if (CasinoPrefetcher.isReady(accessToken)) {
+                ready = true
+                progress = 1f
+                showLoading = false
+                CasinoPrefetcher.revealAfterBoot()
+                CasinoPrefetcher.forceVisibleIfAttached()
+                return@LaunchedEffect
+            }
+        }
+        // Give up spinner — reveal WebView if online; never fake offline over a loading lobby.
         CasinoPrefetcher.forceVisibleIfAttached()
+        if (CasinoPrefetcher.isReady(accessToken)) {
+            ready = true
+            showLoading = false
+            CasinoPrefetcher.revealAfterBoot()
+        } else if (!NetworkUtils.isOnline(context) && !CasinoPrefetcher.hasCasinoUrl()) {
+            networkError = true
+            showLoading = false
+        } else {
+            ready = true
+            showLoading = false
+            CasinoPrefetcher.revealAfterBoot()
+        }
     }
 
     LaunchedEffect(accessToken, networkError) {
@@ -363,15 +399,17 @@ private fun CasinoPreloadedWebView(
         }
         val ok = NetworkUtils.awaitReadyOrOffline(
             context = context,
+            offlineMs = NetworkUtils.OFFLINE_UI_MS,
+            loadMs = 12_000L,
             isReady = { CasinoPrefetcher.isReady(accessToken) },
             hasError = { CasinoPrefetcher.hasNetworkError() }
         )
-        if (!ok) {
-            networkError = true
-            showLoading = false
-        } else {
+        if (ok) {
             ready = true
             CasinoPrefetcher.forceVisibleIfAttached()
+        } else if (!NetworkUtils.isOnline(context) && !CasinoPrefetcher.hasCasinoUrl()) {
+            networkError = true
+            showLoading = false
         }
     }
 

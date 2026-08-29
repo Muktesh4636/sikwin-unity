@@ -272,6 +272,8 @@ fun AppNavigation(
         }
         com.sikwin.app.utils.EventLogger.click("open_sports", mapOf("dest" to dest, "sport" to (sport ?: "")))
         try {
+            // Soft-halt casino before LIVE so first sports frame isn't contending Chromium.
+            CasinoPrefetcher.haltForOtherWebGame()
             navController.navigate(dest) {
                 launchSingleTop = true
             }
